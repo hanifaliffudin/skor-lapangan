@@ -1,0 +1,17 @@
+{
+  "name": "skor-lapangan",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "build": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/web build",
+    "dev": "pnpm --filter @skor-lapangan/web dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm --filter @skor-lapangan/scoring-core test && pnpm --filter @skor-lapangan/web test",
+    "typecheck": "pnpm --filter @skor-lapangan/scoring-core typecheck && pnpm --filter @skor-lapangan/web typecheck"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}
