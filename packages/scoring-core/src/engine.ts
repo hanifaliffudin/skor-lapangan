@@ -233,6 +233,7 @@ function validateOverride(points: Record<TeamId, number>): void {
 function applyOverride(
   state: MatchState,
   points: Record<TeamId, number>,
+  definition: MatchDefinition,
 ): MatchState {
   validateOverride(points);
   const positions = { ...state.positions };
@@ -258,7 +259,16 @@ function applyOverride(
     positions[state.servingTeam] = swapPosition(currentPosition);
   }
 
-  return { ...state, points: clonePoints(points), positions };
+  const next = { ...state, points: clonePoints(points), positions };
+  const gameWinner = (["A", "B"] as const).find((team) =>
+    hasWonGame(
+      definition.sport,
+      next.points[team],
+      next.points[otherTeam(team)],
+    ),
+  );
+
+  return gameWinner ? completeGameIfNeeded(next, definition, gameWinner) : next;
 }
 
 function applyDomainEvent(
@@ -271,7 +281,7 @@ function applyDomainEvent(
   }
 
   if (event.type === "state_overridden") {
-    return applyOverride(state, event.points);
+    return applyOverride(state, event.points, definition);
   }
 
   return definition.sport === "badminton"
@@ -386,6 +396,10 @@ export function overrideState(
   metadata: EventMetadata,
 ): MatchJournal {
   validateOverride(points);
+  if (deriveJournal(journal).state.status === "complete") {
+    return journal;
+  }
+
   return {
     ...journal,
     events: [

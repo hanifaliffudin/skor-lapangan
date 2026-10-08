@@ -1,58 +1,21 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MatchMode, Sport } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
-import { useAuth } from "../../lib/auth";
 import { useLocale } from "../../lib/i18n";
 import { saveDraft } from "../../lib/session";
-import { getGoogleProviderStatus, signInWithGoogle } from "../../lib/supabase";
 import styles from "../../styles/App.module.css";
 
 export function HomePage() {
   const navigate = useNavigate();
   const { t } = useLocale();
-  const { user } = useAuth();
   const [sport, setSport] = useState<Sport>("badminton");
   const [mode, setMode] = useState<MatchMode>("casual");
-  const [loginState, setLoginState] = useState<
-    | "idle"
-    | "checking"
-    | "not_configured"
-    | "provider_disabled"
-    | "unreachable"
-    | "error"
-  >("idle");
-  const loginDialog = useRef<HTMLDialogElement>(null);
 
   function continueToSetup() {
     saveDraft({ sport, mode });
     navigate("/setup");
   }
-
-  async function beginGoogleLogin() {
-    setLoginState("checking");
-    const provider = await getGoogleProviderStatus();
-    if (!provider.available) {
-      setLoginState(provider.reason);
-      loginDialog.current?.showModal();
-      return;
-    }
-
-    const result = await signInWithGoogle();
-    if (result.error) {
-      setLoginState("error");
-      loginDialog.current?.showModal();
-    }
-  }
-
-  const loginMessage =
-    loginState === "provider_disabled"
-      ? t("loginProviderDisabled")
-      : loginState === "not_configured"
-        ? t("loginNotConfigured")
-        : loginState === "unreachable"
-          ? t("loginUnreachable")
-          : t("loginError");
 
   return (
     <div className={styles.pageShell}>
@@ -118,28 +81,7 @@ export function HomePage() {
           >
             {t("continue")} <span aria-hidden="true">→</span>
           </button>
-
-          {user ? (
-            <p className={styles.signedInNote}>{t("signedInNote")}</p>
-          ) : (
-            <>
-              <div className={styles.divider}>
-                <span>atau / or</span>
-              </div>
-              <button
-                className={styles.secondaryButton}
-                type="button"
-                disabled={loginState === "checking"}
-                onClick={() => void beginGoogleLogin()}
-              >
-                <span className={styles.googleMark} aria-hidden="true">
-                  G
-                </span>
-                {loginState === "checking" ? t("checkingGoogle") : t("google")}
-              </button>
-              <p className={styles.guestNote}>{t("guestNote")}</p>
-            </>
-          )}
+          <p className={styles.guestNote}>{t("guestNote")}</p>
         </section>
       </main>
 
@@ -147,18 +89,6 @@ export function HomePage() {
         <span>{t("officialRules")}</span>
         <span>{t("officialHint")}</span>
       </footer>
-
-      <dialog className={styles.dialog} ref={loginDialog}>
-        <div className={styles.dialogBody}>
-          <h2>{t("loginUnavailableTitle")}</h2>
-          <p>{loginMessage}</p>
-          <form method="dialog">
-            <button className={styles.primaryButton} type="submit">
-              {t("close")}
-            </button>
-          </form>
-        </div>
-      </dialog>
     </div>
   );
 }

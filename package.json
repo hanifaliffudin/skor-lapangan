@@ -7,7 +7,7 @@
     "dev": "pnpm --filter @skor-lapangan/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm --filter @skor-lapangan/scoring-core test && pnpm --filter @skor-lapangan/web test",
+    "test": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/scoring-core test && pnpm --filter @skor-lapangan/web test",
     "typecheck": "pnpm --filter @skor-lapangan/scoring-core typecheck && pnpm --filter @skor-lapangan/web typecheck"
   },
   "devDependencies": {

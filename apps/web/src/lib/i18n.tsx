@@ -26,21 +26,8 @@ const messages = {
     casualHint: "Cepat dan sederhana",
     refereeHint: "Kontrol lebih lengkap",
     continue: "Lanjut atur pemain",
-    google: "Masuk dengan Google",
-    checkingGoogle: "Memeriksa Google login…",
-    signOut: "Keluar",
-    signedInNote: "Login aktif. Pertandingan akan disinkronkan ke akun ini.",
     guestNote:
       "Pertandingan tamu tersimpan di tab ini dan hilang saat tab ditutup.",
-    loginUnavailableTitle: "Google login belum siap",
-    loginProviderDisabled:
-      "Koneksi Supabase aktif, tetapi provider Google belum diaktifkan di dashboard.",
-    loginNotConfigured:
-      "Konfigurasi Supabase belum ditemukan pada aplikasi ini.",
-    loginUnreachable:
-      "Status Google login tidak dapat diperiksa. Periksa koneksi lalu coba lagi.",
-    loginError: "Google login gagal dimulai. Silakan coba lagi.",
-    close: "Tutup",
     back: "Kembali",
     setupTitle: "Siapa yang bermain?",
     setupIntro:
@@ -77,12 +64,6 @@ const messages = {
     sets: "Game menang",
     officialRules: "Official Rules",
     officialHint: "Aturan standar federasi, dikunci",
-    syncing: "Menyinkronkan…",
-    synced: "Tersimpan",
-    syncFailed: "Sinkronisasi gagal",
-    retry: "Coba lagi",
-    endBodySignedIn:
-      "Pertandingan akan ditutup dari tab ini. Riwayat yang sudah tersinkron tetap tersimpan.",
   },
   en: {
     appName: "Skor Lapangan",
@@ -99,20 +80,8 @@ const messages = {
     casualHint: "Fast and simple",
     refereeHint: "More match controls",
     continue: "Continue to player setup",
-    google: "Continue with Google",
-    checkingGoogle: "Checking Google login…",
-    signOut: "Sign out",
-    signedInNote: "Signed in. Matches will sync to this account.",
     guestNote:
       "Guest matches stay in this tab and disappear when the tab is closed.",
-    loginUnavailableTitle: "Google login is not ready",
-    loginProviderDisabled:
-      "Supabase is connected, but the Google provider is not enabled in the dashboard.",
-    loginNotConfigured: "Supabase configuration was not found in this app.",
-    loginUnreachable:
-      "Google login status could not be checked. Check the connection and try again.",
-    loginError: "Google login could not start. Please try again.",
-    close: "Close",
     back: "Back",
     setupTitle: "Who is playing?",
     setupIntro:
@@ -150,12 +119,6 @@ const messages = {
     sets: "Games won",
     officialRules: "Official Rules",
     officialHint: "Locked federation-standard rules",
-    syncing: "Syncing…",
-    synced: "Saved",
-    syncFailed: "Sync failed",
-    retry: "Retry",
-    endBodySignedIn:
-      "This match will close in this tab. Synced history will remain saved.",
   },
 } as const;
 
@@ -171,7 +134,7 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>(() =>
-    window.localStorage.getItem("skor-lapangan:locale") === "en" ? "en" : "id",
+    window.localStorage.getItem("skor-lapangan:locale") === "id" ? "id" : "en",
   );
 
   useEffect(() => {

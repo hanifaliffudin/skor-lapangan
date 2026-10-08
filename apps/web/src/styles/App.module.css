@@ -70,30 +70,10 @@
   background: var(--ink);
 }
 
-.headerControls,
-.accountMenu {
+.headerControls {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.accountEmail {
-  max-width: 210px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.accountMenu button {
-  min-height: 44px;
-  padding: 6px 10px;
-  color: var(--cobalt-dark);
-  border: 0;
-  background: transparent;
-  font-size: 12px;
-  font-weight: 850;
 }
 
 .homeMain {
@@ -270,52 +250,10 @@
   background: var(--danger);
 }
 
-.divider {
-  height: 45px;
-  display: flex;
-  align-items: center;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.divider::before,
-.divider::after {
-  height: 1px;
-  flex: 1;
-  content: "";
-  background: var(--line);
-}
-
-.divider span {
-  padding: 0 12px;
-}
-
-.googleMark {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  color: var(--cobalt);
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  font-weight: 900;
-}
-
 .guestNote {
   margin: 14px auto 0;
   max-width: 480px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.signedInNote {
-  margin: 20px 0 0;
-  padding: 12px 14px;
-  color: var(--ink);
-  border: 1px solid var(--lime-dark);
-  background: #efffe6;
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
@@ -453,43 +391,6 @@
   border-radius: 7px;
   background: var(--surface);
   font-size: 12px;
-}
-
-.matchStatusGroup {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-}
-
-.syncStatus {
-  min-height: 32px;
-  padding: 4px 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  background: var(--surface);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.syncStatus[data-status="synced"] {
-  color: var(--lime-dark);
-}
-
-.syncStatus[data-status="error"] {
-  color: var(--danger);
-}
-
-.syncStatus button {
-  min-height: 32px;
-  padding: 2px 5px;
-  color: inherit;
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  background: transparent;
-  font: inherit;
 }
 
 .rulesBadge span {
@@ -861,12 +762,7 @@
     display: none;
   }
 
-  .accountEmail {
-    display: none;
-  }
-
-  .headerControls,
-  .accountMenu {
+  .headerControls {
     gap: 5px;
   }
 

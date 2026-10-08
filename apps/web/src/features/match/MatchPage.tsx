@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   awardRally,
@@ -11,10 +11,8 @@ import {
   type TeamId,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
-import { useAuth } from "../../lib/auth";
 import { useLocale } from "../../lib/i18n";
 import { loadMatch, removeMatch, saveMatch } from "../../lib/session";
-import { syncJournal } from "../../lib/sync";
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
 import styles from "../../styles/App.module.css";
@@ -28,47 +26,15 @@ export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { t } = useLocale();
-  const { user } = useAuth();
   const [journal, setJournal] = useState<MatchJournal | null>(() =>
     matchId ? loadMatch(matchId) : null,
   );
-  const [syncStatus, setSyncStatus] = useState<
-    "idle" | "syncing" | "synced" | "error"
-  >("idle");
-  const [syncError, setSyncError] = useState("");
-  const syncRequest = useRef(0);
   const overrideDialog = useRef<HTMLDialogElement>(null);
   const endDialog = useRef<HTMLDialogElement>(null);
   const view = useMemo(
     () => (journal ? deriveJournal(journal) : null),
     [journal],
   );
-
-  async function sync(next: MatchJournal) {
-    if (!user) return;
-    const request = ++syncRequest.current;
-    setSyncStatus("syncing");
-    const result = await syncJournal(next, user.id);
-    if (request !== syncRequest.current) return;
-
-    if (result.status === "synced") {
-      setSyncError("");
-      setSyncStatus("synced");
-    } else if (result.status === "failed") {
-      setSyncError(result.error);
-      setSyncStatus("error");
-    }
-  }
-
-  useEffect(() => {
-    if (!journal || !user) {
-      setSyncStatus("idle");
-      return;
-    }
-
-    const timer = window.setTimeout(() => void sync(journal), 250);
-    return () => window.clearTimeout(timer);
-  }, [journal, user]);
 
   function commit(next: MatchJournal) {
     setJournal(next);
@@ -124,37 +90,9 @@ export function MatchPage() {
               {t("game")} {state.gameNumber}
             </h1>
           </div>
-          <div className={styles.matchStatusGroup}>
-            <div className={styles.rulesBadge}>
-              <strong>{t("officialRules")}</strong>
-              <span aria-hidden="true">✓</span>
-            </div>
-            {user && syncStatus !== "idle" ? (
-              <div
-                className={styles.syncStatus}
-                data-status={syncStatus}
-                role="status"
-                title={syncError || undefined}
-              >
-                <span aria-hidden="true">
-                  {syncStatus === "synced"
-                    ? "✓"
-                    : syncStatus === "error"
-                      ? "!"
-                      : "↻"}
-                </span>
-                {syncStatus === "syncing"
-                  ? t("syncing")
-                  : syncStatus === "synced"
-                    ? t("synced")
-                    : t("syncFailed")}
-                {syncStatus === "error" ? (
-                  <button type="button" onClick={() => void sync(journal)}>
-                    {t("retry")}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
+          <div className={styles.rulesBadge}>
+            <strong>{t("officialRules")}</strong>
+            <span aria-hidden="true">✓</span>
           </div>
         </div>
 
@@ -184,6 +122,7 @@ export function MatchPage() {
                 className={styles.scoreButton}
                 type="button"
                 aria-label={`${t("correction")}: ${definition.teams[team].name}`}
+                disabled={state.status === "complete"}
                 onClick={() => overrideDialog.current?.showModal()}
               >
                 {state.points[team]}
@@ -235,6 +174,7 @@ export function MatchPage() {
             <button
               className={styles.controlButton}
               type="button"
+              disabled={state.status === "complete"}
               onClick={() => overrideDialog.current?.showModal()}
             >
               <span aria-hidden="true">✎</span> {t("correction")}
@@ -262,7 +202,7 @@ export function MatchPage() {
       <dialog className={styles.dialog} ref={endDialog}>
         <div className={styles.dialogBody}>
           <h2>{state.status === "complete" ? t("newMatch") : t("endTitle")}</h2>
-          <p>{user ? t("endBodySignedIn") : t("endBody")}</p>
+          <p>{t("endBody")}</p>
           <div className={styles.dialogActions}>
             <button
               className={styles.secondaryButton}

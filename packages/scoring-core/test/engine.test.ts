@@ -186,6 +186,35 @@ describe("journal corrections", () => {
     expect(game.events[0]?.type).toBe("state_overridden");
   });
 
+  it.each([
+    ["badminton", { A: 21, B: 8 }],
+    ["pickleball", { A: 11, B: 3 }],
+  ] as const)(
+    "advances to the next game when a %s override is a winning score",
+    (sport, points) => {
+      const game = overrideState(journal(sport), points, metadata());
+      const state = deriveJournal(game).state;
+
+      expect(state.gameNumber).toBe(2);
+      expect(state.gamesWon).toEqual({ A: 1, B: 0 });
+      expect(state.points).toEqual({ A: 0, B: 0 });
+      expect(state.completedGames).toEqual([{ winner: "A", score: points }]);
+    },
+  );
+
+  it("finishes a match from winning overrides and ignores later corrections", () => {
+    let game = overrideState(journal("badminton"), { A: 21, B: 8 }, metadata());
+    game = overrideState(game, { A: 22, B: 20 }, metadata());
+
+    const completed = deriveJournal(game).state;
+    expect(completed.status).toBe("complete");
+    expect(completed.winner).toBe("A");
+    expect(completed.gamesWon).toEqual({ A: 2, B: 0 });
+
+    const ignored = overrideState(game, { A: 0, B: 0 }, metadata());
+    expect(ignored).toBe(game);
+  });
+
   it("rejects negative and fractional overrides", () => {
     expect(() =>
       overrideState(journal("badminton"), { A: -1, B: 0 }, metadata()),
