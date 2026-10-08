@@ -10,12 +10,13 @@ create table public.matches (
   current_state jsonb not null,
   last_client_sequence bigint not null default 0 check (last_client_sequence >= 0),
   created_at timestamptz not null,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (id, owner_id)
 );
 
 create table public.match_events (
   id uuid primary key,
-  match_id uuid not null references public.matches(id) on delete cascade,
+  match_id uuid not null,
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   client_sequence bigint not null check (client_sequence > 0),
   event_type text not null check (
@@ -23,6 +24,9 @@ create table public.match_events (
   ),
   payload jsonb not null,
   created_at timestamptz not null,
+  foreign key (match_id, owner_id)
+    references public.matches(id, owner_id)
+    on delete cascade,
   unique (match_id, client_sequence)
 );
 
@@ -109,12 +113,4 @@ create policy "owners_insert_match_events"
 on public.match_events
 for insert
 to authenticated
-with check (
-  (select auth.uid()) = owner_id
-  and exists (
-    select 1
-    from public.matches
-    where matches.id = match_events.match_id
-      and matches.owner_id = (select auth.uid())
-  )
-);
+with check ((select auth.uid()) = owner_id);
