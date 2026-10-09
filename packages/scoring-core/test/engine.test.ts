@@ -153,6 +153,47 @@ describe("pickleball doubles", () => {
     expect(state.servingTeam).toBe("A");
     expect(state.serverNumber).toBe(1);
   });
+
+  it("starts an odd-score service turn with the player physically on the left", () => {
+    let game = rallies(journal("pickleball"), [
+      "B",
+      "A",
+      "A",
+      "A",
+      "B",
+      "B",
+      "B",
+      "A",
+      "A",
+    ]);
+    const state = deriveJournal(game).state;
+
+    expect(state.points).toEqual({ A: 1, B: 1 });
+    expect(state.servingTeam).toBe("A");
+    expect(state.serverNumber).toBe(1);
+    expect(state.positions.A).toEqual({ left: 0, right: 1 });
+    expect(state.currentServer).toBe(0);
+    expect(servingSide(state)).toBe("left");
+
+    game = awardRally(game, "B", metadata());
+    const secondServer = deriveJournal(game).state;
+    expect(secondServer.servingTeam).toBe("A");
+    expect(secondServer.serverNumber).toBe(2);
+    expect(secondServer.currentServer).toBe(1);
+    expect(servingSide(secondServer)).toBe("right");
+  });
+
+  it("starts an odd-score side-out from the left service court", () => {
+    let game = rallies(journal("pickleball"), ["A"]);
+    game = rallies(game, ["B"]);
+    game = rallies(game, ["A"]);
+    game = awardRally(game, "A", metadata());
+
+    const state = deriveJournal(game).state;
+    expect(state.servingTeam).toBe("A");
+    expect(state.points.A).toBe(1);
+    expect(servingSide(state)).toBe("left");
+  });
 });
 
 describe("journal corrections", () => {
@@ -228,5 +269,82 @@ describe("journal corrections", () => {
     const game = awardRally(journal("badminton"), "A", metadata());
     const duplicated = { ...game, events: [...game.events, game.events[0]!] };
     expect(deriveJournal(duplicated).state.points).toEqual({ A: 1, B: 0 });
+  });
+});
+
+describe("match-scoped custom rules", () => {
+  it("uses the stored target, win-by rule, and best-of configuration", () => {
+    const base = definition("badminton");
+    const custom: MatchDefinition = {
+      ...base,
+      rulesetId: "guest-rules-1",
+      ruleset: {
+        id: "guest-rules-1",
+        name: "Short game",
+        sport: "badminton",
+        source: "guest_custom",
+        version: 1,
+        configuration: {
+          pointsToWin: 3,
+          winBy: 1,
+          maxPoints: null,
+          bestOf: 1,
+          scoringMode: "rally",
+          serversPerTurn: 1,
+          openingServerNumber: 1,
+        },
+      },
+    };
+
+    const game = rallies({ definition: custom, events: [] }, [
+      "A",
+      "B",
+      "A",
+      "B",
+      "A",
+    ]);
+    const state = deriveJournal(game).state;
+
+    expect(state.status).toBe("complete");
+    expect(state.winner).toBe("A");
+    expect(state.completedGames).toEqual([
+      { winner: "A", score: { A: 3, B: 2 } },
+    ]);
+  });
+
+  it("supports a single-server side-out turn for a guest match", () => {
+    const base = definition("pickleball");
+    const custom: MatchDefinition = {
+      ...base,
+      rulesetId: "guest-one-server",
+      ruleset: {
+        id: "guest-one-server",
+        name: "One server",
+        sport: "pickleball",
+        source: "guest_custom",
+        version: 1,
+        configuration: {
+          pointsToWin: 11,
+          winBy: 2,
+          maxPoints: null,
+          bestOf: 3,
+          scoringMode: "side_out",
+          serversPerTurn: 1,
+          openingServerNumber: 2,
+        },
+      },
+    };
+
+    const afterInitialServe = awardRally(
+      { definition: custom, events: [] },
+      "B",
+      metadata(),
+    );
+    const state = deriveJournal(afterInitialServe).state;
+
+    expect(state.points).toEqual({ A: 0, B: 0 });
+    expect(state.servingTeam).toBe("B");
+    expect(state.serverNumber).toBe(1);
+    expect(servingSide(state)).toBe("right");
   });
 });

@@ -1,10 +1,11 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { overrideState, type MatchJournal } from "@skor-lapangan/scoring-core";
 import { App } from "./App";
 import { LocaleProvider } from "./lib/i18n";
+import { listGuestMatches, saveMatch } from "./lib/session";
 
 function completedMatch(): MatchJournal {
   const createdAt = "2026-10-08T00:00:00.000Z";
@@ -55,13 +56,26 @@ function completedMatch(): MatchJournal {
   );
 }
 
+const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks");
+
+function restoreLocks() {
+  if (originalLocks) {
+    Object.defineProperty(navigator, "locks", originalLocks);
+  } else {
+    Reflect.deleteProperty(navigator, "locks");
+  }
+}
+
 describe("quick start", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    restoreLocks();
+  });
 
   it("defaults to English and can switch to Indonesian", async () => {
     const user = userEvent.setup();
@@ -129,7 +143,7 @@ describe("quick start", () => {
     );
   });
 
-  it("runs as guest without offering account sign-in", () => {
+  it("starts without requiring an account", () => {
     render(
       <MemoryRouter>
         <LocaleProvider>
@@ -140,12 +154,85 @@ describe("quick start", () => {
 
     expect(
       screen.getByText(
-        "Guest matches stay in this tab and disappear when the tab is closed.",
+        "Guest matches stay on this device for up to 12 hours after the last activity.",
       ),
     ).toBeVisible();
-    expect(
-      screen.queryByRole("button", { name: /google|sign in|login/i }),
-    ).not.toBeInTheDocument();
+  });
+
+  it("offers an active match after the tab is reopened on the same device", async () => {
+    const user = userEvent.setup();
+    const match = completedMatch();
+    saveMatch({ definition: match.definition, events: [] });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Resume match/ }));
+    expect(screen.getByRole("heading", { name: "Game 1" })).toBeVisible();
+  });
+
+  it("creates a match with a local-only custom rules snapshot", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: /Custom rules for this match/ }),
+    );
+    await user.clear(screen.getByLabelText("Points to win"));
+    await user.type(screen.getByLabelText("Points to win"), "15");
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    expect(screen.getByText("Custom rules for this match only")).toBeVisible();
+    const saved = listGuestMatches()[0]!.definition;
+    expect(saved.ruleset?.configuration?.pointsToWin).toBe(15);
+    expect(saved.id).toMatch(/^[0-9a-f-]{36}$/i);
+  });
+
+  it("removes guest rule settings when a custom-rules match completes", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: /Custom rules for this match/ }),
+    );
+    await user.clear(screen.getByLabelText("Points to win"));
+    await user.type(screen.getByLabelText("Points to win"), "1");
+    await user.clear(screen.getByLabelText("Win by"));
+    await user.type(screen.getByLabelText("Win by"), "1");
+    await user.selectOptions(screen.getByLabelText("Games per match"), "1");
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+    await user.click(
+      screen.getByRole("button", { name: "+ Point for Team A" }),
+    );
+
+    expect(screen.getByText("Match complete")).toBeVisible();
+    const saved = listGuestMatches()[0]!;
+    expect(saved.definition.ruleset?.source).toBe("guest_custom");
+    expect(saved.definition.ruleset?.configuration).toBeUndefined();
+    expect(saved.finalState?.status).toBe("complete");
   });
 
   it("disables score correction after the match is complete", () => {
@@ -169,5 +256,57 @@ describe("quick start", () => {
     })) {
       expect(button).toBeDisabled();
     }
+  });
+
+  it("enables match controls after a queued tab receives the Web Lock", async () => {
+    const user = userEvent.setup();
+    const match = completedMatch();
+    const activeMatch = { definition: match.definition, events: [] };
+    saveMatch(activeMatch);
+
+    let grant: (() => void) | undefined;
+    const request = vi.fn(
+      (
+        _name: string,
+        options: LockOptions,
+        callback: (lock: Lock) => unknown,
+      ) =>
+        new Promise<void>((resolve, reject) => {
+          const abort = () =>
+            reject(new DOMException("The request was aborted", "AbortError"));
+          options.signal?.addEventListener("abort", abort, { once: true });
+          grant = () => {
+            options.signal?.removeEventListener("abort", abort);
+            Promise.resolve(callback({} as Lock)).then(() => resolve(), reject);
+          };
+        }),
+    );
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: { request } as unknown as LockManager,
+    });
+
+    render(
+      <MemoryRouter initialEntries={[`/match/${match.definition.id}`]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    const rallyButton = screen.getByRole("button", {
+      name: "+ Point for Team A",
+    });
+    expect(rallyButton).toBeDisabled();
+
+    await act(async () => {
+      grant?.();
+    });
+    expect(rallyButton).toBeEnabled();
+
+    await user.click(rallyButton);
+    expect(
+      screen.getByRole("button", { name: "Correct score: Team A" }),
+    ).toHaveTextContent("1");
   });
 });

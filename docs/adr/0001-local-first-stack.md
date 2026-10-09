@@ -1,17 +1,20 @@
-# ADR 0001: Fondasi local-first
+# ADR 0001: Local-first foundation
 
 ## Status
 
 Accepted
 
-## Keputusan
+## Decision
 
-Gunakan React, TypeScript strict, Vite, dan paket scoring engine murni tanpa ketergantungan UI. Pertandingan guest disimpan di `sessionStorage`. UUID dibuat di browser untuk match dan semua event.
+Use React, strict TypeScript, Vite, and a UI-independent scoring package. Generate match and event UUIDs in the browser. Keep scoring responsive and persist guest journals in browser storage while syncing accepted activity to Supabase under anonymous authentication.
 
-## Alasan
+## Rationale
 
-Pemisahan ini membuat aturan skor dapat diuji tanpa browser, menjaga interaksi tetap cepat saat koneksi buruk, dan menyiapkan sinkronisasi idempoten ke Supabase tanpa mengubah identitas data lokal.
+The scoring engine can be tested without a browser, guest scoring survives temporary network loss, and retries retain the same record identities. Supabase provides short-lived cross-tab/server continuity and read-only viewer access without requiring Google sign-in to start a match.
 
-## Tahap berikutnya
+## Consequences
 
-Supabase baru dibutuhkan ketika Google login, histori lintas perangkat, live viewer publik, atau sinkronisasi offline mulai diimplementasikan.
+- Guest journals are kept locally for up to 12 hours after local activity; server guest records expire 12 hours after the last accepted server activity.
+- A client-generated UUID is the idempotency key for every match and event.
+- Google OAuth is optional for guest play, but needed for account history and Community Rules publishing.
+- The frontend uses only Supabase's publishable key. Row Level Security and restricted RPC functions enforce access.

@@ -61,5 +61,41 @@ describe("Supabase sync serialization", () => {
         payload: { team: "A" },
       }),
     ]);
+
+    const retryPayload = serializeJournalForSync(next, "user-1");
+    expect(retryPayload.match.id).toBe(payload.match.id);
+    expect(retryPayload.events.map((event) => event.id)).toEqual(
+      payload.events.map((event) => event.id),
+    );
+  });
+
+  it("keeps guest names and custom rule configuration out of server payloads", () => {
+    const guestJournal = journal();
+    guestJournal.definition.teams.A.players[0].name = "Private Player Name";
+    guestJournal.definition.ruleset = {
+      id: "guest-custom-rules-1",
+      name: "Club night",
+      sport: "badminton",
+      source: "guest_custom",
+      version: 1,
+      configuration: {
+        pointsToWin: 15,
+        winBy: 2,
+        maxPoints: 21,
+        bestOf: 3,
+        scoringMode: "rally",
+        serversPerTurn: 1,
+        openingServerNumber: 1,
+      },
+    };
+
+    const payload = serializeJournalForSync(guestJournal, "guest-user", true);
+
+    expect(payload.match.is_guest).toBe(true);
+    expect(payload.match.ruleset_id).toBe("guest-custom-local");
+    expect(payload.match.definition).not.toHaveProperty("teams");
+    expect(payload.match.definition).not.toHaveProperty("ruleset");
+    expect(JSON.stringify(payload.match)).not.toContain("Private Player Name");
+    expect(JSON.stringify(payload.match)).not.toContain("pointsToWin");
   });
 });

@@ -1,5 +1,6 @@
 import {
   deriveJournal,
+  officialRulesetFor,
   type MatchEvent,
   type MatchJournal,
 } from "@skor-lapangan/scoring-core";
@@ -38,6 +39,7 @@ function eventPayload(event: MatchEvent): Json {
 export function serializeJournalForSync(
   journal: MatchJournal,
   userId: string,
+  isGuest = false,
 ): SyncPayload {
   const { definition, events } = journal;
   const { state } = deriveJournal(journal);
@@ -48,14 +50,29 @@ export function serializeJournalForSync(
       id: definition.id,
       owner_id: userId,
       sport: definition.sport,
-      ruleset_id: definition.rulesetId,
+      ruleset_id:
+        isGuest && definition.ruleset?.source === "guest_custom"
+          ? "guest-custom-local"
+          : definition.rulesetId,
       mode: definition.mode,
-      definition: toJson(definition),
+      definition: toJson({
+        id: definition.id,
+        sport: definition.sport,
+        rulesetId:
+          isGuest && definition.ruleset?.source === "guest_custom"
+            ? officialRulesetFor(definition.sport).id
+            : definition.rulesetId,
+        mode: definition.mode,
+        createdAt: definition.createdAt,
+        initialServingTeam: definition.initialServingTeam,
+        initialServingPlayer: definition.initialServingPlayer,
+      }),
       status: state.status,
       winner: state.winner,
       current_state: toJson(state),
       last_client_sequence: lastSequence,
       created_at: definition.createdAt,
+      is_guest: isGuest,
     },
     events: events.map((event) => ({
       id: event.id,
@@ -72,12 +89,13 @@ export function serializeJournalForSync(
 export async function syncJournal(
   journal: MatchJournal,
   userId: string | null,
+  isGuest = false,
 ): Promise<SyncResult> {
   if (!supabase) return { status: "skipped", reason: "not_configured" };
   if (!userId) return { status: "skipped", reason: "not_signed_in" };
 
   try {
-    const payload = serializeJournalForSync(journal, userId);
+    const payload = serializeJournalForSync(journal, userId, isGuest);
     const { error: matchError } = await supabase
       .from("matches")
       .upsert(payload.match, { onConflict: "id" });

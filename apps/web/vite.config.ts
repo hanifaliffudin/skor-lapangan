@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
+const hcaptchaDevHost = process.env.HCAPTCHA_DEV_HOST?.trim();
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -13,7 +15,8 @@ export default defineConfig({
     setupFiles: "./src/test/setup.ts",
   },
   server: {
-    host: "127.0.0.1",
+    host: hcaptchaDevHost || "127.0.0.1",
+    ...(hcaptchaDevHost ? { allowedHosts: [hcaptchaDevHost] } : {}),
     port: 5173,
   },
   preview: {

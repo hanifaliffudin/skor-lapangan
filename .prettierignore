@@ -2,3 +2,8 @@ node_modules
 dist
 coverage
 pnpm-lock.yaml
+
+# Preserve repository and coding-agent instructions verbatim.
+AGENTS.md
+antislop.md
+skills/

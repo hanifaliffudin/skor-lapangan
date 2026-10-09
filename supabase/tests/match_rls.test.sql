@@ -1,5 +1,5 @@
 begin;
-select plan(6);
+select plan(7);
 
 select tests.rls_enabled('public', 'matches');
 select tests.rls_enabled('public', 'match_events');
@@ -58,6 +58,30 @@ select is(
   (select count(*)::integer from public.match_events),
   1,
   'owner can read their match event'
+);
+
+insert into public.match_events (
+  id,
+  match_id,
+  owner_id,
+  client_sequence,
+  event_type,
+  payload,
+  created_at
+) values (
+  '00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000001',
+  tests.get_supabase_uid('owner'),
+  1,
+  'rally_awarded',
+  '{"team":"A"}'::jsonb,
+  now()
+) on conflict (id) do nothing;
+
+select is(
+  (select count(*)::integer from public.match_events),
+  1,
+  'retrying the same client event UUID does not create a duplicate'
 );
 
 select tests.authenticate_as('stranger');

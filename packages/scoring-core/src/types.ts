@@ -5,6 +5,28 @@ export type PlayerIndex = 0 | 1;
 export type CourtSide = "left" | "right";
 export type OfficialRulesetId =
   "bwf-doubles-3x21-2025" | "usap-doubles-sideout-2026";
+export type RulesetSource = "official" | "community" | "guest_custom";
+export type ScoringMode = "rally" | "side_out";
+export type BestOf = 1 | 3 | 5;
+
+export interface ScoringRules {
+  pointsToWin: number;
+  winBy: number;
+  maxPoints: number | null;
+  bestOf: BestOf;
+  scoringMode: ScoringMode;
+  serversPerTurn: 1 | 2;
+  openingServerNumber: 1 | 2;
+}
+
+export interface RulesetSnapshot {
+  id: string;
+  name: string;
+  sport: Sport;
+  source: RulesetSource;
+  version: number;
+  configuration?: ScoringRules;
+}
 
 export interface Player {
   id: string;
@@ -19,7 +41,8 @@ export interface TeamDefinition {
 export interface MatchDefinition {
   id: string;
   sport: Sport;
-  rulesetId: OfficialRulesetId;
+  rulesetId: string;
+  ruleset?: RulesetSnapshot;
   mode: MatchMode;
   createdAt: string;
   teams: Record<TeamId, TeamDefinition>;
@@ -82,6 +105,7 @@ export type MatchEvent = DomainEvent | AuditEvent;
 export interface MatchJournal {
   definition: MatchDefinition;
   events: MatchEvent[];
+  finalState?: MatchState;
 }
 
 export interface JournalView {

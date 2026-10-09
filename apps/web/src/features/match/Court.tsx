@@ -56,9 +56,13 @@ function CourtHalf({
   state: MatchState;
 }) {
   const position = state.positions[team];
+  // Team B faces the opposite direction, so its local left/right is mirrored
+  // when both halves are drawn from the same spectator viewpoint.
+  const displaySides =
+    team === "A" ? (["left", "right"] as const) : (["right", "left"] as const);
   return (
     <div className={styles.courtHalf} data-team={team}>
-      {(["left", "right"] as const).map((side) => {
+      {displaySides.map((side) => {
         const playerIndex = position[side];
         const player = definition.teams[team].players[playerIndex];
         const isServer =
@@ -66,6 +70,7 @@ function CourtHalf({
         return (
           <div
             className={styles.playerSpot}
+            data-side={side}
             data-serving={isServer}
             key={`${team}-${side}`}
           >

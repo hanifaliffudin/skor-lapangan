@@ -6,6 +6,7 @@
 }
 
 .header {
+  position: relative;
   width: min(1120px, 100%);
   min-height: 76px;
   margin: 0 auto;
@@ -76,6 +77,61 @@
   gap: 10px;
 }
 
+.accountAction {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.accountAction:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.accountStatus {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.authError {
+  position: absolute;
+  top: 100%;
+  right: clamp(18px, 4vw, 40px);
+  z-index: 2;
+  max-width: min(440px, calc(100vw - 36px));
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #b83c38;
+  border-radius: 6px;
+  background: var(--surface);
+  color: #8a211f;
+  font-size: 13px;
+}
+
+.authError span,
+.syncErrorDetail {
+  overflow-wrap: anywhere;
+}
+
+.authError .accountAction {
+  justify-self: start;
+  min-height: 40px;
+}
+
+.authCaptcha {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .homeMain {
   width: min(760px, 100%);
   margin: 0 auto;
@@ -104,6 +160,50 @@
   color: var(--muted);
   font-size: clamp(17px, 3vw, 21px);
   line-height: 1.55;
+}
+
+.resumeSection {
+  margin: -10px 0 34px;
+  padding: 16px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.resumeSection h2 {
+  margin-bottom: 6px;
+  font-size: 17px;
+}
+
+.resumeSection p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.resumeList {
+  display: grid;
+  gap: 8px;
+}
+
+.resumeMatch {
+  min-height: 48px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  text-align: left;
+}
+
+.resumeMatch strong {
+  color: var(--cobalt-dark);
 }
 
 .eyebrow {
@@ -277,6 +377,14 @@
   font-weight: 800;
 }
 
+.communityFooterLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--cobalt-dark);
+  font-weight: 800;
+}
+
 .setupMain {
   width: min(720px, 100%);
   margin: 0 auto;
@@ -290,6 +398,406 @@
   border: 0;
   background: transparent;
   font-weight: 800;
+}
+
+.syncStatus,
+.readOnlyNotice {
+  margin: -8px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.syncStatus[data-state="error"] {
+  color: #8a211f;
+}
+
+.readOnlyNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--cobalt);
+  background: var(--surface);
+}
+
+.syncErrorDetail {
+  display: block;
+  margin-top: 4px;
+}
+
+.syncRetryButton {
+  min-height: 44px;
+  margin: -8px 0 14px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--cobalt-dark);
+  font-weight: 800;
+}
+
+.shareControls {
+  width: 100%;
+  margin-top: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.shareControls > div:first-child p,
+.shareControls > p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.shareActions,
+.viewerLink {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.viewerLink label {
+  min-width: 0;
+  flex: 1 1 260px;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.viewerLink input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  font-size: 13px;
+}
+
+.viewerMain {
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 32px clamp(18px, 5vw, 40px) 64px;
+}
+
+.viewerMain h1 {
+  margin: 0 0 12px;
+  font-size: clamp(28px, 6vw, 42px);
+  letter-spacing: -0.04em;
+}
+
+.viewerMeta {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.viewerScore {
+  display: block;
+  padding: 12px 0;
+  color: var(--ink);
+  font-size: clamp(48px, 12vw, 76px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.rulesMain {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding: 32px clamp(18px, 5vw, 40px) 64px;
+}
+
+.rulesPageHeading {
+  margin: 22px 0 20px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.rulesPageHeading h1 {
+  margin: 0 0 10px;
+  font-size: clamp(32px, 6vw, 48px);
+  letter-spacing: -0.045em;
+}
+
+.rulesPageHeading p:not(.eyebrow) {
+  max-width: 620px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.communityDisclaimer {
+  margin: 14px 0 24px;
+  padding: 12px 14px;
+  border-left: 4px solid #81838a;
+  background: #ececef;
+  color: #34363c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.communityRuleList {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.communityRuleCard,
+.rulesEmpty {
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.communityRuleCard h2 {
+  margin: 12px 0 8px;
+  font-size: 20px;
+}
+
+.communityRuleCard h2 a {
+  color: var(--ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.communityRuleCard > p {
+  min-height: 42px;
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.communityRuleCardTop {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.unofficialBadge,
+.unpublishedBadge {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e6e7ea;
+  color: #40434a;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.unpublishedBadge {
+  margin-left: 8px;
+}
+
+.ruleVersion {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ruleSharePanel {
+  margin: 20px 0;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.ruleSharePanel h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.ruleSharePanel p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.ruleQr {
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  background: white;
+}
+
+.rulesSummary {
+  margin: 20px 0;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.rulesSummary div {
+  display: grid;
+  gap: 5px;
+}
+
+.rulesSummary dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rulesSummary dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.reportForm,
+.communityRuleForm {
+  margin-top: 24px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.reportForm h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.reportForm label,
+.communityRuleForm label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.reportForm input,
+.reportForm select,
+.reportForm textarea,
+.communityRuleForm input,
+.communityRuleForm select,
+.communityRuleForm textarea,
+.communityScoringFields input,
+.communityScoringFields select {
+  width: 100%;
+  min-height: 46px;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.reportForm textarea,
+.communityRuleForm textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.communityScoringFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.historyTitle {
+  margin: 0 0 10px;
+  font-size: clamp(32px, 6vw, 48px);
+  letter-spacing: -0.045em;
+}
+
+.historyIntro {
+  max-width: 620px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.historyList {
+  margin: 22px 0;
+  display: grid;
+  gap: 12px;
+}
+
+.historyCard {
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.historyCardHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.historyCardHeading span,
+.historyDate,
+.historyDeviceOnly {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.historyScore {
+  margin: 2px 0;
+  font-size: 24px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.historyScore small {
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.historyDate {
+  margin: 0;
+}
+
+.communityScoringFields label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.rulePublishNote,
+.formStatus {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.formStatus {
+  margin-top: 12px;
 }
 
 .textButton {
@@ -308,6 +816,107 @@
 .setupForm {
   display: grid;
   gap: 22px;
+}
+
+.rulesGroup {
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.rulesGroup legend {
+  padding: 0 8px;
+  font-weight: 900;
+}
+
+.rulesChoices,
+.ruleFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ruleChoice {
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.ruleChoice[data-selected="true"] {
+  border: 2px solid var(--cobalt);
+  background: #f0f4ff;
+}
+
+.ruleChoice input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--cobalt);
+}
+
+.ruleChoice span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ruleChoice small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.ruleEditor {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ruleEditor > p {
+  max-width: 58ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ruleFields label {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ruleFields input,
+.ruleFields select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 9px 10px;
+  border: 2px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.ruleFields input:focus,
+.ruleFields select:focus {
+  border-color: var(--cobalt);
+}
+
+.formError {
+  margin: -12px 0 0;
+  color: var(--danger);
+  font-weight: 700;
 }
 
 .teamFields {
@@ -393,8 +1002,14 @@
   font-size: 12px;
 }
 
-.rulesBadge span {
+.rulesBadge[data-source="official"] span {
   color: var(--lime-dark);
+}
+
+.rulesBadge[data-source="guest_custom"],
+.rulesBadge[data-source="community"] {
+  color: var(--muted);
+  background: #eceef0;
 }
 
 .winnerBanner {
@@ -766,13 +1381,33 @@
     gap: 5px;
   }
 
+  .accountAction {
+    max-width: 138px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
   .homeMain {
     padding-top: 38px;
   }
 
-  .optionGrid,
-  .teamFields {
+  .resumeSection {
     grid-template-columns: 1fr;
+  }
+
+  .optionGrid,
+  .teamFields,
+  .rulesChoices,
+  .ruleFields,
+  .communityRuleList,
+  .communityScoringFields,
+  .ruleSharePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .rulesPageHeading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .quickStart {
