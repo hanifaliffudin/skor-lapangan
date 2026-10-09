@@ -18,6 +18,15 @@ describe("guest session storage", () => {
     expect(loadDraft()).toEqual({ sport: "badminton", mode: "casual" });
   });
 
+  it("normalizes a legacy Referee setup draft to the single V1 mode", () => {
+    window.sessionStorage.setItem(
+      "skor-lapangan:setup-draft",
+      JSON.stringify({ sport: "pickleball", mode: "referee" }),
+    );
+
+    expect(loadDraft()).toEqual({ sport: "pickleball", mode: "casual" });
+  });
+
   it("uses the client UUID as the match storage identity", () => {
     const journal: MatchJournal = {
       definition: {

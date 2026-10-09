@@ -25,20 +25,21 @@ In Supabase Dashboard, open **SQL Editor** and run each migration once, in filen
 3. `supabase/migrations/20261009110000_community_rules.sql`
 4. `supabase/migrations/20261009120000_safe_community_rule_reads.sql`
 5. `supabase/migrations/20261009130000_revoke_community_rule_table_reads.sql`
+6. `supabase/migrations/20261009140000_release_guardrails.sql`
 
-The migrations create the match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, Community Rules tables, and their access policies. The final two migrations add safe read functions and then revoke direct client reads of Community Rules tables.
+The migrations create the match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, Community Rules tables, and their access policies. The Community Rules read migrations add safe functions and revoke direct client table reads. The final release-guardrail migration adds database rate limits, hard guest retention caps, the report review fields, and an hourly `pg_cron` cleanup job.
 
-For a fresh environment, apply all five migrations in filename order before deploying the current web app. For an existing live environment, stage the change to avoid breaking the currently deployed app: apply migration `20261009120000_safe_community_rule_reads.sql`, deploy the updated frontend, then apply migration `20261009130000_revoke_community_rule_table_reads.sql`. The old frontend depends on direct table reads until it is replaced. Do not rerun earlier migrations to apply this security fix.
+For a fresh environment, apply all six migrations in filename order before deploying the current web app. For an existing live environment, stage the Community Rules read migrations as described in the operations runbook, then apply `20261009140000_release_guardrails.sql`. Do not rerun earlier migrations to apply a later schema change.
 
-Expired guest records become unreadable as soon as their 12-hour server expiry passes. The `purge_expired_guest_matches()` function removes expired rows and their events; schedule it periodically if database cleanup is desired. Cleanup timing is not the access-control boundary.
+Expired guest records become unreadable at 12 hours after last accepted server activity, capped at 24 hours after creation. Live Viewer links expire within 12 hours and no later than match expiry; reads do not refresh the link. The migration schedules `purge_expired_guest_matches()` hourly, removing expired matches/events and rate-limit counters; anonymous Auth users older than 30 days are also deleted. Cleanup timing is not the access-control boundary. After the next hour, check Supabase Cron run history and verify the job succeeded.
 
 ## 3. Enable anonymous sign-ins
 
-In Supabase Authentication settings, enable **Anonymous Sign-Ins**. The app creates an anonymous Supabase user for a guest browser so row-level policies can protect its temporary match records. The browser keeps the guest match locally too and retries sync after connectivity returns.
+In Supabase Authentication settings, enable **Anonymous Sign-Ins**. The app creates an anonymous Supabase user for a guest browser so row-level policies can protect its temporary match records. The browser keeps the guest match locally too and retries sync after connectivity returns. Set the anonymous sign-in rate limit to 10 per IP per hour for the initial public release, if the control is available in the project. Database limits also cap match, event, viewer, and report actions per guest account.
 
 If CAPTCHA protection is enabled, select hCaptcha in Supabase Authentication's bot protection settings and store the hCaptcha secret there. The app displays the hCaptcha check only when Supabase requires a CAPTCHA token for guest sign-in, then sends the verified token with the anonymous sign-in request. Keep the secret only in the hCaptcha and Supabase dashboards. The public site key belongs in `VITE_HCAPTCHA_SITE_KEY`.
 
-With CAPTCHA protection disabled, anonymous sign-ins have less protection against automated abuse. Re-enable it before a broader public release after configuring the hCaptcha site key.
+Start with CAPTCHA disabled and monitor abuse and failed sign-ins. Enable hCaptcha only if repeated abuse appears; the sign-in UI already handles a CAPTCHA challenge when Supabase requests it. With CAPTCHA disabled, the Auth IP limit and database action limits are the active protections.
 
 hCaptcha does not accept `localhost` or `127.0.0.1` as the challenge hostname. To test locally, map a development hostname such as `dev.your-domain.com` to `127.0.0.1` in the machine's hosts file, then start Vite with `HCAPTCHA_DEV_HOST=dev.your-domain.com pnpm dev` and open that hostname on port `5173`. If hCaptcha domain allowlisting is enabled, add the development hostname there too. Otherwise, test on a deployed Vercel URL.
 
@@ -64,6 +65,8 @@ Keep the Google client secret only in Supabase Dashboard. Do not add it to `.env
 - Revoke the link. A subsequent viewer refresh should show that it is unavailable.
 - If Google is enabled, link the guest session and check that the match appears in account history. Publish a Community Rule and confirm it is visibly labeled unofficial.
 - Confirm anonymous users can read published rules through the app, but direct `community_rules` and `community_rule_versions` table reads are denied. Verify creator identifiers are absent from all public responses.
+- Submit a Community Rule report while signed in as a guest, then inspect it in the restricted SQL Editor queue. Verify the report has status `open`, the reason/details/contact fields are correct, and it is not visible to public clients.
+- Verify `purge-expired-guest-data` is scheduled hourly and inspect its first successful run in Supabase Cron.
 - Disconnect the browser, score a point, then reconnect. The same client-generated event UUID should be retried rather than creating a second event.
 
 The SQL policy tests live in `supabase/tests/`. They use the Supabase pgTAP testing helpers and should be run in a disposable local Supabase database after migrations; they are not safe to run against production data as a general test suite.

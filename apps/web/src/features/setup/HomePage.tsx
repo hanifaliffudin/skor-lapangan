@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   deriveJournal,
   type MatchJournal,
-  type MatchMode,
   type Sport,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
@@ -16,14 +15,13 @@ export function HomePage() {
   const navigate = useNavigate();
   const { t } = useLocale();
   const [sport, setSport] = useState<Sport>("badminton");
-  const [mode, setMode] = useState<MatchMode>("casual");
   const [savedMatches] = useState<MatchJournal[]>(() => listGuestMatches());
   const activeMatches = savedMatches.filter(
     (journal) => deriveJournal(journal).state.status === "active",
   );
 
   function continueToSetup() {
-    saveDraft({ sport, mode });
+    saveDraft({ sport, mode: "casual" });
     navigate("/setup");
   }
 
@@ -82,29 +80,6 @@ export function HomePage() {
                 hint={t("pickleballHint")}
                 name="sport"
                 onChange={() => setSport("pickleball")}
-              />
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.optionGroup}>
-            <legend>
-              <span>2</span>
-              {t("chooseMode")}
-            </legend>
-            <div className={styles.optionGrid}>
-              <ChoiceCard
-                checked={mode === "casual"}
-                label={t("casual")}
-                hint={t("casualHint")}
-                name="mode"
-                onChange={() => setMode("casual")}
-              />
-              <ChoiceCard
-                checked={mode === "referee"}
-                label={t("referee")}
-                hint={t("refereeHint")}
-                name="mode"
-                onChange={() => setMode("referee")}
               />
             </div>
           </fieldset>

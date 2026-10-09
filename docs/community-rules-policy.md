@@ -1,6 +1,6 @@
 # Community Rules policy
 
-**Status: Draft for owner approval.** This policy describes the current product behavior and identifies the moderation work that still needs an owner decision.
+**Status: V1.0 operating policy; public-facing legal terms still require owner and legal review.**
 
 ## What Community Rules are
 
@@ -34,11 +34,11 @@ Unpublishing removes the rule from public discovery and prevents new matches fro
 
 ## Reporting and moderation
 
-Anyone viewing a published rule can submit a report with one of these reasons: spam, unsafe, misleading, or other. Report details can contain up to 500 characters. The system stores the report and may store the reporter's account ID when one is available.
+Anyone viewing a published rule can submit a report without Google sign-in. The app uses its guest session to rate-limit reports to three per hour per account. Reasons are inaccurate scoring, misleading, unsafe, spam, copyright or other rights, and other. Details can contain up to 500 characters. A reporter may optionally provide an email for follow-up. The system stores the rule ID, reason, details, time, reporter account ID, and optional email.
 
-A report does not automatically hide a rule. The current app has no moderator dashboard, no staff unpublish action for another user's rule, and no published review time. Rule owners can unpublish their own rules.
+A report does not automatically hide a rule, and rules are not pre-approved before publication. Reports are manually reviewed by the service operator in the restricted Supabase SQL Editor queue. The operator should aim to review unsafe or rights-related reports within 48 hours and other reports within seven days; these are internal targets, not a guaranteed response time. A reviewer records the disposition and notes. A substantiated report may lead to a rule being unpublished; report volume alone is not a removal criterion. The app has no moderator dashboard, creator notification, or appeals interface. A reporter-provided email is for contacting the reporter, not the creator.
 
-Before public launch, the operator must decide who reviews reports, how reviewers access them safely, what criteria justify removal, how to handle appeals, and what contact information to publish. This process can operate after publication and does not require pre-approval of every rule.
+Use `open` and `reviewing` for pending reports, then `actioned` or `dismissed` for a reviewed report. Record outcomes as `no_action`, `requested_edit`, `unpublished`, or `removed`. Only use `requested_edit` when the operator has a real way to contact the creator. Unpublish rather than permanently delete when that sufficiently addresses the issue; reserve permanent removal for a deliberate operator decision. Removing a rule retains its reports without the rule link. Keep queue access restricted because reports may contain personal information. This process operates after publication and does not require approval of every rule.
 
 ## Sharing and responsibility
 

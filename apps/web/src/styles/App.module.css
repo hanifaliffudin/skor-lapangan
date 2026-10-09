@@ -364,6 +364,7 @@
   margin: 0 auto;
   padding: 22px 0 34px;
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: 8px 16px;
   flex-wrap: wrap;

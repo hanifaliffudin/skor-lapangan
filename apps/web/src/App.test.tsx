@@ -113,7 +113,7 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
-  it("stores the selected local setup before navigation", async () => {
+  it("stores the selected sport and the single V1 mode before navigation", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -128,9 +128,9 @@ describe("quick start", () => {
         name: "Pickleball Doubles · 3-number score",
       }),
     );
-    await user.click(
-      screen.getByRole("radio", { name: "Referee More match controls" }),
-    );
+    expect(
+      screen.queryByRole("radio", { name: /referee/i }),
+    ).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "Continue to player setup" }),
     );
@@ -139,7 +139,7 @@ describe("quick start", () => {
       screen.getByRole("heading", { name: "Who is playing?" }),
     ).toBeVisible();
     expect(window.sessionStorage.getItem("skor-lapangan:setup-draft")).toBe(
-      JSON.stringify({ sport: "pickleball", mode: "referee" }),
+      JSON.stringify({ sport: "pickleball", mode: "casual" }),
     );
   });
 
@@ -154,7 +154,7 @@ describe("quick start", () => {
 
     expect(
       screen.getByText(
-        "Guest matches stay on this device for up to 12 hours after the last activity.",
+        "Guest matches stay on this device. If server sync is available, synced data expires after 12 hours without activity (24-hour maximum).",
       ),
     ).toBeVisible();
   });

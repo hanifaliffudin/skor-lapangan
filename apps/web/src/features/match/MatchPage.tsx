@@ -17,6 +17,7 @@ import { useLocale } from "../../lib/i18n";
 import { loadMatch, removeMatch, saveMatch } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { syncJournal } from "../../lib/sync";
+import { isRateLimitError } from "../../lib/userError";
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
 import { useMatchControl } from "./useMatchControl";
@@ -141,7 +142,13 @@ export function MatchPage() {
     });
     setViewerBusy(false);
     if (error || !data) {
-      setShareMessage(error?.message ?? t("shareFailed"));
+      setShareMessage(
+        error
+          ? isRateLimitError(error.message)
+            ? t("rateLimited")
+            : error.message
+          : t("shareFailed"),
+      );
       return;
     }
     setViewerUrl(`${window.location.origin}/view/${data}`);
@@ -271,7 +278,9 @@ export function MatchPage() {
                     : "syncError",
           )}
           {syncError ? (
-            <span className={styles.syncErrorDetail}>{syncError}</span>
+            <span className={styles.syncErrorDetail}>
+              {isRateLimitError(syncError) ? t("rateLimited") : syncError}
+            </span>
           ) : null}
         </p>
         {syncState === "error" ? (

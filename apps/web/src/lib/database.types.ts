@@ -26,6 +26,7 @@ export interface Database {
           is_guest: boolean;
           last_activity_at: string;
           expires_at: string | null;
+          hard_expires_at: string | null;
           viewer_token_hash: string | null;
           viewer_expires_at: string | null;
           viewer_revoked_at: string | null;
@@ -46,6 +47,7 @@ export interface Database {
           is_guest: boolean;
           last_activity_at?: string;
           expires_at?: string | null;
+          hard_expires_at?: string | null;
           viewer_token_hash?: string | null;
           viewer_expires_at?: string | null;
           viewer_revoked_at?: string | null;
@@ -63,6 +65,7 @@ export interface Database {
           is_guest?: boolean;
           last_activity_at?: string;
           expires_at?: string | null;
+          hard_expires_at?: string | null;
           viewer_token_hash?: string | null;
           viewer_expires_at?: string | null;
           viewer_revoked_at?: string | null;
@@ -109,7 +112,7 @@ export interface Database {
       };
       community_rule_versions: {
         Row: {
-          rule_id: string;
+          rule_id: string | null;
           version: number;
           configuration: Json;
           created_by: string;
@@ -127,6 +130,11 @@ export interface Database {
           reason: string;
           details: string;
           created_at: string;
+          reporter_contact: string | null;
+          status: string;
+          reviewed_at: string | null;
+          resolution: string | null;
+          review_notes: string | null;
         };
         Insert: never;
         Update: never;
@@ -172,6 +180,15 @@ export interface Database {
       };
       report_community_rule: {
         Args: { p_rule_id: string; p_reason: string; p_details?: string };
+        Returns: string;
+      };
+      report_community_rule_v2: {
+        Args: {
+          p_rule_id: string;
+          p_reason: string;
+          p_details: string;
+          p_reporter_contact: string | null;
+        };
         Returns: string;
       };
       can_manage_community_rule: {

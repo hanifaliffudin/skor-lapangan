@@ -10,13 +10,13 @@ Keep the product mobile-first and English by default, with Indonesian available.
 
 ## Release sequence
 
-| Release | Goal                                                  | Scope                                                                                                                                                                       | Exit check                                                                                                                         |
-| ------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| V1.0    | Public MVP for doubles play                           | Badminton and Pickleball, guest matches, score controls, Live Viewer, Official Rules, and Community Rules                                                                   | V1.0 launch checks below pass                                                                                                      |
-| V1.1    | Improve the core using real player feedback           | Fix issues in undo/redo, synchronization, and screen visibility. Resolve whether Casual and Referee should behave differently. Do not bundle a new sport into this release. | Critical scoring and sync defects are resolved, regression tests pass, and feedback from real games has been reviewed              |
-| V1.2    | Add Tennis as the next sport candidate                | Implement only after the V1.1 foundation gate passes. Confirm the supported format and current federation rules before development.                                         | Tennis scoring, serve changes, court positions, corrections, and match completion have rules-based tests and a mobile play-through |
-| V1.3    | Add Squash or the next most requested sport           | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                | The sport passes the same rules, regression, and mobile checks as V1.2                                                             |
-| V2.0    | Reassess product scope after the first sport releases | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                         | A separate product decision defines the scope and reason for a major release                                                       |
+| Release | Goal                                                  | Scope                                                                                                                                                                              | Exit check                                                                                                                         |
+| ------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| V1.0    | Public MVP for doubles play                           | Badminton and Pickleball, guest matches, score controls, Live Viewer, Official Rules, and Community Rules                                                                          | V1.0 launch checks below pass                                                                                                      |
+| V1.1    | Improve the core using real player feedback           | Fix issues in undo/redo, synchronization, and screen visibility. Revisit Referee only if players need a genuinely different workflow. Do not bundle a new sport into this release. | Critical scoring and sync defects are resolved, regression tests pass, and feedback from real games has been reviewed              |
+| V1.2    | Add Tennis as the next sport candidate                | Implement only after the V1.1 foundation gate passes. Confirm the supported format and current federation rules before development.                                                | Tennis scoring, serve changes, court positions, corrections, and match completion have rules-based tests and a mobile play-through |
+| V1.3    | Add Squash or the next most requested sport           | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                       | The sport passes the same rules, regression, and mobile checks as V1.2                                                             |
+| V2.0    | Reassess product scope after the first sport releases | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                                | A separate product decision defines the scope and reason for a major release                                                       |
 
 The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports before launching V1.0. Add one sport at a time, and change the order when player feedback supports a different choice.
 
@@ -28,11 +28,14 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 - Pickleball doubles using the Official Rules source recorded in [rules sources](rules-sources.md).
 - Match setup, team and player positions, point entry, automatic service and position changes, undo, redo, and one-event score override.
 - Guest play without Google sign-in. Generate match and event UUIDs in the browser, save locally first, and sync idempotently when the server is available.
-- Guest match continuity for up to 12 hours after the last accepted activity. Expired guest data and Live Viewer links must stop being accessible.
-- Owner-created Live Viewer links. Viewers do not need an account and can see only the score and court positions. Owners can revoke links, and links expire no later than the match data.
+- Guest match continuity for up to 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired guest data and Live Viewer links stop being accessible immediately; an hourly database cleanup physically removes expired game data.
+- Owner-created Live Viewer links. Viewers do not need an account and can see only the score and court positions. Owners can revoke links, and links expire within 12 hours and no later than the match data.
 - Optional Google sign-in for persistent match history and for creating and managing public Community Rules.
 - Official Rules stay locked and follow federation sources. Community Rules are public, shareable by link or QR, versioned, marked unofficial, and do not require manual approval. Anyone can report them; creators can unpublish their own rules.
 - Guest-created custom rules apply only to that guest's current match. They stay in the browser, are not published or synced, and are discarded when the match ends.
+- Anonymous sign-in and server actions have rate limits. CAPTCHA is a fallback if real abuse appears, not a launch prerequisite.
+- Community Rule reports are available to guests, rate-limited, and reviewed manually after publication. Reports do not automatically unpublish a rule.
+- New matches use the single Casual workflow. Referee is hidden until it has meaningfully different behavior.
 
 ### Not included
 
@@ -50,8 +53,8 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 - Supabase row-level security and viewer access tests pass. The frontend contains no service-role secret.
 - Mobile play-through confirms that scores and court positions are readable during play, controls are usable with touch, and no content overflows horizontally.
 - Loading, empty, offline, and error states provide a clear status or next action.
-- Choose a bot-abuse protection approach before broad public access. CAPTCHA is currently disabled for local guest testing and should not be treated as the final public setting.
-- Define the actual behavior of Casual and Referee before presenting them as different modes. The current app stores and displays the selection, but the scoring controls behave the same. Either implement a meaningful distinction or ship one mode in V1.0.
+- Set the Supabase Auth anonymous sign-in limit and verify the hourly expired-guest cleanup job before broad public access. Start without CAPTCHA and enable it if abuse appears.
+- Keep Referee hidden until there is a clear player need and a distinct workflow to test.
 
 ## V1.1 feedback cycle
 
@@ -76,6 +79,5 @@ Before scheduling a sport release:
 
 ## Decisions to revisit
 
-- The Casual and Referee modes need a product definition before V1.0 can claim different workflows.
-- Bot protection must be chosen before broad public access while anonymous sign-in is enabled.
 - The order and supported formats for sports after Badminton and Pickleball depend on feedback and verified rules, not a fixed calendar.
+- Revisit Referee only if real users need a distinct officiating workflow.

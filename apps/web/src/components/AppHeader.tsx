@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import { useLocale } from "../lib/i18n";
 import { hasSupabaseConfig, hcaptchaSiteKey } from "../lib/supabase";
+import { isRateLimitError } from "../lib/userError";
 import styles from "../styles/App.module.css";
 
 export function AppHeader({ compact = false }: { compact?: boolean }) {
@@ -20,6 +21,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
   const [accountError, setAccountError] = useState("");
   const captchaRef = useRef<HCaptcha>(null);
   const needsCaptcha = authError?.toLowerCase().includes("captcha") ?? false;
+  const guestSignInRateLimited = isRateLimitError(authError);
 
   async function handleAccountAction() {
     setAccountError("");
@@ -89,8 +91,10 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
             {needsCaptcha
               ? t("guestCaptchaPrompt")
               : authError
-                ? `${t("guestSignInError")} ${authError}`
-                : accountError}
+                ? `${t("guestSignInError")} ${guestSignInRateLimited ? t("rateLimited") : authError}`
+                : isRateLimitError(accountError)
+                  ? t("rateLimited")
+                  : accountError}
           </span>
           {needsCaptcha ? (
             hcaptchaSiteKey ? (

@@ -34,7 +34,7 @@ export function loadDraft(): SetupDraft | null {
       (parsed.communityRuleId === undefined ||
         typeof parsed.communityRuleId === "string")
     ) {
-      return parsed;
+      return { ...parsed, mode: "casual" };
     }
   } catch {
     return null;

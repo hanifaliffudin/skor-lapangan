@@ -5,10 +5,9 @@ This guide describes the current V1.0 product scope. The app labels are in Engli
 ## Start a match
 
 1. Choose Badminton or Pickleball. V1.0 supports doubles for both sports.
-2. Choose Casual or Referee. The current app stores and displays this choice, but both modes use the same match controls. Do not expect different scoring behavior yet.
-3. Continue to setup. Choose Official Rules, a published Community Rule, or guest custom rules when that option is available.
-4. Enter player names if you want them on this device. Choose which player serves first.
-5. Start the match.
+2. Continue to player setup. V1 has one match workflow (Casual); Referee mode is hidden until it offers meaningfully different controls.
+3. Choose Official Rules, a published Community Rule, or guest custom rules when that option is available.
+4. Enter player names if you want them on this device. Choose which player serves first, then start the match.
 
 ## Choose a ruleset
 
@@ -32,7 +31,7 @@ Pickleball doubles uses a three-number score call. The opening sequence has a sp
 
 Guests can start a match without Google sign-in. The browser keeps a local match journal and generates its match and event IDs. If Supabase is configured and the guest session is available, the app syncs the match to the server and retries failed syncs with the same IDs.
 
-Guest matches remain available for up to 12 hours after the last accepted activity. If the app shows that a match is local or offline, keep the browser data and reconnect before relying on server sync. Clearing the site's browser data can remove the local copy.
+The local copy remains available for up to 12 hours after the last local save. The server copy expires 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired server data becomes inaccessible immediately and is physically deleted by an hourly cleanup job. If the app shows that a match is local or offline, keep the browser data and reconnect before relying on server sync. Clearing the site's browser data can remove the local copy.
 
 One browser tab controls a match at a time. Other tabs for that match are read-only until control is available.
 
@@ -43,7 +42,7 @@ One browser tab controls a match at a time. Other tabs for that match are read-o
 3. Viewers can see the score and court display, but cannot change the match.
 4. Revoke the link from the match controls when it should stop working.
 
-Anyone who gets the link can view the match until the link expires or the owner revokes it. Do not post a link publicly unless you intend the score and court display to be public. The link expires no later than the match data.
+Anyone who gets the link can view the match until the link expires or the owner revokes it. It expires within 12 hours and no later than the match data; viewing does not extend it. Do not post a link publicly unless you intend the score and court display to be public.
 
 ## Account history
 
@@ -55,7 +54,7 @@ The history page shows saved match summaries. Full match details are available o
 
 Anyone can read published Community Rules. A Google-linked account can create, edit, publish, or unpublish its own rules. Use the share action or QR code on a rule page to send it to a group. You can report a published rule from its detail page.
 
-Community Rules are unofficial and are not reviewed before publication. Check the scoring setup before applying one. See [community-rules-policy.md](community-rules-policy.md) for the current policy draft.
+Community Rules are unofficial and are not reviewed before publication. Check the scoring setup before applying one. You can report a rule without a Google account; reports are reviewed manually and do not automatically hide the rule. See [community-rules-policy.md](community-rules-policy.md) for the policy.
 
 ## If something looks wrong
 

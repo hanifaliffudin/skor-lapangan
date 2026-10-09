@@ -14,7 +14,8 @@ The scoring engine can be tested without a browser, guest scoring survives tempo
 
 ## Consequences
 
-- Guest journals are kept locally for up to 12 hours after local activity; server guest records expire 12 hours after the last accepted server activity.
+- Guest journals are kept locally for up to 12 hours after local activity; server guest records expire 12 hours after the last accepted server activity, capped at 24 hours from creation. An hourly database job physically removes expired rows.
+- Server guest actions are rate-limited. CAPTCHA remains an adaptive fallback if abuse appears.
 - A client-generated UUID is the idempotency key for every match and event.
 - Google OAuth is optional for guest play, but needed for account history and Community Rules publishing.
 - The frontend uses only Supabase's publishable key. Row Level Security and restricted RPC functions enforce access.

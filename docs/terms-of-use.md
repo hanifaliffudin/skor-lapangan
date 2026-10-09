@@ -23,19 +23,19 @@ Community Rules are created by users, are unofficial, and are not checked before
 
 ## 3. Guest matches and accounts
 
-Guests can play without linking Google. Local guest match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted activity and is later physically deleted when cleanup runs.
+Guests can play without linking Google. Local guest match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted server activity, capped at 24 hours after creation, and the hourly cleanup job physically deletes it and its event data. Anonymous Auth records are deleted after 30 days. These schedules depend on the Supabase cleanup job succeeding.
 
 Google sign-in enables account history and Community Rules management. Account match records do not use the guest 12-hour expiry. The current app does not provide self-service account deletion. The operator must publish a deletion contact and process before this draft becomes effective.
 
 ## 4. Live Viewer links
 
-An owner may create a read-only Live Viewer link. Anyone with the link can view its score and court display until the link expires or the owner revokes it. Owners are responsible for choosing where to share a link. Revocation stops future access, but it cannot remove screenshots or information a viewer saved earlier.
+An owner may create a read-only Live Viewer link. Anyone with the link can view its score and court display until the link expires (within 12 hours and no later than match expiry) or the owner revokes it. Viewing does not extend the expiry. Owners are responsible for choosing where to share a link. Revocation stops future access, but it cannot remove screenshots or information a viewer saved earlier.
 
 ## 5. Community content
 
 Only publish a Community Rule that you are allowed to share. Do not include private personal information, impersonate a federation or official, or publish content intended to mislead or harm other users.
 
-Community Rules publish without advance approval. Users can submit a report, but the current service does not automatically hide a reported rule and has no in-app moderator queue. A report does not guarantee a response or removal.
+Community Rules publish without advance approval. Users can submit a report without Google sign-in; reports are rate-limited and reviewed manually. A report does not automatically hide a reported rule, and there is no in-app moderator queue. A report does not guarantee a response or removal.
 
 **Owner decision required:** choose and document the permission or license that applies to Community Rule titles, descriptions, and scoring configurations. Do not activate this clause until that permission is clear and reviewed.
 

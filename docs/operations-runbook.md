@@ -36,34 +36,65 @@ For each new environment, run the SQL files once in filename order using the Sup
 3. `supabase/migrations/20261009110000_community_rules.sql`
 4. `supabase/migrations/20261009120000_safe_community_rule_reads.sql`
 5. `supabase/migrations/20261009130000_revoke_community_rule_table_reads.sql`
+6. `supabase/migrations/20261009140000_release_guardrails.sql`
 
-Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, apply migration `20261009120000_safe_community_rule_reads.sql`, deploy the updated frontend, then apply migration `20261009130000_revoke_community_rule_table_reads.sql`. The final migration denies direct reads used by the old frontend, so do not apply it before the updated frontend is deployed. Ask users with an already-open older tab to refresh after revoking table access. Keep the filenames immutable after release and add a new migration for later schema changes.
+Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the existing safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply `20261009140000_release_guardrails.sql` before deploying this frontend. The new migration keeps the old report RPC as a backward-compatible wrapper. Ask users with an already-open older tab to refresh after revoking table access. Keep filenames immutable after release and add a new migration for later schema changes. The new migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it.
 
 ## Configure Supabase Auth
 
 - Enable Anonymous Sign-Ins for guest play and sync.
 - Enable Google OAuth only if account history and Community Rules publishing are needed. Configure the Google OAuth client secret in Supabase, not in Vercel's frontend environment.
 - If manual identity linking is required by the project, enable it so a guest can link Google and claim still-valid matches.
-- CAPTCHA is currently disabled for local testing. Before broad public access, choose the abuse-protection setting. If enabling hCaptcha, configure the secret in Supabase, the public site key in Vercel, and the allowed hostnames in hCaptcha. Verify the flow on the deployed hostname.
+- Set the Anonymous Sign-Ins rate limit in Supabase Auth to 10 sign-ins per IP per hour for the initial public release, if that control is available in the project. The database migration separately limits guest match creation (10/hour), match-state updates (500/hour), event inserts (500/hour), Live Viewer link creation (10/hour), viewer reads (600/minute per match), and Community Rule reports (3/hour) per anonymous account or viewer capability. These are safety ceilings, not expected usage targets.
+- Start with CAPTCHA disabled and monitor Auth errors and report volume. If repeated guest-signup abuse appears, enable Supabase CAPTCHA with hCaptcha, configure its secret in Supabase, the public site key in Vercel, and allowed hostnames in hCaptcha, then verify the challenge on the deployed hostname. The UI already supports a CAPTCHA response when Supabase requests one.
 - Do not assume an authentication provider is active because its environment variables exist. Test it from the deployed app.
 
 ## Guest expiry and database cleanup
 
-Supabase denies reads and writes for expired guest records as soon as their 12-hour expiry passes. The migration also creates `public.purge_expired_guest_matches()`, which physically deletes expired guest matches and cascades their events. The repository does not configure a schedule for this function.
+Guest match records expire 12 hours after the last accepted server activity, with a hard cap of 24 hours after creation. A guest session cannot remove the expiry flag or extend the hard cap. Viewer links expire after at most 12 hours and no later than the match; reads do not extend either expiry. Expired guest matches are inaccessible immediately. An hourly `pg_cron` job physically deletes matches and cascades their events, removes old rate-limit counters, and deletes anonymous Auth users older than 30 days. The 30-day account cleanup is separate from 12/24-hour game-data retention.
 
-Before launch, decide whether and how to schedule the function using a trusted server-side scheduler. Only `service_role` can execute it. Check the current Supabase plan and any scheduler cost before enabling it. Never run it from the browser or expose a service-role key. If no schedule exists, expired rows remain inaccessible but may remain stored until an operator runs cleanup.
+After migration, verify the `purge-expired-guest-data` Cron job in Supabase and inspect its run history after the next hour. If it fails, fix the database error and rerun the cleanup function from SQL Editor as an authorized operator. Never run it from the browser or expose a service-role key. While the project is active and the job is healthy, physical deletion should happen within about an hour after expiry; a missed job delays deletion but does not restore access to expired data.
+
+Supabase Free projects with low activity may be paused after seven days. A paused project cannot run its database Cron job, so physical deletion can be delayed until the project resumes. Treat the hourly cleanup interval as an active-project target, not a deletion SLA. After resuming a project, check the Cron run history and invoke the cleanup function as an authorized operator if expired rows remain. See [Supabase's Free project pausing policy](https://supabase.com/docs/guides/platform/free-project-pausing) for current conditions.
 
 ## Community Rule reports
 
-The app stores reports in `public.community_rule_reports`. The current app has no moderation dashboard and reports do not automatically unpublish a rule. Until a dedicated review flow exists, an authorized operator can inspect the report queue in Supabase SQL Editor:
+Reports are open to guests and Google-linked users; Google sign-in is not required. The optional email is only for follow-up. Each anonymous account can send up to three reports per hour. Reports do not automatically unpublish a rule, and Community Rules remain open for publication without pre-approval. Review them manually in Supabase SQL Editor using a restricted project session:
 
 ```sql
-select id, rule_id, reporter_id, reason, details, created_at
+select id, rule_id, reporter_id, reporter_contact, reason, details,
+       status, resolution, created_at, reviewed_at, review_notes
 from public.community_rule_reports
-order by created_at desc;
+where status in ('open', 'reviewing')
+order by created_at asc;
 ```
 
-Limit access to this query because it may include reporter IDs and report details. The operator must establish a review owner, removal criteria, contact, and appeal path before announcing the Community Rules directory publicly. Publishing remains open without pre-approval.
+Keep queue access restricted because it can contain reporter IDs, details, and optional contact emails. Triage reports as `open` → `reviewing` → `actioned` or `dismissed`; record the decision rationale (and reviewer initials if useful) in `review_notes`. Set `reviewed_at` when a final decision is made. To mark a report as under review:
+
+```sql
+update public.community_rule_reports
+set status = 'reviewing'
+where id = '<report-uuid>' and status = 'open';
+```
+
+Aim to review unsafe or rights-related reports within 48 hours and other reports within seven days; these are internal targets, not a promised SLA. Do not hide a rule just because it received reports. When removal is justified, unpublish the rule and resolve the report in one SQL transaction:
+
+```sql
+begin;
+update public.community_rules
+set is_published = false
+where id = '<rule-uuid>';
+
+update public.community_rule_reports
+set status = 'actioned',
+    resolution = 'unpublished',
+    reviewed_at = now(),
+    review_notes = 'Reason for the decision'
+where id = '<report-uuid>';
+commit;
+```
+
+For a report that does not warrant action, set `status = 'dismissed'`, `resolution = 'no_action'`, and record a short explanation. Use `requested_edit` only if the operator can contact the creator; this release does not send creator notifications. `removed` is reserved for a deliberate deletion and recovery decision. Deleting a Community Rule sets `rule_id` to null on its reports so the moderation record is retained; include the deleted rule ID in `review_notes` if needed for context. The repository has no in-app moderator dashboard, appeal form, or automatic report-count threshold.
 
 ## Smoke test after a deployment
 
@@ -87,9 +118,9 @@ Limit access to this query because it may include reporter IDs and report detail
 
 ## Current operational gaps
 
-- CAPTCHA protection is disabled for local testing and must be reviewed before broad public access.
-- The expired guest cleanup function has no schedule configured by the repository.
+- CAPTCHA remains disabled initially; review anonymous Auth limits and abuse reports before enabling it.
+- Verify the hourly `purge-expired-guest-data` Cron job and its run history after the next successful hour.
 - There is no self-service account deletion flow or published support contact.
-- Community Rule reports have no in-app moderation queue or staff unpublish action.
+- Community Rule reports are manually reviewed in SQL Editor; there is no moderator dashboard or creator-notification workflow.
 - Older database setups expose creator identifiers through direct Community Rules table reads until migration `20261009130000_revoke_community_rule_table_reads.sql` is applied. Verify direct reads are denied and safe read functions work after applying both Community Rules migrations.
-- Casual and Referee currently have the same match controls.
+- New V1 matches use the single Casual workflow. Referee is hidden until it has meaningfully different controls; historical matches retain their saved mode label.

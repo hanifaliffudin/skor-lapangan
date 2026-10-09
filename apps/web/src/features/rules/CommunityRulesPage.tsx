@@ -11,6 +11,7 @@ import { useAuth } from "../../lib/auth";
 import { useLocale } from "../../lib/i18n";
 import { saveDraft } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
+import { isRateLimitError } from "../../lib/userError";
 import type { Json } from "../../lib/database.types";
 import styles from "../../styles/App.module.css";
 
@@ -137,7 +138,7 @@ export function CommunityRuleDetailPage() {
   const { ruleId } = useParams();
   const navigate = useNavigate();
   const { t } = useLocale();
-  const { user, isAnonymous } = useAuth();
+  const { loading: authLoading, user, isAnonymous } = useAuth();
   const [rule, setRule] = useState<CommunityRule | null>(null);
   const [configuration, setConfiguration] = useState<ScoringRules | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -145,6 +146,7 @@ export function CommunityRuleDetailPage() {
   const [message, setMessage] = useState("");
   const [reportReason, setReportReason] = useState("misleading");
   const [reportDetails, setReportDetails] = useState("");
+  const [reportContact, setReportContact] = useState("");
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
@@ -232,13 +234,20 @@ export function CommunityRuleDetailPage() {
     event.preventDefault();
     if (!ruleId || !supabase) return;
     setReporting(true);
-    const { error } = await supabase.rpc("report_community_rule", {
+    const { error } = await supabase.rpc("report_community_rule_v2", {
       p_rule_id: ruleId,
       p_reason: reportReason,
       p_details: reportDetails.trim(),
+      p_reporter_contact: reportContact.trim() || null,
     });
     setReporting(false);
-    setMessage(error ? error.message : t("reportSubmitted"));
+    setMessage(
+      error
+        ? isRateLimitError(error.message)
+          ? t("rateLimited")
+          : error.message
+        : t("reportSubmitted"),
+    );
   }
 
   return (
@@ -342,9 +351,11 @@ export function CommunityRuleDetailPage() {
                     value={reportReason}
                     onChange={(event) => setReportReason(event.target.value)}
                   >
+                    <option value="incorrect">{t("reportIncorrect")}</option>
                     <option value="misleading">{t("reportMisleading")}</option>
                     <option value="unsafe">{t("reportUnsafe")}</option>
                     <option value="spam">{t("reportSpam")}</option>
+                    <option value="rights">{t("reportRights")}</option>
                     <option value="other">{t("reportOther")}</option>
                   </select>
                 </label>
@@ -356,10 +367,25 @@ export function CommunityRuleDetailPage() {
                     onChange={(event) => setReportDetails(event.target.value)}
                   />
                 </label>
+                <label>
+                  <span>{t("reportContact")}</span>
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    maxLength={254}
+                    value={reportContact}
+                    onChange={(event) => setReportContact(event.target.value)}
+                  />
+                  <small>{t("reportContactHint")}</small>
+                </label>
+                <p>{t("reportReviewNote")}</p>
+                {!user && !authLoading ? (
+                  <p role="status">{t("reportSessionRequired")}</p>
+                ) : null}
                 <button
                   className={styles.secondaryButton}
                   type="submit"
-                  disabled={reporting}
+                  disabled={reporting || authLoading || !user}
                 >
                   {reporting ? t("working") : t("submitReport")}
                 </button>

@@ -10,9 +10,10 @@ V1.0 launches with these two sports. The focus is reliable scoring, quick correc
 - Pickleball doubles: side-out scoring, best of three games, first to 11, win by two, including the opening 0-0-2 server exception.
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
-- Guest matches with client-generated UUIDs, local-first scoring, and temporary server sync. Guest matches can be resumed in the same browser for up to 12 hours after the last activity.
-- Read-only Live Viewer links with revocation and an expiry no later than the match data.
-- Locked Official Rules and public, versioned Community Rules. Community Rules are unofficial and are published without manual approval.
+- Guest matches with client-generated UUIDs, local-first scoring, rate-limited server sync, and a 12-hour inactivity expiry capped at 24 hours. Expired records are cleaned hourly.
+- Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
+- Locked Official Rules and public, versioned Community Rules. Community Rules are unofficial, published without pre-approval, and manually reviewed after reports.
+- One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
 - English by default, with Indonesian available.
 
 ## Tech stack

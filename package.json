@@ -1,7 +1,7 @@
 {
   "name": "skor-lapangan",
   "private": true,
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@10.34.6",
   "scripts": {
     "build": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/web build",
     "dev": "pnpm --filter @skor-lapangan/web dev",
