@@ -105,6 +105,12 @@ const messages = {
     resumeTitle: "Pertandingan aktif di perangkat ini",
     resumeBody: "Lanjutkan pertandingan tamu yang belum selesai.",
     resumeMatch: "Lanjutkan pertandingan",
+    deleteMatch: "Hapus",
+    deleteMatchPromptGroup: "Konfirmasi hapus pertandingan",
+    deleteMatchConfirm:
+      "Hapus pertandingan ini dari perangkat? Salinan yang tersinkron tetap tersedia sampai kedaluwarsa.",
+    confirmDeleteMatch: "Hapus dari perangkat",
+    matchDeleted: "Pertandingan dihapus dari perangkat ini.",
     back: "Kembali",
     setupTitle: "Siapa yang bermain?",
     setupIntro:
@@ -407,6 +413,12 @@ const messages = {
     resumeTitle: "Active matches on this device",
     resumeBody: "Continue an unfinished guest match.",
     resumeMatch: "Resume match",
+    deleteMatch: "Delete",
+    deleteMatchPromptGroup: "Confirm match deletion",
+    deleteMatchConfirm:
+      "Remove this match from this device? Any synced copy remains available until it expires.",
+    confirmDeleteMatch: "Remove from device",
+    matchDeleted: "Match removed from this device.",
     back: "Back",
     setupTitle: "Who is playing?",
     setupIntro:

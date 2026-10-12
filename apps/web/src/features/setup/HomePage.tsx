@@ -10,7 +10,7 @@ import { AppHeader } from "../../components/AppHeader";
 import { PwaInstallControl } from "../../components/PwaInstallControl";
 import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { localizedPath, useLocale } from "../../lib/i18n";
-import { listGuestMatches, saveDraft } from "../../lib/session";
+import { listGuestMatches, removeMatch, saveDraft } from "../../lib/session";
 import styles from "../../styles/App.module.css";
 
 export function HomePage() {
@@ -18,7 +18,11 @@ export function HomePage() {
   const { locale, t } = useLocale();
   const [sport, setSport] = useState<Sport>("badminton");
   const [format, setFormat] = useState<MatchFormat>("doubles");
-  const [savedMatches] = useState<MatchJournal[]>(() => listGuestMatches());
+  const [savedMatches, setSavedMatches] = useState<MatchJournal[]>(() =>
+    listGuestMatches(),
+  );
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [hasDeletedMatch, setHasDeletedMatch] = useState(false);
   const activeMatches = savedMatches.filter(
     (journal) => deriveJournal(journal).state.status === "active",
   );
@@ -57,6 +61,15 @@ export function HomePage() {
     navigate(localizedPath("/setup", locale));
   }
 
+  function confirmDeleteMatch(matchId: string) {
+    removeMatch(matchId);
+    setSavedMatches((matches) =>
+      matches.filter((match) => match.definition.id !== matchId),
+    );
+    setPendingDeleteId(null);
+    setHasDeletedMatch(true);
+  }
+
   return (
     <div className={styles.pageShell}>
       <AppHeader />
@@ -81,26 +94,77 @@ export function HomePage() {
             </div>
             <div className={styles.resumeList}>
               {activeMatches.map((journal) => (
-                <button
+                <article
                   className={styles.resumeMatch}
-                  type="button"
                   key={journal.definition.id}
-                  onClick={() =>
-                    navigate(
-                      localizedPath(`/match/${journal.definition.id}`, locale),
-                    )
-                  }
+                  aria-label={`${t(journal.definition.sport)} ${t(journal.definition.format ?? "doubles")}`}
                 >
                   <span>
                     {t(journal.definition.sport)} ·{" "}
                     {t(journal.definition.format ?? "doubles")}
                   </span>
-                  <strong>{t("resumeMatch")}</strong>
-                </button>
+                  <div className={styles.resumeMatchActions}>
+                    <button
+                      className={styles.resumeButton}
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          localizedPath(
+                            `/match/${journal.definition.id}`,
+                            locale,
+                          ),
+                        )
+                      }
+                    >
+                      {t("resumeMatch")}
+                    </button>
+                    <button
+                      className={styles.deleteMatchButton}
+                      type="button"
+                      aria-label={`${t("deleteMatch")} ${t(journal.definition.sport)}`}
+                      onClick={() => {
+                        setHasDeletedMatch(false);
+                        setPendingDeleteId(journal.definition.id);
+                      }}
+                    >
+                      {t("deleteMatch")}
+                    </button>
+                  </div>
+                  {pendingDeleteId === journal.definition.id ? (
+                    <div
+                      className={styles.deleteMatchConfirm}
+                      role="group"
+                      aria-label={t("deleteMatchPromptGroup")}
+                    >
+                      <p>{t("deleteMatchConfirm")}</p>
+                      <div className={styles.deleteMatchConfirmActions}>
+                        <button
+                          className={styles.deleteMatchConfirmButton}
+                          type="button"
+                          onClick={() =>
+                            confirmDeleteMatch(journal.definition.id)
+                          }
+                        >
+                          {t("confirmDeleteMatch")}
+                        </button>
+                        <button
+                          className={styles.deleteMatchCancelButton}
+                          type="button"
+                          onClick={() => setPendingDeleteId(null)}
+                        >
+                          {t("cancel")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
               ))}
             </div>
           </section>
         ) : null}
+        <p className={styles.deleteAnnouncement} role="status" aria-live="polite">
+          {hasDeletedMatch ? t("matchDeleted") : ""}
+        </p>
 
         <section className={styles.quickStart} aria-label="Quick start">
           <fieldset className={styles.optionGroup}>

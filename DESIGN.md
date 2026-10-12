@@ -13,3 +13,4 @@ Skor Lapangan adalah alat utilitas lapangan untuk pemain rekreasional. Tampilan 
 - Lapangan selalu memakai orientasi potret dengan net horizontal, mengikuti proporsi fisik lapangan.
 - Lapangan Tennis memakai hijau rumput dengan garis putih supaya bentuk lapangan mudah dikenali dan posisi pemain tetap terbaca.
 - Semua target sentuh minimum 44 piksel, focus ring terlihat, dan warna tidak menjadi satu-satunya penanda keadaan.
+- Aksi hapus dipisahkan dari aksi lanjut dan meminta konfirmasi agar match lokal tidak terhapus karena salah sentuh.

@@ -194,19 +194,91 @@
 }
 
 .resumeMatch {
-  min-height: 48px;
+  min-height: 64px;
   padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.resumeMatch > span {
+  min-width: 0;
+}
+
+.resumeMatchActions,
+.deleteMatchConfirmActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resumeButton,
+.deleteMatchButton,
+.deleteMatchConfirmActions button {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-weight: 850;
+}
+
+.resumeButton {
+  border: 0;
+  background: transparent;
+  color: var(--cobalt-dark);
+}
+
+.deleteMatchButton {
+  border: 1px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+}
+
+.deleteMatchConfirm {
+  grid-column: 1 / -1;
+  padding-top: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface);
-  text-align: left;
+  border-top: 1px solid var(--line);
 }
 
-.resumeMatch strong {
-  color: var(--cobalt-dark);
+.deleteMatchConfirm p {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.deleteMatchConfirmActions button {
+  border: 2px solid var(--ink);
+}
+
+.deleteMatchConfirmButton {
+  color: white;
+  background: var(--danger);
+}
+
+.deleteMatchCancelButton {
+  background: var(--surface);
+}
+
+.deleteAnnouncement {
+  min-height: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.deleteAnnouncement:empty {
+  display: none;
 }
 
 .eyebrow {
@@ -1707,6 +1779,10 @@
 
   .resumeSection {
     grid-template-columns: 1fr;
+  }
+
+  .resumeMatchActions {
+    justify-content: flex-start;
   }
 
   .optionGrid,
