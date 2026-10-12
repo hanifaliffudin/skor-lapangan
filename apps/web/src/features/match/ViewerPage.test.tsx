@@ -38,6 +38,57 @@ const singlesViewerState = {
   },
 };
 
+const mixedTennisViewerState = {
+  ...singlesViewerState,
+  sport: "tennis",
+  format: "mixed_doubles",
+  tennisLocalRoles: { A: ["woman", "man"], B: ["man", "woman"] },
+  tennis: {
+    setNumber: 1,
+    setsWon: { A: 0, B: 0 },
+    gamesInSet: { A: 0, B: 0 },
+    pointScore: { A: 1, B: 2 },
+    advantage: null,
+    gamePointCount: 3,
+    tieBreakScore: null,
+    phase: "game",
+    courtEndsSwapped: false,
+    noAdReceivingSide: null,
+  },
+};
+
+const mixedPadelViewerState = {
+  ...singlesViewerState,
+  sport: "padel",
+  format: "mixed_doubles",
+  padel: {
+    gameScoring: "golden_point",
+    setNumber: 2,
+    setsWon: { A: 1, B: 0 },
+    gamesInSet: { A: 6, B: 6 },
+    pointScore: { A: 3, B: 3 },
+    advantage: null,
+    starDeuces: 0,
+    gamePointCount: 6,
+    tieBreakScore: null,
+    phase: "game",
+    setOpeningServer: "A",
+    setOrders: {
+      serviceOrder: { A: [0, 1], B: [1, 0] },
+      deuceReceiver: { A: 0, B: 1 },
+    },
+    serviceTurns: { A: 3, B: 3 },
+    tieBreakFirstServer: null,
+    tieBreakStartCourtEndsSwapped: false,
+    decidingReceivingSide: "left",
+    awaitingSetOrders: false,
+    courtEndsSwapped: true,
+    completedSets: [],
+    roleLabels: ["woman", "man"],
+  },
+  padelLocalRoles: { A: ["woman", "man"], B: ["man", "woman"] },
+};
+
 describe("live viewer", () => {
   beforeEach(() => {
     rpcMock.mockReset();
@@ -115,6 +166,73 @@ describe("live viewer", () => {
     expect(container.querySelectorAll("[data-side]")).toHaveLength(2);
     expect(screen.getAllByText("Player 1").length).toBeGreaterThan(0);
     expect(screen.queryByText("Player 2")).not.toBeInTheDocument();
+  });
+
+  it("shows mixed Tennis score without exposing local role labels or names", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "tennis",
+          status: "active",
+          current_state: mixedTennisViewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/view/mixed-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Tennis · Mixed doubles/)).toBeVisible();
+    expect(screen.getByText("15")).toBeVisible();
+    expect(screen.getByText("30")).toBeVisible();
+    expect(
+      screen.queryByText(/woman|man|tennisLocalRoles/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/A1|B1|private name/i)).not.toBeInTheDocument();
+  });
+
+  it("shows mixed Padel score and court state without local roles or names", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "padel",
+          status: "active",
+          current_state: mixedPadelViewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/view/padel-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Padel · Mixed doubles/)).toBeVisible();
+    expect(screen.getAllByText("Golden")).toHaveLength(2);
+    expect(
+      container.querySelector('[data-ends-swapped="true"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/woman|man|padelLocalRoles|Private Mixed Player/i),
+    ).not.toBeInTheDocument();
   });
 
   it("shows an unavailable state for expired or revoked links", async () => {

@@ -6,3 +6,13 @@ export function isRateLimitError(message: string | null | undefined): boolean {
     normalized.includes("security purposes")
   );
 }
+
+export function isUnsupportedMatchSportError(
+  message: string | null | undefined,
+): boolean {
+  const normalized = message?.toLowerCase() ?? "";
+  return (
+    normalized.includes("matches_sport_check") ||
+    normalized.includes("match_events_event_type_check")
+  );
+}

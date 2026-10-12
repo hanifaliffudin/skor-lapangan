@@ -1,6 +1,6 @@
 # Supabase setup
 
-Supabase enables anonymous guest sync and Live Viewer links in V1.0. Google sign-in, account history, and Community Rules are deferred to V1.1. Badminton and Pickleball scoring still works locally without Supabase, but server-backed features stay unavailable.
+Supabase enables anonymous guest sync and Live Viewer links. Google sign-in, account history, and Community Rules are deferred to V1.1. All sports can be scored locally without Supabase, but server-backed features stay unavailable.
 
 ## 1. Configure the web app
 
@@ -27,10 +27,12 @@ In Supabase Dashboard, open **SQL Editor** and run each migration once, in filen
 5. `supabase/migrations/20261009130000_revoke_community_rule_table_reads.sql`
 6. `supabase/migrations/20261009140000_release_guardrails.sql`
 7. `supabase/migrations/20261012110000_match_format_in_guest_payload.sql`
+8. `supabase/migrations/20261012130000_tennis_scoring.sql`
+9. `supabase/migrations/20261012140000_padel_scoring.sql`
 
-The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all seven migrations in filename order because the release-guardrail migration depends on those tables and the match-format migration updates the guest payload sanitizer. V1.0 does not expose Community Rules in the app, and Google OAuth stays disabled. The release-guardrail migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job.
+The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all nine migrations in filename order because later migrations replace functions created by earlier ones. The release-guardrail migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job. The Tennis migration adds ITF ruleset validation and privacy-limited Tennis viewer projections. The Padel migration adds FIP ruleset validation, the labeled club-singles variant, and privacy-limited Padel projections.
 
-For a fresh environment, apply all seven migrations in filename order before deploying the app. For an existing live environment, apply any pending migrations in filename order, including `20261012110000_match_format_in_guest_payload.sql`, before deploying code that creates or shares singles matches. Do not rerun earlier migrations to apply a later schema change.
+For a fresh environment, apply all nine migrations in filename order before deploying the app. For an existing live environment, apply pending migrations in filename order before deploying code that depends on them. Apply `20261012110000_match_format_in_guest_payload.sql` before code that creates or shares singles matches, `20261012130000_tennis_scoring.sql` before enabling Tennis clients, and `20261012140000_padel_scoring.sql` before enabling Padel clients. Do not rerun earlier migrations to apply a later schema change.
 
 Expired guest records become unreadable at 12 hours after last accepted server activity, capped at 24 hours after creation. Live Viewer links expire within 12 hours and no later than match expiry; reads do not refresh the link. The migration schedules `purge_expired_guest_matches()` hourly, removing expired matches/events and rate-limit counters; anonymous Auth users older than 30 days are also deleted. Cleanup timing is not the access-control boundary. After the next hour, check Supabase Cron run history and verify the job succeeded.
 

@@ -22,7 +22,7 @@
   --lime: #9be36a;
   --lime-dark: #20440c;
   --danger: #a61b1b;
-  --focus: #ff7a00;
+  --focus: #b45100;
 }
 
 * {
@@ -30,12 +30,10 @@
 }
 
 html {
-  min-width: 320px;
   background: var(--paper);
 }
 
 body {
-  min-width: 320px;
   min-height: 100vh;
   margin: 0;
 }

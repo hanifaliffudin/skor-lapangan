@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,7 +8,19 @@ const hcaptchaDevHost = process.env.HCAPTCHA_DEV_HOST?.trim();
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "prompt",
+      injectRegister: false,
+      manifest: false,
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        navigateFallback: "/index.html",
+        cleanupOutdatedCaches: true,
+      },
+    }),
+  ],
   build: {
     rollupOptions: {
       input: {

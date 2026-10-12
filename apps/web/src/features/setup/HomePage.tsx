@@ -7,6 +7,8 @@ import {
   type Sport,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
+import { PwaInstallControl } from "../../components/PwaInstallControl";
+import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { listGuestMatches, saveDraft } from "../../lib/session";
 import styles from "../../styles/App.module.css";
@@ -59,8 +61,11 @@ export function HomePage() {
     <div className={styles.pageShell}>
       <AppHeader />
       <main className={styles.homeMain}>
+        <PwaUpdateNotice />
         <section className={styles.hero} aria-labelledby="hero-title">
-          <p className={styles.eyebrow}>Badminton · Pickleball</p>
+          <p className={styles.eyebrow}>
+            Badminton · Pickleball · Tennis · Padel
+          </p>
           <h1 id="hero-title">{t("tagline")}</h1>
           <p>{t("intro")}</p>
         </section>
@@ -106,14 +111,34 @@ export function HomePage() {
                 label={t("badminton")}
                 hint={t("badmintonHint")}
                 name="sport"
-                onChange={() => setSport("badminton")}
+                onChange={() => {
+                  setSport("badminton");
+                  if (format === "mixed_doubles") setFormat("doubles");
+                }}
               />
               <ChoiceCard
                 checked={sport === "pickleball"}
                 label={t("pickleball")}
                 hint={t("pickleballHint")}
                 name="sport"
-                onChange={() => setSport("pickleball")}
+                onChange={() => {
+                  setSport("pickleball");
+                  if (format === "mixed_doubles") setFormat("doubles");
+                }}
+              />
+              <ChoiceCard
+                checked={sport === "tennis"}
+                label={t("tennis")}
+                hint={t("tennisHint")}
+                name="sport"
+                onChange={() => setSport("tennis")}
+              />
+              <ChoiceCard
+                checked={sport === "padel"}
+                label={t("padel")}
+                hint={t("padelHint")}
+                name="sport"
+                onChange={() => setSport("padel")}
               />
             </div>
           </fieldset>
@@ -123,8 +148,8 @@ export function HomePage() {
             <div className={styles.optionGrid}>
               <ChoiceCard
                 checked={format === "singles"}
-                label={t("singles")}
-                hint={t("singlesHint")}
+                label={t(sport === "padel" ? "padelSingles" : "singles")}
+                hint={t(sport === "padel" ? "padelSinglesHint" : "singlesHint")}
                 name="format"
                 onChange={() => setFormat("singles")}
               />
@@ -135,6 +160,15 @@ export function HomePage() {
                 name="format"
                 onChange={() => setFormat("doubles")}
               />
+              {sport === "tennis" || sport === "padel" ? (
+                <ChoiceCard
+                  checked={format === "mixed_doubles"}
+                  label={t("mixedDoubles")}
+                  hint={t("mixedDoublesHint")}
+                  name="format"
+                  onChange={() => setFormat("mixed_doubles")}
+                />
+              ) : null}
             </div>
           </fieldset>
 
@@ -146,6 +180,7 @@ export function HomePage() {
             {t("continue")} <span aria-hidden="true">→</span>
           </button>
           <p className={styles.guestNote}>{t("guestNote")}</p>
+          <PwaInstallControl />
         </section>
       </main>
 

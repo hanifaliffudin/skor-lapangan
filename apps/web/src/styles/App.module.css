@@ -2,6 +2,8 @@
 .matchShell {
   min-height: 100vh;
   min-height: 100dvh;
+  padding-right: env(safe-area-inset-right);
+  padding-left: env(safe-area-inset-left);
   background: var(--paper);
 }
 
@@ -11,6 +13,7 @@
   min-height: 76px;
   margin: 0 auto;
   padding: 16px clamp(18px, 4vw, 40px);
+  padding-top: calc(16px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -357,6 +360,82 @@
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
+}
+
+.installControl {
+  margin-top: 14px;
+}
+
+.installButton {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.installButton:hover {
+  background: #eef0f2;
+}
+
+.installInstructions {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.installInstructions summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--cobalt-dark);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.installInstructions p {
+  margin: 0;
+  padding: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.pwaUpdateNotice {
+  margin-bottom: 26px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.pwaUpdateNotice p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.pwaUpdateButton {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--lime);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.pwaUpdateButton:hover:not(:disabled) {
+  background: #84d84c;
 }
 
 .footer {
@@ -1077,6 +1156,18 @@
   letter-spacing: -0.07em;
 }
 
+.scoreButton[data-tennis="true"] {
+  min-height: 88px;
+  font-size: clamp(34px, 6vw, 58px);
+  letter-spacing: -0.04em;
+}
+
+.scoreButton[data-padel="true"] {
+  min-height: 88px;
+  font-size: clamp(34px, 6vw, 58px);
+  letter-spacing: -0.04em;
+}
+
 .scoreButton:hover {
   color: var(--cobalt-dark);
 }
@@ -1144,6 +1235,144 @@
   outline: 2px solid var(--ink);
   background: #356b4b;
   box-shadow: 6px 6px 0 var(--ink);
+}
+
+.court[data-sport="tennis"] {
+  background:
+    linear-gradient(
+      90deg,
+      transparent 9%,
+      rgb(255 255 255 / 85%) 9% 9.7%,
+      transparent 9.7% 90.3%,
+      rgb(255 255 255 / 85%) 90.3% 91%,
+      transparent 91%
+    ),
+    #356b4b;
+}
+
+.court[data-sport="tennis"]::after {
+  display: block;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="tennis"] .courtHalf::after {
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  content: "";
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="tennis"] .courtHalf[data-team="B"]::before {
+  position: absolute;
+  top: 50%;
+  right: 9%;
+  left: 9%;
+  height: 1px;
+  content: "";
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="tennis"] .courtHalf[data-team="B"]::after {
+  top: 0;
+  bottom: 50%;
+}
+
+.court[data-sport="tennis"] .courtHalf[data-team="A"]::before {
+  position: absolute;
+  right: 9%;
+  bottom: 50%;
+  left: 9%;
+  height: 1px;
+  content: "";
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="tennis"] .courtHalf[data-team="A"]::after {
+  top: 50%;
+  bottom: 0;
+}
+
+.court[data-sport="padel"]::before {
+  display: none;
+}
+
+.court[data-sport="padel"] {
+  aspect-ratio: 1 / 2;
+}
+
+.court[data-sport="padel"][data-format="singles"] {
+  width: min(180px, 47vw);
+  aspect-ratio: 3 / 10;
+}
+
+.court[data-sport="padel"] .courtHalf {
+  border: 0;
+}
+
+.court[data-sport="padel"] .courtHalf::before {
+  position: absolute;
+  right: 9%;
+  left: 9%;
+  height: 1px;
+  content: "";
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="padel"] .courtHalf[data-team="B"]::before {
+  top: 30.5%;
+}
+
+.court[data-sport="padel"] .courtHalf[data-team="A"]::before {
+  bottom: 30.5%;
+}
+
+.court[data-sport="padel"] .courtHalf::after {
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  content: "";
+  background: rgb(255 255 255 / 85%);
+}
+
+.court[data-sport="padel"] .courtHalf[data-team="B"]::after {
+  top: 30.5%;
+  bottom: 0;
+}
+
+.court[data-sport="padel"] .courtHalf[data-team="A"]::after {
+  top: 0;
+  bottom: 30.5%;
+}
+
+.court[data-sport="padel"][data-ends-swapped="true"] .courtHalf[data-team="A"] {
+  grid-row: 1;
+}
+
+.court[data-sport="padel"][data-ends-swapped="true"] .courtHalf[data-team="B"] {
+  grid-row: 3;
+}
+
+.court[data-sport="padel"][data-ends-swapped="true"] .net {
+  grid-row: 2;
+}
+
+.court[data-sport="tennis"][data-ends-swapped="true"]
+  .courtHalf[data-team="A"] {
+  grid-row: 1;
+}
+
+.court[data-sport="tennis"][data-ends-swapped="true"]
+  .courtHalf[data-team="B"] {
+  grid-row: 3;
+}
+
+.court[data-sport="tennis"][data-ends-swapped="true"] .net {
+  grid-row: 2;
 }
 
 .court::before,
@@ -1217,6 +1446,11 @@
   background: var(--lime);
 }
 
+.playerSpot[data-receiving="true"] {
+  outline: 3px solid var(--lime);
+  outline-offset: 1px;
+}
+
 .playerSpot strong {
   width: 18px;
   height: 18px;
@@ -1231,6 +1465,75 @@
 .matchActions {
   display: grid;
   gap: 14px;
+}
+
+.tennisSetLine {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.tennisPhaseNote {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  border-left: 4px solid var(--lime-dark);
+  background: #f2f5ea;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.tennisPointChoice {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tennisPointChoice > span {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.tennisPointChoice button {
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  font-weight: 800;
+}
+
+.tennisPointChoice button[aria-pressed="true"] {
+  border: 2px solid var(--ink);
+  background: var(--lime);
+}
+
+.tennisPairOrders {
+  margin-top: 14px;
+  padding-top: 12px;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tennisPairOrders h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.fieldHint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.teamFields .fieldHint {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .rallyActions {
@@ -1372,6 +1675,7 @@
   .header {
     min-height: 62px;
     padding: 10px 14px;
+    padding-top: calc(10px + env(safe-area-inset-top));
   }
 
   .brand span:last-child {
@@ -1390,6 +1694,15 @@
 
   .homeMain {
     padding-top: 38px;
+  }
+
+  .pwaUpdateNotice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pwaUpdateButton {
+    width: 100%;
   }
 
   .resumeSection {

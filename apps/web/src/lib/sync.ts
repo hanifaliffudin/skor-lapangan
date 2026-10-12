@@ -72,6 +72,37 @@ export function serializeJournalForSync(
         createdAt: definition.createdAt,
         initialServingTeam: definition.initialServingTeam,
         initialServingPlayer: definition.initialServingPlayer,
+        ...(definition.sport === "tennis"
+          ? {
+              tennisSetOrders: definition.tennisSetOrders,
+              ruleset: definition.ruleset
+                ? {
+                    id: definition.ruleset.id,
+                    name: definition.ruleset.name,
+                    sport: definition.ruleset.sport,
+                    format: definition.ruleset.format,
+                    source: definition.ruleset.source,
+                    version: definition.ruleset.version,
+                    tennisConfiguration: definition.ruleset.tennisConfiguration,
+                  }
+                : undefined,
+            }
+          : definition.sport === "padel"
+            ? {
+                padelSetOrders: definition.padelSetOrders,
+                ruleset: definition.ruleset
+                  ? {
+                      id: definition.ruleset.id,
+                      name: definition.ruleset.name,
+                      sport: definition.ruleset.sport,
+                      format: definition.ruleset.format,
+                      source: definition.ruleset.source,
+                      version: definition.ruleset.version,
+                      padelConfiguration: definition.ruleset.padelConfiguration,
+                    }
+                  : undefined,
+              }
+            : {}),
       }),
       status: state.status,
       winner: state.winner,

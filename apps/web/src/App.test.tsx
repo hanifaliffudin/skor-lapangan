@@ -89,13 +89,13 @@ describe("quick start", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Badminton & Pickleball scorekeeper",
+        name: "Scoreboards for badminton, pickleball, tennis, and padel",
       }),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "ID" }));
     expect(
       screen.getByRole("heading", {
-        name: "Papan skor Badminton & Pickleball",
+        name: "Papan skor untuk badminton, pickleball, tenis, dan padel",
       }),
     ).toBeVisible();
   });
@@ -112,9 +112,224 @@ describe("quick start", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Papan skor Badminton & Pickleball",
+        name: "Papan skor untuk badminton, pickleball, tenis, dan padel",
       }),
     ).toBeVisible();
+  });
+
+  it("offers mixed doubles and ITF format settings when Tennis is selected", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByText("Tennis"));
+    expect(screen.getByText("Mixed doubles")).toBeVisible();
+    await user.click(screen.getByText("Mixed doubles"));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+
+    expect(
+      await screen.findByText("Tennis format · 2026 ITF rules"),
+    ).toBeVisible();
+    expect(screen.getAllByText(/Mixed-doubles roles/)).toHaveLength(2);
+    expect(screen.getByText("Match tie-break replaces the set")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    const saved = listGuestMatches()[0]!;
+    expect(saved.definition).toMatchObject({
+      sport: "tennis",
+      format: "mixed_doubles",
+      ruleset: {
+        id: "itf-tennis-2026",
+        tennisConfiguration: {
+          bestOf: 3,
+          gameScoring: "advantage",
+          setScoring: "tiebreak",
+          finalSetScoring: "tiebreak",
+        },
+      },
+      tennisLocalRoles: { A: ["woman", "man"], B: ["woman", "man"] },
+    });
+    await user.click(
+      screen.getByRole("button", { name: /Tennis point won by Team A/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Correct score: Team A" }),
+    ).toHaveTextContent("15");
+    expect(listGuestMatches()[0]?.events).toHaveLength(1);
+  });
+
+  it("scores a Tennis doubles point with the selected service and receiver order", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Tennis Track games, sets, service, and tie-breaks",
+      }),
+    );
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Doubles 2 players per side",
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+    expect(
+      screen.getAllByLabelText("Player who serves first for this team"),
+    ).toHaveLength(2);
+    expect(screen.getAllByLabelText("Deuce-court receiver")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+    await user.click(
+      screen.getByRole("button", { name: /Tennis point won by Team B/ }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Correct score: Team B" }),
+    ).toHaveTextContent("15");
+    expect(listGuestMatches()[0]?.events).toHaveLength(1);
+    expect(listGuestMatches()[0]?.definition.tennisSetOrders).toMatchObject({
+      serviceOrder: { A: [0, 1], B: [0, 1] },
+      deuceReceiver: { A: 0, B: 0 },
+    });
+  });
+
+  it("sets up mixed Padel with FIP options and enforces the deciding receiver", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Padel Track games, service, receivers, and FIP tie-breaks",
+      }),
+    );
+    await user.click(screen.getByRole("radio", { name: /Mixed doubles/i }));
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+
+    expect(
+      await screen.findByText("Padel format · 2026 FIP rules"),
+    ).toBeVisible();
+    await user.selectOptions(
+      screen.getByLabelText("Game scoring"),
+      "golden_point",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("First two set format"),
+      "mini",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Deciding set"),
+      "match_tiebreak",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Match tie-break target"),
+      "10",
+    );
+    expect(
+      screen.getAllByText(/Mixed receiver-role labels stay on the device/i),
+    ).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    let saved = listGuestMatches()[0]!;
+    expect(saved.definition).toMatchObject({
+      sport: "padel",
+      format: "mixed_doubles",
+      ruleset: {
+        id: "fip-padel-2026",
+        source: "official",
+        padelConfiguration: {
+          gameScoring: "golden_point",
+          setScoring: "mini",
+          finalSetScoring: "match_tiebreak",
+          matchTieBreakPoints: 10,
+        },
+      },
+      padelLocalRoles: { A: ["woman", "man"], B: ["woman", "man"] },
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      await user.click(
+        screen.getByRole("button", { name: /Padel point won by Team A/ }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: /Padel point won by Team B/ }),
+      );
+    }
+    expect(screen.getByRole("button", { name: "right" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "left" })).toBeDisabled();
+    await user.click(
+      screen.getByRole("button", { name: /Padel point won by Team B/ }),
+    );
+
+    saved = listGuestMatches()[0]!;
+    expect(saved.events).toHaveLength(7);
+    expect(JSON.stringify(saved.events)).not.toContain("woman");
+    expect(saved.events[6]).toMatchObject({ type: "rally_awarded", team: "B" });
+  });
+
+  it("labels club Padel singles as a local variant", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Padel Track games, service, receivers, and FIP tie-breaks",
+      }),
+    );
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Club singles Local 6 × 20 m variant with FIP-derived scoring",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+
+    expect(
+      await screen.findByText("Club singles format · local variant"),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "FIP does not define singles. This is an unofficial FIP-derived scoring option.",
+      ),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    const saved = listGuestMatches()[0]!;
+    expect(saved.definition).toMatchObject({
+      sport: "padel",
+      format: "singles",
+      rulesetId: "club-padel-singles-2026",
+      ruleset: { source: "local_variant" },
+    });
+    expect(screen.getByText("Club singles · local variant")).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: /Padel point won by Team A/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Correct score: Team A" }),
+    ).toHaveTextContent("15");
   });
 
   it("starts a keyboard-selected pickleball singles match with the chosen scoring mode", async () => {
@@ -209,7 +424,7 @@ describe("quick start", () => {
 
       expect(
         screen.getByRole("heading", {
-          name: "Badminton & Pickleball scorekeeper",
+          name: "Scoreboards for badminton, pickleball, tennis, and padel",
         }),
       ).toBeVisible();
       expect(

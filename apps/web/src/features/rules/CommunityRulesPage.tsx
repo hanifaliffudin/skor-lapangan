@@ -353,6 +353,7 @@ export function CommunityRuleDetailPage() {
                 <label>
                   <span>{t("reportReason")}</span>
                   <select
+                    name="report-reason"
                     value={reportReason}
                     onChange={(event) => setReportReason(event.target.value)}
                   >
@@ -367,6 +368,7 @@ export function CommunityRuleDetailPage() {
                 <label>
                   <span>{t("reportDetails")}</span>
                   <textarea
+                    name="report-details"
                     maxLength={500}
                     value={reportDetails}
                     onChange={(event) => setReportDetails(event.target.value)}
@@ -375,6 +377,7 @@ export function CommunityRuleDetailPage() {
                 <label>
                   <span>{t("reportContact")}</span>
                   <input
+                    name="report-contact"
                     type="email"
                     autoComplete="email"
                     maxLength={254}
@@ -533,6 +536,7 @@ export function CommunityRuleEditorPage() {
           <label>
             <span>{t("ruleTitle")}</span>
             <input
+              name="community-rule-title"
               required
               minLength={3}
               maxLength={80}
@@ -543,6 +547,7 @@ export function CommunityRuleEditorPage() {
           <label>
             <span>{t("sport")}</span>
             <select
+              name="community-sport"
               value={sport}
               onChange={(event) => changeSport(event.target.value as Sport)}
             >
@@ -553,6 +558,7 @@ export function CommunityRuleEditorPage() {
           <label>
             <span>{t("ruleDescription")}</span>
             <textarea
+              name="community-rule-description"
               maxLength={500}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -634,6 +640,7 @@ function ScoringRulesFields({
       <label>
         <span>{t("pointsToWin")}</span>
         <input
+          name="community-points-to-win"
           type="number"
           min="1"
           max="101"
@@ -647,6 +654,7 @@ function ScoringRulesFields({
       <label>
         <span>{t("winBy")}</span>
         <input
+          name="community-win-by"
           type="number"
           min="1"
           max="10"
@@ -658,6 +666,7 @@ function ScoringRulesFields({
       <label>
         <span>{t("maxPoints")}</span>
         <input
+          name="community-max-points"
           type="number"
           min={rules.pointsToWin}
           max="101"
@@ -673,6 +682,7 @@ function ScoringRulesFields({
       <label>
         <span>{t("bestOf")}</span>
         <select
+          name="community-best-of"
           value={rules.bestOf}
           onChange={(event) =>
             updateRules("bestOf", Number(event.target.value) as 1 | 3 | 5)
@@ -686,6 +696,7 @@ function ScoringRulesFields({
       <label>
         <span>{t("scoringMode")}</span>
         <select
+          name="community-scoring-mode"
           value={rules.scoringMode}
           onChange={(event) =>
             updateRules(
@@ -703,6 +714,7 @@ function ScoringRulesFields({
           <label>
             <span>{t("serversPerTurn")}</span>
             <select
+              name="community-servers-per-turn"
               value={rules.serversPerTurn}
               onChange={(event) =>
                 updateRules(
@@ -718,6 +730,7 @@ function ScoringRulesFields({
           <label>
             <span>{t("openingServerNumber")}</span>
             <select
+              name="community-opening-server-number"
               value={rules.openingServerNumber}
               onChange={(event) =>
                 updateRules(

@@ -7,7 +7,11 @@ import type {
   Sport,
   TeamId,
 } from "@skor-lapangan/scoring-core";
-import { getMatchFormat } from "@skor-lapangan/scoring-core";
+import {
+  getMatchFormat,
+  padelScoreLabel,
+  tennisScoreLabel,
+} from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
 import { useLocale } from "../../lib/i18n";
 import { supabase } from "../../lib/supabase";
@@ -32,6 +36,8 @@ function isViewerState(value: unknown): value is MatchState {
   const points = state.points;
   const gamesWon = state.gamesWon;
   const positions = state.positions;
+  const tennisState = state.tennis;
+  const padelState = state.padel;
   const positionIsValid = (position: unknown) => {
     if (!position || typeof position !== "object") return false;
     const sides = position as { left?: unknown; right?: unknown };
@@ -40,13 +46,65 @@ function isViewerState(value: unknown): value is MatchState {
       [0, 1].includes(sides.right as number)
     );
   };
+  const scoreIsValid = (score: unknown) => {
+    if (!score || typeof score !== "object") return false;
+    const value = score as { A?: unknown; B?: unknown };
+    return Number.isInteger(value.A) && Number.isInteger(value.B);
+  };
+  const tennisIsValid =
+    state.sport !== "tennis" ||
+    Boolean(
+      tennisState &&
+      Number.isInteger(tennisState.setNumber) &&
+      scoreIsValid(tennisState.setsWon) &&
+      scoreIsValid(tennisState.gamesInSet) &&
+      scoreIsValid(tennisState.pointScore) &&
+      (tennisState.tieBreakScore === null ||
+        scoreIsValid(tennisState.tieBreakScore)) &&
+      (tennisState.phase === "game" ||
+        tennisState.phase === "tiebreak" ||
+        tennisState.phase === "match_tiebreak") &&
+      typeof tennisState.courtEndsSwapped === "boolean" &&
+      (tennisState.noAdReceivingSide === null ||
+        tennisState.noAdReceivingSide === "left" ||
+        tennisState.noAdReceivingSide === "right"),
+    );
+  const padelIsValid =
+    state.sport !== "padel" ||
+    Boolean(
+      padelState &&
+      Number.isInteger(padelState.setNumber) &&
+      scoreIsValid(padelState.setsWon) &&
+      scoreIsValid(padelState.gamesInSet) &&
+      scoreIsValid(padelState.pointScore) &&
+      (padelState.tieBreakScore === null ||
+        scoreIsValid(padelState.tieBreakScore)) &&
+      ["advantage", "star_point", "golden_point"].includes(
+        padelState.gameScoring,
+      ) &&
+      ["game", "tiebreak", "match_tiebreak"].includes(padelState.phase) &&
+      typeof padelState.courtEndsSwapped === "boolean" &&
+      typeof padelState.awaitingSetOrders === "boolean" &&
+      Number.isInteger(padelState.starDeuces) &&
+      padelState.starDeuces >= 0 &&
+      padelState.starDeuces <= 2 &&
+      Array.isArray(padelState.completedSets) &&
+      (padelState.decidingReceivingSide === null ||
+        padelState.decidingReceivingSide === "left" ||
+        padelState.decidingReceivingSide === "right"),
+    );
 
   return (
     typeof state.matchId === "string" &&
-    (state.sport === "badminton" || state.sport === "pickleball") &&
+    (state.sport === "badminton" ||
+      state.sport === "pickleball" ||
+      state.sport === "tennis" ||
+      state.sport === "padel") &&
     (state.format === undefined ||
       state.format === "singles" ||
-      state.format === "doubles") &&
+      state.format === "doubles" ||
+      ((state.sport === "tennis" || state.sport === "padel") &&
+        state.format === "mixed_doubles")) &&
     typeof state.gameNumber === "number" &&
     Boolean(
       points && Number.isInteger(points.A) && Number.isInteger(points.B),
@@ -64,7 +122,9 @@ function isViewerState(value: unknown): value is MatchState {
     ) &&
     (state.status === "active" || state.status === "complete") &&
     (state.winner === null || isTeamId(state.winner)) &&
-    Array.isArray(state.completedGames)
+    Array.isArray(state.completedGames) &&
+    tennisIsValid &&
+    padelIsValid
   );
 }
 
@@ -95,7 +155,7 @@ function viewerDefinition(state: MatchState): MatchDefinition {
 
 export function ViewerPage() {
   const { token } = useParams();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [snapshot, setSnapshot] = useState<ViewerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
@@ -130,7 +190,12 @@ export function ViewerPage() {
       }
 
       setSnapshot({
-        sport: row.sport === "pickleball" ? "pickleball" : "badminton",
+        sport:
+          row.sport === "pickleball" ||
+          row.sport === "tennis" ||
+          row.sport === "padel"
+            ? row.sport
+            : "badminton",
         status: row.status === "complete" ? "complete" : "active",
         currentState: row.current_state,
         updatedAt: row.updated_at,
@@ -175,7 +240,11 @@ export function ViewerPage() {
           <>
             <p className={styles.viewerMeta} role="status">
               {stale ? t("viewerStale") : t("viewerLive")} · {t(snapshot.sport)}{" "}
-              · {t(getMatchFormat(state))} · {t("updatedAt")}{" "}
+              ·{" "}
+              {state.sport === "padel" && getMatchFormat(state) === "singles"
+                ? t("padelLocalVariant")
+                : t(getMatchFormat(state))}{" "}
+              · {t("updatedAt")}{" "}
               {new Date(snapshot.updatedAt).toLocaleTimeString()}
             </p>
             <section className={styles.scoreboard} aria-label={t("score")}>
@@ -188,11 +257,25 @@ export function ViewerPage() {
                   <div className={styles.teamMeta}>
                     <span>{team === "A" ? t("teamA") : t("teamB")}</span>
                     <small>
-                      {t("sets")}: {state.gamesWon[team]}
+                      {t(state.tennis || state.padel ? "tennisSets" : "sets")}:{" "}
+                      {state.tennis?.setsWon[team] ??
+                        state.padel?.setsWon[team] ??
+                        state.gamesWon[team]}
                     </small>
+                    {state.tennis || state.padel ? (
+                      <small>
+                        {t("games")}:{" "}
+                        {state.tennis?.gamesInSet[team] ??
+                          state.padel?.gamesInSet[team]}
+                      </small>
+                    ) : null}
                   </div>
                   <strong className={styles.viewerScore}>
-                    {state.points[team]}
+                    {state.tennis
+                      ? tennisScoreLabel(state, team, locale)
+                      : state.padel
+                        ? padelScoreLabel(state, team, locale)
+                        : state.points[team]}
                   </strong>
                 </article>
               ))}

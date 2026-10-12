@@ -1,6 +1,8 @@
 import {
   getMatchFormat,
   servingSide,
+  padelReceivingPlayer,
+  tennisReceivingPlayer,
   type CourtSide,
   type MatchDefinition,
   type MatchState,
@@ -17,7 +19,7 @@ export function Court({
   state: MatchState;
 }) {
   const { t } = useLocale();
-  const side = servingSide(state);
+  const side = servingSide(state, definition);
   const serverName =
     definition.teams[state.servingTeam].players[state.currentServer]!.name;
 
@@ -39,7 +41,16 @@ export function Court({
         ) : null}
       </div>
 
-      <div className={styles.court} data-sport={definition.sport}>
+      <div
+        className={styles.court}
+        data-sport={definition.sport}
+        data-format={getMatchFormat(definition)}
+        data-ends-swapped={
+          state.tennis?.courtEndsSwapped ??
+          state.padel?.courtEndsSwapped ??
+          false
+        }
+      >
         <CourtHalf team="B" definition={definition} state={state} />
         <div className={styles.net} aria-hidden="true" />
         <CourtHalf team="A" definition={definition} state={state} />
@@ -62,7 +73,7 @@ function CourtHalf({
   // when both halves are drawn from the same spectator viewpoint.
   const displaySides =
     team === "A" ? (["left", "right"] as const) : (["right", "left"] as const);
-  const serviceSide = servingSide(state);
+  const serviceSide = servingSide(state, definition);
   const visibleSides =
     getMatchFormat(definition) === "singles"
       ? ([serviceSide] as CourtSide[])
@@ -75,17 +86,31 @@ function CourtHalf({
           getMatchFormat(definition) === "singles" ? 0 : position[side];
         const player = definition.teams[team].players[playerIndex]!;
         const isServer =
-          team === state.servingTeam && playerIndex === state.currentServer;
+          definition.sport !== "tennis" &&
+          team === state.servingTeam &&
+          playerIndex === state.currentServer;
+        const isReceiver =
+          (definition.sport === "tennis" || definition.sport === "padel") &&
+          team !== state.servingTeam &&
+          playerIndex ===
+            (definition.sport === "tennis"
+              ? tennisReceivingPlayer(definition, state, serviceSide)
+              : padelReceivingPlayer(definition, state, serviceSide));
         return (
           <div
             className={styles.playerSpot}
             data-side={side}
             data-serving={isServer}
+            data-receiving={isReceiver}
             style={{ gridColumn: displaySides.indexOf(side) + 1 }}
             key={`${team}-${side}`}
           >
             <span>{player.name}</span>
-            {isServer ? <strong>S</strong> : null}
+            {isServer ? (
+              <strong>S</strong>
+            ) : isReceiver ? (
+              <strong>R</strong>
+            ) : null}
           </div>
         );
       })}

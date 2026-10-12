@@ -53,6 +53,7 @@ export function OverrideDialog({
           <label>
             <span>{t("teamA")}</span>
             <input
+              name="score-team-a"
               ref={firstInput}
               type="number"
               min="0"
@@ -65,6 +66,7 @@ export function OverrideDialog({
           <label>
             <span>{t("teamB")}</span>
             <input
+              name="score-team-b"
               type="number"
               min="0"
               inputMode="numeric"

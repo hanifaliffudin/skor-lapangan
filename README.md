@@ -1,14 +1,18 @@
 # Skor Lapangan
 
-A mobile-first scorekeeper for recreational Badminton and Pickleball singles and doubles. It tracks points, service turns, the active server, and player positions on court.
+A mobile-first scorekeeper for Badminton, Pickleball, Tennis, and Padel. It tracks scores, service turns, the active server, and court positions for singles, doubles, and supported mixed-doubles formats.
 
-V1.0 launches with these two sports. The focus is reliable scoring, quick correction, and a court view players can read during a game. More sports can follow as separate releases.
+V1.0 launched with Badminton and Pickleball. Tennis and Padel have separate federation-rule, database, regression, and mobile release checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
 
 ## Features
 
 - Badminton singles and doubles: rally scoring, best of three games, first to 21, win by two, capped at 30.
 - Pickleball doubles: side-out scoring, best of three games, first to 11, win by two, including the opening 0-0-2 server exception.
 - Pickleball singles: side-out scoring by default, with optional rally scoring; both are best of three games, first to 11, win by two.
+- Tennis singles, standard doubles, and mixed doubles: event-announced best of 3 or 5 sets; advantage or no-ad games; tie-break or advantage sets, including the deciding set; and a 7- or 10-point final match tie-break by two. Defaults are best of 3, advantage games, and a tie-break at 6–6.
+- Tennis doubles service and receiver orders are stored per set. Mixed-doubles role labels remain local to the controlling device and are not shared with Live Viewer.
+- Padel doubles and mixed doubles: FIP Advantage, Star Point, or Golden Point games; standard or mini-sets; and standard, advantage, or 7-/10-point deciding-set match tie-break by two. Doubles uses a 10 × 20 m court. Club singles is a non-FIP, FIP-derived local variant on a 6 × 20 m court.
+- Padel doubles service and deuce-court receiver orders are stored per set. Mixed-doubles role labels remain on the controlling device and are excluded from synced viewer data.
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
 - Guest matches with client-generated UUIDs, local-first scoring, rate-limited server sync, and a 12-hour inactivity expiry capped at 24 hours. Expired records are cleaned hourly.
@@ -51,7 +55,7 @@ pnpm build
 
 ## Supabase setup
 
-Run the migrations in filename order using the Supabase SQL Editor. Enable anonymous sign-ins for guest matches. Do not enable Google OAuth for the V1.0 release. The database migration set retains Community Rules schema needed by the release-guardrail migration, but the V1.0 app does not expose those features. See [docs/supabase-setup.md](docs/supabase-setup.md) for setup and verification steps.
+Run the migrations in filename order using the Supabase SQL Editor. Apply `20261012130000_tennis_scoring.sql` before enabling Tennis clients and `20261012140000_padel_scoring.sql` before enabling Padel clients. Enable anonymous sign-ins for guest matches. Do not enable Google OAuth for the V1.0 release. The database migration set retains Community Rules schema needed by the release-guardrail migration, but the V1.0 app does not expose those features. See [docs/supabase-setup.md](docs/supabase-setup.md) for setup and verification steps.
 
 ## Deploy to Vercel
 

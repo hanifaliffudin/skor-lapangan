@@ -1,4 +1,24 @@
 import { getMatchFormat } from "./types";
+import {
+  applyPadelDecidingSideEvent,
+  applyPadelPoint,
+  applyPadelScoreOverride,
+  applyPadelSetOrdersEvent,
+  canSelectPadelDecidingSide,
+  createPadelState,
+  initializePadelMatchState,
+  padelServingSide,
+} from "./padel";
+import {
+  applyTennisDecidingSideEvent,
+  applyTennisPoint,
+  applyTennisScoreOverride,
+  applyTennisSetOrdersEvent,
+  canSelectTennisDecidingSide,
+  createTennisState,
+  initializeTennisMatchState,
+  tennisServingSide,
+} from "./tennis";
 import type {
   CourtSide,
   DomainEvent,
@@ -14,6 +34,10 @@ import type {
   ScoringMode,
   TeamId,
   TeamPosition,
+  TennisScoreOverriddenEvent,
+  TennisSetOrders,
+  PadelScoreOverriddenEvent,
+  PadelSetOrders,
 } from "./types";
 
 export const OFFICIAL_RULESETS = {
@@ -113,6 +137,83 @@ export const OFFICIAL_RULESETS = {
       openingServerNumber: 1,
     },
   },
+  tennis: {
+    id: "itf-tennis-2026",
+    name: "ITF Rules of Tennis 2026",
+    sport: "tennis",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-12",
+    sourceUrl:
+      "https://www.itftennis.com/media/7221/2026-rules-of-tennis-english.pdf",
+    configuration: {
+      pointsToWin: 6,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    tennisConfiguration: {
+      bestOf: 3,
+      gameScoring: "advantage",
+      setScoring: "tiebreak",
+      finalSetScoring: "tiebreak",
+      matchTieBreakPoints: 7,
+    },
+  },
+  padel: {
+    id: "fip-padel-2026",
+    name: "FIP Rules of Padel 2026",
+    sport: "padel",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-12",
+    sourceUrl:
+      "https://www.padelfip.com/wp-content/uploads/2025/12/FIP_Rules-of-Padel-1.pdf",
+    configuration: {
+      pointsToWin: 6,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    padelConfiguration: {
+      gameScoring: "advantage",
+      setScoring: "standard",
+      finalSetScoring: "standard",
+      matchTieBreakPoints: 7,
+    },
+  },
+  padelSingles: {
+    id: "club-padel-singles-2026",
+    name: "Club Padel Singles (FIP-derived scoring)",
+    sport: "padel",
+    format: "singles",
+    source: "local_variant",
+    version: 1,
+    checkedAt: "2026-10-12",
+    sourceUrl:
+      "https://www.padelfip.com/wp-content/uploads/2025/12/FIP_Rules-of-Padel-1.pdf",
+    configuration: {
+      pointsToWin: 6,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    padelConfiguration: {
+      gameScoring: "advantage",
+      setScoring: "standard",
+      finalSetScoring: "standard",
+      matchTieBreakPoints: 7,
+    },
+  },
 } as const;
 
 export function officialRulesetFor(
@@ -120,6 +221,12 @@ export function officialRulesetFor(
   format: MatchFormat = "doubles",
   scoringMode?: ScoringMode,
 ) {
+  if (sport === "tennis") return OFFICIAL_RULESETS.tennis;
+  if (sport === "padel") {
+    return format === "singles"
+      ? OFFICIAL_RULESETS.padelSingles
+      : OFFICIAL_RULESETS.padel;
+  }
   if (format === "doubles") return OFFICIAL_RULESETS[sport];
   if (sport === "badminton") return OFFICIAL_RULESETS.badmintonSingles;
   return scoringMode === "rally"
@@ -131,7 +238,7 @@ function rulesFor(definition: MatchDefinition): ScoringRules {
   return (
     definition.ruleset?.configuration ??
     officialRulesetFor(definition.sport, getMatchFormat(definition))
-      .configuration
+      .configuration!
   );
 }
 
@@ -176,7 +283,7 @@ export function createInitialState(definition: MatchDefinition): MatchState {
   const positions = initialPositions(definition);
   const rules = rulesFor(definition);
 
-  return {
+  const initial: MatchState = {
     matchId: definition.id,
     sport: definition.sport,
     format: getMatchFormat(definition),
@@ -198,6 +305,17 @@ export function createInitialState(definition: MatchDefinition): MatchState {
     winner: null,
     completedGames: [],
   };
+  return definition.sport === "tennis"
+    ? initializeTennisMatchState(definition, {
+        ...initial,
+        tennis: createTennisState(definition)!,
+      })
+    : definition.sport === "padel"
+      ? initializePadelMatchState(definition, {
+          ...initial,
+          padel: createPadelState(definition)!,
+        })
+      : initial;
 }
 
 function requiredServiceSide(score: number): CourtSide {
@@ -453,11 +571,42 @@ function applyDomainEvent(
   if (state.status === "complete") {
     return state;
   }
+  if (definition.sport === "tennis") {
+    switch (event.type) {
+      case "rally_awarded":
+        return applyTennisPoint(state, event.team, definition);
+      case "tennis_set_orders_confirmed":
+        return applyTennisSetOrdersEvent(state, event, definition);
+      case "tennis_deciding_side_selected":
+        return applyTennisDecidingSideEvent(state, event, definition);
+      case "tennis_score_overridden":
+        return applyTennisScoreOverride(state, event, definition);
+      case "state_overridden":
+        return state;
+    }
+    return state;
+  }
+  if (definition.sport === "padel") {
+    switch (event.type) {
+      case "rally_awarded":
+        return applyPadelPoint(state, event.team, definition);
+      case "padel_set_orders_confirmed":
+        return applyPadelSetOrdersEvent(state, event, definition);
+      case "padel_deciding_side_selected":
+        return applyPadelDecidingSideEvent(state, event, definition);
+      case "padel_score_overridden":
+        return applyPadelScoreOverride(state, event, definition);
+      case "state_overridden":
+        return state;
+    }
+    return state;
+  }
   const rules = rulesFor(definition);
 
   if (event.type === "state_overridden") {
     return applyOverride(state, event.points, definition, rules);
   }
+  if (event.type !== "rally_awarded") return state;
 
   return rules.scoringMode === "rally"
     ? applyRallyScoring(state, event.team, definition, rules)
@@ -467,7 +616,16 @@ function applyDomainEvent(
 function domainEvents(events: MatchEvent[]): Map<string, DomainEvent> {
   const byId = new Map<string, DomainEvent>();
   for (const event of events) {
-    if (event.type === "rally_awarded" || event.type === "state_overridden") {
+    if (
+      event.type === "rally_awarded" ||
+      event.type === "state_overridden" ||
+      event.type === "tennis_set_orders_confirmed" ||
+      event.type === "tennis_deciding_side_selected" ||
+      event.type === "tennis_score_overridden" ||
+      event.type === "padel_set_orders_confirmed" ||
+      event.type === "padel_deciding_side_selected" ||
+      event.type === "padel_score_overridden"
+    ) {
       byId.set(event.id, event);
     }
   }
@@ -483,7 +641,16 @@ function activeTimeline(events: MatchEvent[]): {
   const seenDomainEvents = new Set<string>();
 
   for (const event of events) {
-    if (event.type === "rally_awarded" || event.type === "state_overridden") {
+    if (
+      event.type === "rally_awarded" ||
+      event.type === "state_overridden" ||
+      event.type === "tennis_set_orders_confirmed" ||
+      event.type === "tennis_deciding_side_selected" ||
+      event.type === "tennis_score_overridden" ||
+      event.type === "padel_set_orders_confirmed" ||
+      event.type === "padel_deciding_side_selected" ||
+      event.type === "padel_score_overridden"
+    ) {
       if (seenDomainEvents.has(event.id)) continue;
       seenDomainEvents.add(event.id);
       applied.push(event.id);
@@ -598,6 +765,154 @@ export function overrideState(
   };
 }
 
+export function confirmTennisSetOrders(
+  journal: MatchJournal,
+  orders: TennisSetOrders,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "tennis" ||
+    state.status === "complete" ||
+    !state.tennis?.awaitingSetOrders
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "tennis_set_orders_confirmed",
+        orders,
+      },
+    ],
+  };
+}
+
+export function confirmPadelSetOrders(
+  journal: MatchJournal,
+  orders: PadelSetOrders,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "padel" ||
+    state.status === "complete" ||
+    !state.padel?.awaitingSetOrders
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "padel_set_orders_confirmed",
+        orders,
+      },
+    ],
+  };
+}
+
+export function selectPadelDecidingSide(
+  journal: MatchJournal,
+  side: CourtSide,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "padel" ||
+    state.status === "complete" ||
+    !canSelectPadelDecidingSide(journal.definition, state, side)
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "padel_deciding_side_selected",
+        side,
+      },
+    ],
+  };
+}
+
+export function overridePadelScore(
+  journal: MatchJournal,
+  score: Omit<
+    PadelScoreOverriddenEvent,
+    "id" | "matchId" | "clientSequence" | "createdAt" | "type"
+  >,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (journal.definition.sport !== "padel" || state.status === "complete")
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "padel_score_overridden",
+        ...score,
+      },
+    ],
+  };
+}
+
+export function selectTennisDecidingSide(
+  journal: MatchJournal,
+  side: CourtSide,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "tennis" ||
+    state.status === "complete" ||
+    !canSelectTennisDecidingSide(journal.definition, state, side)
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "tennis_deciding_side_selected",
+        side,
+      },
+    ],
+  };
+}
+
+export function overrideTennisScore(
+  journal: MatchJournal,
+  score: Omit<
+    TennisScoreOverriddenEvent,
+    "id" | "matchId" | "clientSequence" | "createdAt" | "type"
+  >,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (journal.definition.sport !== "tennis" || state.status === "complete")
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "tennis_score_overridden",
+        ...score,
+      },
+    ],
+  };
+}
+
 export function undo(
   journal: MatchJournal,
   metadata: EventMetadata,
@@ -632,7 +947,12 @@ export function redo(
   };
 }
 
-export function servingSide(state: MatchState): CourtSide {
+export function servingSide(
+  state: MatchState,
+  definition?: MatchDefinition,
+): CourtSide {
+  if (state.sport === "tennis") return tennisServingSide(state);
+  if (state.sport === "padel") return padelServingSide(state);
   if (getMatchFormat(state) === "singles") {
     return requiredServiceSide(state.points[state.servingTeam]);
   }

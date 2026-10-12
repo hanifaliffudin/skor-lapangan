@@ -32,8 +32,14 @@ export function loadDraft(): SetupDraft | null {
     const parsed = JSON.parse(value) as SetupDraft;
     const format = parsed.format === undefined ? "doubles" : parsed.format;
     if (
-      (parsed.sport === "badminton" || parsed.sport === "pickleball") &&
-      (format === "singles" || format === "doubles") &&
+      (parsed.sport === "badminton" ||
+        parsed.sport === "pickleball" ||
+        parsed.sport === "tennis" ||
+        parsed.sport === "padel") &&
+      (format === "singles" ||
+        format === "doubles" ||
+        ((parsed.sport === "tennis" || parsed.sport === "padel") &&
+          format === "mixed_doubles")) &&
       (parsed.mode === "casual" || parsed.mode === "referee") &&
       (parsed.communityRuleId === undefined ||
         typeof parsed.communityRuleId === "string")

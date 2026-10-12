@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { awardRally, type MatchJournal } from "@skor-lapangan/scoring-core";
+import {
+  awardRally,
+  officialRulesetFor,
+  type MatchJournal,
+} from "@skor-lapangan/scoring-core";
 import { serializeJournalForSync } from "./sync";
 
 const matchId = "7550e45b-28c8-4be7-8127-810454a45c64";
@@ -118,5 +122,168 @@ describe("Supabase sync serialization", () => {
       "Private Opponent Name",
     );
     expect(JSON.stringify(payload.match)).not.toContain("pointsToWin");
+  });
+
+  it("syncs Tennis rules and score state without mixed-doubles labels", () => {
+    const official = officialRulesetFor("tennis");
+    const tennisJournal: MatchJournal = {
+      definition: {
+        id: matchId,
+        sport: "tennis",
+        format: "mixed_doubles",
+        rulesetId: official.id,
+        ruleset: {
+          id: official.id,
+          name: official.name,
+          sport: "tennis",
+          format: "mixed_doubles",
+          source: "official",
+          version: official.version,
+          tennisConfiguration: {
+            bestOf: 3,
+            gameScoring: "no_ad",
+            setScoring: "tiebreak",
+            finalSetScoring: "match_tiebreak",
+            matchTieBreakPoints: 10,
+          },
+        },
+        mode: "casual",
+        createdAt: "2026-10-12T00:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        tennisSetOrders: {
+          serviceOrder: { A: [0, 1], B: [1, 0] },
+          deuceReceiver: { A: 0, B: 1 },
+        },
+        tennisLocalRoles: {
+          A: ["woman", "man"],
+          B: ["man", "woman"],
+        },
+        teams: {
+          A: {
+            name: "Team A",
+            players: [
+              { id: "a1", name: "Private A" },
+              { id: "a2", name: "Private A2" },
+            ],
+          },
+          B: {
+            name: "Team B",
+            players: [
+              { id: "b1", name: "Private B" },
+              { id: "b2", name: "Private B2" },
+            ],
+          },
+        },
+      },
+      events: [],
+    };
+
+    const payload = serializeJournalForSync(tennisJournal, "user-1", true);
+    const serialized = JSON.stringify(payload);
+    expect(payload.match.definition).toMatchObject({
+      sport: "tennis",
+      format: "mixed_doubles",
+      ruleset: {
+        id: "itf-tennis-2026",
+        tennisConfiguration: {
+          finalSetScoring: "match_tiebreak",
+          matchTieBreakPoints: 10,
+        },
+      },
+    });
+    expect(payload.match.current_state).toMatchObject({
+      sport: "tennis",
+      tennis: {
+        setNumber: 1,
+        setOrders: { deuceReceiver: { A: 0, B: 1 } },
+      },
+    });
+    expect(serialized).not.toContain("tennisLocalRoles");
+    expect(serialized).not.toContain("woman");
+    expect(serialized).not.toContain("Private A");
+  });
+
+  it("syncs the FIP Padel snapshot and strips mixed roles and player names", () => {
+    const official = officialRulesetFor("padel", "mixed_doubles");
+    const padelJournal: MatchJournal = {
+      definition: {
+        id: matchId,
+        sport: "padel",
+        format: "mixed_doubles",
+        rulesetId: official.id,
+        ruleset: {
+          id: official.id,
+          name: official.name,
+          sport: "padel",
+          format: "mixed_doubles",
+          source: official.source,
+          version: official.version,
+          padelConfiguration: {
+            gameScoring: "star_point",
+            setScoring: "mini",
+            finalSetScoring: "match_tiebreak",
+            matchTieBreakPoints: 10,
+          },
+        },
+        mode: "casual",
+        createdAt: "2026-10-12T00:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        padelSetOrders: {
+          serviceOrder: { A: [0, 1], B: [1, 0] },
+          deuceReceiver: { A: 0, B: 1 },
+        },
+        padelLocalRoles: {
+          A: ["woman", "man"],
+          B: ["man", "woman"],
+        },
+        teams: {
+          A: {
+            name: "Private Team A",
+            players: [
+              { id: "a1", name: "Private A" },
+              { id: "a2", name: "Private A2" },
+            ],
+          },
+          B: {
+            name: "Private Team B",
+            players: [
+              { id: "b1", name: "Private B" },
+              { id: "b2", name: "Private B2" },
+            ],
+          },
+        },
+      },
+      events: [],
+    };
+
+    const payload = serializeJournalForSync(padelJournal, "guest-user", true);
+    const serialized = JSON.stringify(payload);
+    expect(payload.match.ruleset_id).toBe("fip-padel-2026");
+    expect(payload.match.definition).toMatchObject({
+      sport: "padel",
+      format: "mixed_doubles",
+      padelSetOrders: { deuceReceiver: { A: 0, B: 1 } },
+      ruleset: {
+        id: "fip-padel-2026",
+        source: "official",
+        padelConfiguration: {
+          setScoring: "mini",
+          finalSetScoring: "match_tiebreak",
+          matchTieBreakPoints: 10,
+        },
+      },
+    });
+    expect(payload.match.current_state).toMatchObject({
+      sport: "padel",
+      padel: {
+        gameScoring: "star_point",
+        setOrders: { deuceReceiver: { A: 0, B: 1 } },
+      },
+    });
+    expect(serialized).not.toContain("padelLocalRoles");
+    expect(serialized).not.toContain("woman");
+    expect(serialized).not.toContain("Private A");
   });
 });

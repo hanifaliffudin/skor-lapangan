@@ -40,6 +40,15 @@ describe("guest session storage", () => {
     expect(loadDraft()?.format).toBe("singles");
   });
 
+  it("keeps Padel mixed doubles in the setup draft", () => {
+    saveDraft({ sport: "padel", format: "mixed_doubles", mode: "casual" });
+    expect(loadDraft()).toEqual({
+      sport: "padel",
+      format: "mixed_doubles",
+      mode: "casual",
+    });
+  });
+
   it("uses the client UUID as the match storage identity", () => {
     const journal: MatchJournal = {
       definition: {
