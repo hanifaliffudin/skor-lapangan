@@ -1,10 +1,15 @@
 export type Sport = "badminton" | "pickleball";
+export type MatchFormat = "singles" | "doubles";
 export type MatchMode = "casual" | "referee";
 export type TeamId = "A" | "B";
 export type PlayerIndex = 0 | 1;
 export type CourtSide = "left" | "right";
 export type OfficialRulesetId =
-  "bwf-doubles-3x21-2025" | "usap-doubles-sideout-2026";
+  | "bwf-doubles-3x21-2025"
+  | "usap-doubles-sideout-2026"
+  | "bwf-singles-3x21-2025"
+  | "usap-singles-sideout-2026"
+  | "usap-singles-rally-2026";
 export type RulesetSource = "official" | "community" | "guest_custom";
 export type ScoringMode = "rally" | "side_out";
 export type BestOf = 1 | 3 | 5;
@@ -23,6 +28,7 @@ export interface RulesetSnapshot {
   id: string;
   name: string;
   sport: Sport;
+  format?: MatchFormat;
   source: RulesetSource;
   version: number;
   configuration?: ScoringRules;
@@ -35,12 +41,14 @@ export interface Player {
 
 export interface TeamDefinition {
   name: string;
-  players: readonly [Player, Player];
+  players: readonly [Player] | readonly [Player, Player];
 }
 
 export interface MatchDefinition {
   id: string;
   sport: Sport;
+  /** Missing on matches saved before singles support; treat those as doubles. */
+  format?: MatchFormat;
   rulesetId: string;
   ruleset?: RulesetSnapshot;
   mode: MatchMode;
@@ -58,6 +66,8 @@ export interface TeamPosition {
 export interface MatchState {
   matchId: string;
   sport: Sport;
+  /** Missing on saved states from before singles support; treat those as doubles. */
+  format?: MatchFormat;
   gameNumber: number;
   gamesWon: Record<TeamId, number>;
   points: Record<TeamId, number>;
@@ -68,6 +78,10 @@ export interface MatchState {
   status: "active" | "complete";
   winner: TeamId | null;
   completedGames: Array<{ winner: TeamId; score: Record<TeamId, number> }>;
+}
+
+export function getMatchFormat(match: { format?: MatchFormat }): MatchFormat {
+  return match.format ?? "doubles";
 }
 
 interface EventBase {

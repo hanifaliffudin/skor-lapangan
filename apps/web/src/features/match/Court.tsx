@@ -1,5 +1,7 @@
 import {
+  getMatchFormat,
   servingSide,
+  type CourtSide,
   type MatchDefinition,
   type MatchState,
   type TeamId,
@@ -17,7 +19,7 @@ export function Court({
   const { t } = useLocale();
   const side = servingSide(state);
   const serverName =
-    definition.teams[state.servingTeam].players[state.currentServer].name;
+    definition.teams[state.servingTeam].players[state.currentServer]!.name;
 
   return (
     <section
@@ -60,11 +62,18 @@ function CourtHalf({
   // when both halves are drawn from the same spectator viewpoint.
   const displaySides =
     team === "A" ? (["left", "right"] as const) : (["right", "left"] as const);
+  const serviceSide = servingSide(state);
+  const visibleSides =
+    getMatchFormat(definition) === "singles"
+      ? ([serviceSide] as CourtSide[])
+      : displaySides;
+
   return (
     <div className={styles.courtHalf} data-team={team}>
-      {displaySides.map((side) => {
-        const playerIndex = position[side];
-        const player = definition.teams[team].players[playerIndex];
+      {visibleSides.map((side) => {
+        const playerIndex =
+          getMatchFormat(definition) === "singles" ? 0 : position[side];
+        const player = definition.teams[team].players[playerIndex]!;
         const isServer =
           team === state.servingTeam && playerIndex === state.currentServer;
         return (
@@ -72,6 +81,7 @@ function CourtHalf({
             className={styles.playerSpot}
             data-side={side}
             data-serving={isServer}
+            style={{ gridColumn: displaySides.indexOf(side) + 1 }}
             key={`${team}-${side}`}
           >
             <span>{player.name}</span>

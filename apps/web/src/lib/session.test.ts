@@ -14,8 +14,12 @@ describe("guest session storage", () => {
   afterEach(() => vi.useRealTimers());
 
   it("round-trips a setup draft in the current tab", () => {
-    saveDraft({ sport: "badminton", mode: "casual" });
-    expect(loadDraft()).toEqual({ sport: "badminton", mode: "casual" });
+    saveDraft({ sport: "badminton", format: "doubles", mode: "casual" });
+    expect(loadDraft()).toEqual({
+      sport: "badminton",
+      format: "doubles",
+      mode: "casual",
+    });
   });
 
   it("normalizes a legacy Referee setup draft to the single V1 mode", () => {
@@ -24,7 +28,16 @@ describe("guest session storage", () => {
       JSON.stringify({ sport: "pickleball", mode: "referee" }),
     );
 
-    expect(loadDraft()).toEqual({ sport: "pickleball", mode: "casual" });
+    expect(loadDraft()).toEqual({
+      sport: "pickleball",
+      format: "doubles",
+      mode: "casual",
+    });
+  });
+
+  it("keeps a selected singles format in the setup draft", () => {
+    saveDraft({ sport: "badminton", format: "singles", mode: "casual" });
+    expect(loadDraft()?.format).toBe("singles");
   });
 
   it("uses the client UUID as the match storage identity", () => {

@@ -11,7 +11,7 @@ The owner must complete the bracketed fields, decide the open product terms, and
 
 ## 1. What the service does
 
-Skor Lapangan provides a browser-based scorekeeper for Badminton and Pickleball doubles in V1.0. It records scores, service and court positions, and may sync match state or display it through a Live Viewer when server features are configured.
+Skor Lapangan provides a browser-based scorekeeper for Badminton and Pickleball singles and doubles. Pickleball singles offers side-out or rally scoring. It records scores, service and court positions, and may sync match state or display it through a Live Viewer when server features are configured.
 
 The service is a scorekeeping aid. It is not a referee, a federation service, or a substitute for the rules and decisions of an organizer or match official. Players should verify the applicable rules before play, especially for organized competition.
 

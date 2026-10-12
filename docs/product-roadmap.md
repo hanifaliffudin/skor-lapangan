@@ -4,7 +4,7 @@ This roadmap records the planned public releases for Skor Lapangan. It has no re
 
 ## Release strategy
 
-Launch V1.0 with Badminton and Pickleball doubles. Use the first public release to learn whether scoring, correction, synchronization, and the live display work during real games. Improve that foundation before adding sports. Release each later sport separately so it has its own launch and feedback cycle.
+Launch V1.0 with Badminton and Pickleball singles and doubles. Use the first public release to learn whether scoring, correction, synchronization, and the live display work during real games. Improve that foundation before adding sports. Release each later sport separately so it has its own launch and feedback cycle.
 
 Keep the product mobile-first and English by default, with Indonesian available. Keep operating costs at zero or close to it. Do not add paid infrastructure without an explicit decision.
 
@@ -12,7 +12,7 @@ Keep the product mobile-first and English by default, with Indonesian available.
 
 | Release | Goal                                                   | Scope                                                                                                                                                                                                                      | Exit check                                                                                                                                                                       |
 | ------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1.0    | Public MVP for doubles play                            | Badminton and Pickleball, guest matches, score controls, Live Viewer, Official Rules, and local guest custom rules. No Google account history or Community Rules.                                                          | V1.0 launch checks below pass                                                                                                                                                    |
+| V1.0    | Public MVP for Badminton and Pickleball                | Singles and doubles, guest matches, score controls, Live Viewer, Official Rules, and local guest custom rules. No Google account history or Community Rules.                                                               | V1.0 launch checks below pass                                                                                                                                                    |
 | V1.1    | Harden the core and add account and community features | Fix issues found in V1.0 scoring, synchronization, and screen visibility. Add Google sign-in, account match history, and Community Rules only after the V1.0 foundation and moderation readiness gates pass. No new sport. | Critical scoring and sync defects are resolved, real-game feedback is reviewed, account deletion and support are ready, and Community Rules security and moderation checks pass. |
 | V1.2    | Add Tennis as the next sport candidate                 | Implement only after the V1.1 foundation gate passes. Confirm the supported format and current federation rules before development.                                                                                        | Tennis scoring, serve changes, court positions, corrections, and match completion have rules-based tests and a mobile play-through                                               |
 | V1.3    | Add Squash or the next most requested sport            | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                                                               | The sport passes the same rules, regression, and mobile checks as V1.2                                                                                                           |
@@ -24,8 +24,8 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 
 ### Included
 
-- Badminton doubles using the Official Rules source recorded in [rules sources](rules-sources.md).
-- Pickleball doubles using the Official Rules source recorded in [rules sources](rules-sources.md).
+- Badminton singles and doubles using the Official Rules sources recorded in [rules sources](rules-sources.md).
+- Pickleball singles and doubles using the Official Rules sources recorded in [rules sources](rules-sources.md). Singles supports side-out and rally scoring.
 - Match setup, team and player positions, point entry, automatic service and position changes, undo, redo, and one-event score override.
 - Guest play without Google sign-in. Generate match and event UUIDs in the browser, save locally first, and sync idempotently when the server is available.
 - Guest match continuity for up to 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired guest data and Live Viewer links stop being accessible immediately; an hourly database cleanup physically removes expired game data.
@@ -38,7 +38,6 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 ### Not included
 
 - Sports other than Badminton and Pickleball.
-- Singles formats unless a later release defines and validates them.
 - Google sign-in, persistent account match history, and guest-to-account claiming.
 - Public Community Rules, including publishing, sharing, reports, and moderation.
 - Arbitrary rule scripting or complex editing of a match's event history.

@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import {
   awardRally,
   deriveJournal,
+  getMatchFormat,
   overrideState,
   redo,
   undo,
@@ -242,7 +243,8 @@ export function MatchPage() {
         <div className={styles.matchTopline}>
           <div>
             <p className={styles.eyebrow}>
-              {t(definition.sport)} · {t(definition.mode)}
+              {t(definition.sport)} · {t(getMatchFormat(definition))} ·{" "}
+              {t(definition.mode)}
             </p>
             <h1>
               {t("game")} {state.gameNumber}

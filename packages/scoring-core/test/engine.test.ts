@@ -3,46 +3,63 @@ import {
   awardRally,
   createInitialState,
   deriveJournal,
+  officialRulesetFor,
   overrideState,
   redo,
   servingSide,
   undo,
   type MatchDefinition,
+  type MatchFormat,
   type MatchJournal,
+  type ScoringMode,
   type TeamId,
 } from "../src";
 
-const definition = (sport: "badminton" | "pickleball"): MatchDefinition => ({
-  id: `${sport}-match`,
-  sport,
-  rulesetId:
-    sport === "badminton"
-      ? "bwf-doubles-3x21-2025"
-      : "usap-doubles-sideout-2026",
-  mode: "casual",
-  createdAt: "2026-10-08T00:00:00.000Z",
-  initialServingTeam: "A",
-  initialServingPlayer: 0,
-  teams: {
-    A: {
-      name: "Team A",
-      players: [
-        { id: "a0", name: "A1" },
-        { id: "a1", name: "A2" },
-      ],
-    },
-    B: {
-      name: "Team B",
-      players: [
-        { id: "b0", name: "B1" },
-        { id: "b1", name: "B2" },
-      ],
-    },
-  },
-});
+const definition = (
+  sport: "badminton" | "pickleball",
+  format: MatchFormat = "doubles",
+  scoringMode?: ScoringMode,
+): MatchDefinition => {
+  const official = officialRulesetFor(sport, format, scoringMode);
+  const players = (team: string) =>
+    format === "singles"
+      ? ([{ id: `${team}0`, name: `${team}1` }] as const)
+      : ([
+          { id: `${team}0`, name: `${team}1` },
+          { id: `${team}1`, name: `${team}2` },
+        ] as const);
 
-const journal = (sport: "badminton" | "pickleball"): MatchJournal => ({
-  definition: definition(sport),
+  return {
+    id: `${sport}-${format}-match`,
+    sport,
+    format,
+    rulesetId: official.id,
+    ruleset: {
+      id: official.id,
+      name: official.name,
+      sport,
+      format,
+      source: "official",
+      version: official.version,
+      configuration: { ...official.configuration },
+    },
+    mode: "casual",
+    createdAt: "2026-10-08T00:00:00.000Z",
+    initialServingTeam: "A",
+    initialServingPlayer: 0,
+    teams: {
+      A: { name: "Team A", players: players("A") },
+      B: { name: "Team B", players: players("B") },
+    },
+  };
+};
+
+const journal = (
+  sport: "badminton" | "pickleball",
+  format: MatchFormat = "doubles",
+  scoringMode?: ScoringMode,
+): MatchJournal => ({
+  definition: definition(sport, format, scoringMode),
   events: [],
 });
 
@@ -60,6 +77,15 @@ function rallies(source: MatchJournal, winners: TeamId[]): MatchJournal {
 }
 
 describe("badminton doubles", () => {
+  it("treats a legacy definition without a format as doubles", () => {
+    const legacy = definition("badminton");
+    delete legacy.format;
+
+    const state = createInitialState(legacy);
+    expect(state.format).toBe("doubles");
+    expect(state.positions.A).toEqual({ left: 1, right: 0 });
+  });
+
   it("moves a serving player after a point and transfers service without moving receivers", () => {
     const afterServe = rallies(journal("badminton"), ["A"]);
     const first = deriveJournal(afterServe).state;
@@ -107,6 +133,50 @@ describe("badminton doubles", () => {
       Array.from({ length: 42 }, () => "A" as const),
     );
     const state = deriveJournal(game).state;
+    expect(state.status).toBe("complete");
+    expect(state.winner).toBe("A");
+    expect(state.gamesWon).toEqual({ A: 2, B: 0 });
+  });
+});
+
+describe("badminton singles", () => {
+  it("moves the single player by score parity and changes server after a lost rally", () => {
+    let game = journal("badminton", "singles");
+    expect(servingSide(deriveJournal(game).state)).toBe("right");
+
+    game = awardRally(game, "A", metadata());
+    let state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 1, B: 0 });
+    expect(state.servingTeam).toBe("A");
+    expect(state.currentServer).toBe(0);
+    expect(servingSide(state)).toBe("left");
+
+    game = awardRally(game, "B", metadata());
+    state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 1, B: 1 });
+    expect(state.servingTeam).toBe("B");
+    expect(state.currentServer).toBe(0);
+    expect(servingSide(state)).toBe("left");
+  });
+
+  it("uses the badminton game score and best-of-three match rules", () => {
+    let game = rallies(
+      journal("badminton", "singles"),
+      Array.from({ length: 21 }, () => "A" as const),
+    );
+    const nextGame = deriveJournal(game).state;
+    expect(nextGame.gameNumber).toBe(2);
+    expect(nextGame.points).toEqual({ A: 0, B: 0 });
+    expect(nextGame.gamesWon).toEqual({ A: 1, B: 0 });
+    expect(nextGame.servingTeam).toBe("A");
+    expect(servingSide(nextGame)).toBe("right");
+
+    game = rallies(
+      game,
+      Array.from({ length: 21 }, () => "A" as const),
+    );
+    const state = deriveJournal(game).state;
+
     expect(state.status).toBe("complete");
     expect(state.winner).toBe("A");
     expect(state.gamesWon).toEqual({ A: 2, B: 0 });
@@ -196,7 +266,78 @@ describe("pickleball doubles", () => {
   });
 });
 
+describe("pickleball singles", () => {
+  it("uses one side-out server and changes service without awarding a point to the receiver", () => {
+    let game = journal("pickleball", "singles");
+    let state = deriveJournal(game).state;
+    expect(state.serverNumber).toBeNull();
+    expect(servingSide(state)).toBe("right");
+
+    game = awardRally(game, "B", metadata());
+    state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 0, B: 0 });
+    expect(state.servingTeam).toBe("B");
+    expect(state.currentServer).toBe(0);
+    expect(state.serverNumber).toBeNull();
+    expect(servingSide(state)).toBe("right");
+
+    game = awardRally(game, "B", metadata());
+    state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 0, B: 1 });
+    expect(servingSide(state)).toBe("left");
+
+    game = awardRally(game, "A", metadata());
+    state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 0, B: 1 });
+    expect(state.servingTeam).toBe("A");
+    expect(servingSide(state)).toBe("right");
+  });
+
+  it("uses rally scoring when selected and assigns service to the rally winner", () => {
+    let game = journal("pickleball", "singles", "rally");
+    game = awardRally(game, "B", metadata());
+    let state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 0, B: 1 });
+    expect(state.servingTeam).toBe("B");
+    expect(state.currentServer).toBe(0);
+    expect(servingSide(state)).toBe("left");
+
+    game = awardRally(game, "A", metadata());
+    state = deriveJournal(game).state;
+    expect(state.points).toEqual({ A: 1, B: 1 });
+    expect(state.servingTeam).toBe("A");
+    expect(servingSide(state)).toBe("left");
+  });
+
+  it("recalculates the service court after a score correction", () => {
+    const game = overrideState(
+      journal("pickleball", "singles"),
+      { A: 1, B: 0 },
+      metadata(),
+    );
+
+    expect(servingSide(deriveJournal(game).state)).toBe("left");
+  });
+});
+
 describe("journal corrections", () => {
+  it("supports undo, redo, and score correction in singles", () => {
+    let game = rallies(journal("pickleball", "singles", "rally"), ["A", "B"]);
+    game = undo(game, metadata());
+    expect(deriveJournal(game).state.points).toEqual({ A: 1, B: 0 });
+    expect(deriveJournal(game).state.servingTeam).toBe("A");
+
+    game = redo(game, metadata());
+    expect(deriveJournal(game).state.points).toEqual({ A: 1, B: 1 });
+    expect(deriveJournal(game).state.servingTeam).toBe("B");
+
+    game = overrideState(game, { A: 4, B: 3 }, metadata());
+    const corrected = deriveJournal(game).state;
+    expect(corrected.points).toEqual({ A: 4, B: 3 });
+    expect(corrected.servingTeam).toBe("B");
+    expect(servingSide(corrected)).toBe("left");
+  });
+
   it("keeps undo and redo as append-only audit events", () => {
     let game = rallies(journal("badminton"), ["A", "B"]);
     game = undo(game, metadata());
@@ -346,5 +487,41 @@ describe("match-scoped custom rules", () => {
     expect(state.servingTeam).toBe("B");
     expect(state.serverNumber).toBe(1);
     expect(servingSide(state)).toBe("right");
+  });
+
+  it("forces singles custom rules to one server even when the snapshot says two", () => {
+    const base = definition("pickleball", "singles");
+    const custom: MatchDefinition = {
+      ...base,
+      rulesetId: "guest-singles-rules",
+      ruleset: {
+        id: "guest-singles-rules",
+        name: "Singles custom",
+        sport: "pickleball",
+        format: "singles",
+        source: "guest_custom",
+        version: 1,
+        configuration: {
+          pointsToWin: 11,
+          winBy: 2,
+          maxPoints: null,
+          bestOf: 3,
+          scoringMode: "side_out",
+          serversPerTurn: 2,
+          openingServerNumber: 2,
+        },
+      },
+    };
+
+    const game = awardRally(
+      { definition: custom, events: [] },
+      "B",
+      metadata(),
+    );
+    const state = deriveJournal(game).state;
+
+    expect(state.servingTeam).toBe("B");
+    expect(state.serverNumber).toBeNull();
+    expect(state.points).toEqual({ A: 0, B: 0 });
   });
 });

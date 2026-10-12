@@ -15,9 +15,12 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 
 ## Match setup and scoring
 
-- [ ] Start a Badminton doubles match with Official Rules, set all four player names, and choose each of the four possible initial servers in separate test matches.
-- [ ] Verify Badminton service court, server change, receiver positions, game completion, next-game opening server, and match completion against the current source in `docs/rules-sources.md`.
+- [ ] Start Badminton singles and doubles with Official Rules. Confirm setup shows one or two names per side and offers only valid first-server choices.
+- [ ] Verify Badminton singles' parity-based service court, server changes after a lost rally, 21-point game with a two-point margin and 30-point cap, and next-game opening server.
+- [ ] Verify Badminton doubles service court, server change, receiver positions, game completion, next-game opening server, and match completion against the current source in `docs/rules-sources.md`.
 - [ ] Start a Pickleball doubles match with Official Rules. Verify the opening 0-0-2 server sequence, side-out transition, second server, court positions, game completion, and match completion.
+- [ ] Start Pickleball singles with side-out scoring. Verify that a receiving-side rally does not award a point, service changes after the rally, and court side follows the serving player's score parity.
+- [ ] Repeat Pickleball singles with rally scoring. Verify each rally winner scores and becomes the server, with service court following that player's score parity.
 - [ ] Repeat representative scoring cases with guest custom rules. Confirm that each supported setting changes the engine result as expected and stays local to the current match.
 - [ ] Confirm the court stays in the intended portrait orientation with a horizontal net and that score, service, and positions are readable at court-side viewing distance.
 
@@ -26,6 +29,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Award a point to each team and verify that the score, server, and positions update correctly.
 - [ ] Undo a point, redo it, undo again, then continue scoring. Confirm the final state and event sequence remain consistent.
 - [ ] Override a score to a valid pair of totals. Confirm the app records one override event and derives service and positions from the overridden state.
+- [ ] Repeat point entry, undo, redo, and score correction in singles, and confirm the score, server, service court, history, and Live Viewer stay in sync.
 - [ ] Try an invalid or out-of-range correction and confirm the app rejects it with a clear message.
 - [ ] Refresh the match and verify the same score and local ruleset snapshot return.
 
@@ -36,6 +40,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Interrupt the network during scoring, reconnect, and verify queued events sync with the original UUIDs and in order.
 - [ ] Retry the same sync more than once. Confirm no duplicate match or event rows appear.
 - [ ] Open the same match in two tabs. Confirm only one tab controls it and the other remains read-only until control is released.
+- [ ] Verify a singles match sent to Live Viewer shows one generic player per side and preserves the format while continuing to hide entered names.
 - [ ] Verify guest expiry refreshes on accepted activity but never exceeds 24 hours from creation. Check expired records become inaccessible immediately and the hourly cleanup physically removes them and their events while the Supabase project is active.
 - [ ] Record that Supabase Free may pause a low-activity project and delay physical cleanup; after any resume, inspect Cron history and remove remaining expired rows through the authorized cleanup procedure.
 
@@ -57,6 +62,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 ## Mobile, accessibility, and states
 
 - [ ] Test a narrow phone viewport and a larger phone viewport. Confirm no horizontal overflow, clipped content, or controls below a 44 px tap target.
+- [ ] Confirm the format selector fits narrow screens and can be changed with keyboard navigation.
 - [ ] Check screen visibility with a device placed at a realistic court-side distance and brightness.
 - [ ] Navigate the setup, match controls, dialogs, sharing, and reports with keyboard only. Confirm visible focus and Escape behavior for dialogs.
 - [ ] Verify loading, empty, offline, expired, unavailable, and error states explain what happened and what the user can do next.

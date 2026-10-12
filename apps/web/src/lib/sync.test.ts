@@ -49,8 +49,10 @@ describe("Supabase sync serialization", () => {
     expect(payload.match.last_client_sequence).toBe(1);
     expect(payload.match.current_state).toMatchObject({
       matchId,
+      format: "doubles",
       points: { A: 1, B: 0 },
     });
+    expect(payload.match.definition).toMatchObject({ format: "doubles" });
     expect(payload.events).toEqual([
       expect.objectContaining({
         id: eventId,
@@ -71,11 +73,22 @@ describe("Supabase sync serialization", () => {
 
   it("keeps guest names and custom rule configuration out of server payloads", () => {
     const guestJournal = journal();
-    guestJournal.definition.teams.A.players[0].name = "Private Player Name";
+    guestJournal.definition.format = "singles";
+    guestJournal.definition.teams = {
+      A: {
+        name: "Team A",
+        players: [{ id: "a-1", name: "Private Player Name" }],
+      },
+      B: {
+        name: "Team B",
+        players: [{ id: "b-1", name: "Private Opponent Name" }],
+      },
+    };
     guestJournal.definition.ruleset = {
       id: "guest-custom-rules-1",
       name: "Club night",
       sport: "badminton",
+      format: "singles",
       source: "guest_custom",
       version: 1,
       configuration: {
@@ -93,9 +106,17 @@ describe("Supabase sync serialization", () => {
 
     expect(payload.match.is_guest).toBe(true);
     expect(payload.match.ruleset_id).toBe("guest-custom-local");
+    expect(payload.match.definition).toMatchObject({
+      format: "singles",
+      rulesetId: "bwf-singles-3x21-2025",
+    });
+    expect(payload.match.current_state).toMatchObject({ format: "singles" });
     expect(payload.match.definition).not.toHaveProperty("teams");
     expect(payload.match.definition).not.toHaveProperty("ruleset");
     expect(JSON.stringify(payload.match)).not.toContain("Private Player Name");
+    expect(JSON.stringify(payload.match)).not.toContain(
+      "Private Opponent Name",
+    );
     expect(JSON.stringify(payload.match)).not.toContain("pointsToWin");
   });
 });

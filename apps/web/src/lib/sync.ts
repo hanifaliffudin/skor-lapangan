@@ -1,5 +1,6 @@
 import {
   deriveJournal,
+  getMatchFormat,
   officialRulesetFor,
   type MatchEvent,
   type MatchJournal,
@@ -58,9 +59,14 @@ export function serializeJournalForSync(
       definition: toJson({
         id: definition.id,
         sport: definition.sport,
+        format: getMatchFormat(definition),
         rulesetId:
           isGuest && definition.ruleset?.source === "guest_custom"
-            ? officialRulesetFor(definition.sport).id
+            ? officialRulesetFor(
+                definition.sport,
+                getMatchFormat(definition),
+                definition.ruleset.configuration?.scoringMode,
+              ).id
             : definition.rulesetId,
         mode: definition.mode,
         createdAt: definition.createdAt,

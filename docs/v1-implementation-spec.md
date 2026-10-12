@@ -2,7 +2,7 @@
 
 ## Product scope
 
-V1.0 supports doubles Badminton and Pickleball. The first public release focuses on correct service rotation, score correction, reliable guest matches, and a shareable live score view. Other sports remain separate follow-up releases.
+V1.0 supports singles and doubles Badminton and Pickleball. Pickleball singles supports side-out and rally scoring, with side-out as the default. The product focuses on correct service rotation, score correction, reliable guest matches, and a shareable live score view. Other sports remain separate follow-up releases.
 
 The app remains mobile-first and English-default, with Indonesian available. The visual direction comes from `DESIGN.md`: outdoor readability, large tabular scores, cobalt for primary actions, lime for score/confirmation, portrait court with a horizontal net, and concise motion.
 
@@ -31,7 +31,10 @@ The app remains mobile-first and English-default, with Indonesian available. The
 ### Official Rules
 
 - Official rules remain locked and maintained by the product based on the relevant federation sources.
-- V1.0 ships only the current Badminton and Pickleball doubles rulesets.
+- Match format (`singles` or `doubles`) is stored separately from casual/referee mode. Missing format in legacy matches means doubles.
+- Badminton singles uses rally scoring, best of three games, first to 21, win by two, capped at 30.
+- Pickleball singles uses one server per side and score-parity service courts. Side-out scoring is the default; rally scoring can be selected. Both use best of three games, first to 11, win by two.
+- Pickleball doubles keeps its two-server sequence and opening 0-0-2 exception.
 - A match keeps the exact ruleset snapshot used when it began.
 
 ### Guest custom rules

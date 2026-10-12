@@ -1,13 +1,14 @@
 # Skor Lapangan
 
-A mobile-first scorekeeper for recreational Badminton and Pickleball doubles. It tracks points, service turns, the active server, and player positions on court.
+A mobile-first scorekeeper for recreational Badminton and Pickleball singles and doubles. It tracks points, service turns, the active server, and player positions on court.
 
 V1.0 launches with these two sports. The focus is reliable scoring, quick correction, and a court view players can read during a game. More sports can follow as separate releases.
 
 ## Features
 
-- Badminton doubles: rally scoring, best of three games, first to 21, win by two, capped at 30.
+- Badminton singles and doubles: rally scoring, best of three games, first to 21, win by two, capped at 30.
 - Pickleball doubles: side-out scoring, best of three games, first to 11, win by two, including the opening 0-0-2 server exception.
+- Pickleball singles: side-out scoring by default, with optional rally scoring; both are best of three games, first to 11, win by two.
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
 - Guest matches with client-generated UUIDs, local-first scoring, rate-limited server sync, and a 12-hour inactivity expiry capped at 24 hours. Expired records are cleaned hourly.

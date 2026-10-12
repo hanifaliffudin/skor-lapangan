@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import type {
+  MatchFormat,
   MatchDefinition,
   MatchState,
   Sport,
   TeamId,
 } from "@skor-lapangan/scoring-core";
+import { getMatchFormat } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
 import { useLocale } from "../../lib/i18n";
 import { supabase } from "../../lib/supabase";
@@ -42,6 +44,9 @@ function isViewerState(value: unknown): value is MatchState {
   return (
     typeof state.matchId === "string" &&
     (state.sport === "badminton" || state.sport === "pickleball") &&
+    (state.format === undefined ||
+      state.format === "singles" ||
+      state.format === "doubles") &&
     typeof state.gameNumber === "number" &&
     Boolean(
       points && Number.isInteger(points.A) && Number.isInteger(points.B),
@@ -64,16 +69,21 @@ function isViewerState(value: unknown): value is MatchState {
 }
 
 function viewerDefinition(state: MatchState): MatchDefinition {
+  const format = getMatchFormat(state);
   const genericTeam = (team: TeamId) => ({
     name: team === "A" ? "Team A" : "Team B",
-    players: [
-      { id: `${team}-player-1`, name: "Player 1" },
-      { id: `${team}-player-2`, name: "Player 2" },
-    ] as const,
+    players:
+      format === "singles"
+        ? ([{ id: `${team}-player-1`, name: "Player 1" }] as const)
+        : ([
+            { id: `${team}-player-1`, name: "Player 1" },
+            { id: `${team}-player-2`, name: "Player 2" },
+          ] as const),
   });
   return {
     id: state.matchId,
     sport: state.sport,
+    format,
     rulesetId: "viewer",
     mode: "casual",
     createdAt: new Date().toISOString(),
@@ -165,7 +175,7 @@ export function ViewerPage() {
           <>
             <p className={styles.viewerMeta} role="status">
               {stale ? t("viewerStale") : t("viewerLive")} · {t(snapshot.sport)}{" "}
-              · {t("updatedAt")}{" "}
+              · {t(getMatchFormat(state))} · {t("updatedAt")}{" "}
               {new Date(snapshot.updatedAt).toLocaleTimeString()}
             </p>
             <section className={styles.scoreboard} aria-label={t("score")}>

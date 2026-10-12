@@ -1,5 +1,6 @@
 import type {
   MatchJournal,
+  MatchFormat,
   MatchMode,
   Sport,
 } from "@skor-lapangan/scoring-core";
@@ -15,6 +16,7 @@ interface StoredMatch {
 
 export interface SetupDraft {
   sport: Sport;
+  format: MatchFormat;
   mode: MatchMode;
   communityRuleId?: string;
 }
@@ -28,13 +30,15 @@ export function loadDraft(): SetupDraft | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as SetupDraft;
+    const format = parsed.format === undefined ? "doubles" : parsed.format;
     if (
       (parsed.sport === "badminton" || parsed.sport === "pickleball") &&
+      (format === "singles" || format === "doubles") &&
       (parsed.mode === "casual" || parsed.mode === "referee") &&
       (parsed.communityRuleId === undefined ||
         typeof parsed.communityRuleId === "string")
     ) {
-      return { ...parsed, mode: "casual" };
+      return { ...parsed, format, mode: "casual" };
     }
   } catch {
     return null;

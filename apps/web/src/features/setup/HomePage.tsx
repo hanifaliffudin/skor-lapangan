@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   deriveJournal,
+  type MatchFormat,
   type MatchJournal,
   type Sport,
 } from "@skor-lapangan/scoring-core";
@@ -14,6 +15,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const [sport, setSport] = useState<Sport>("badminton");
+  const [format, setFormat] = useState<MatchFormat>("doubles");
   const [savedMatches] = useState<MatchJournal[]>(() => listGuestMatches());
   const activeMatches = savedMatches.filter(
     (journal) => deriveJournal(journal).state.status === "active",
@@ -49,7 +51,7 @@ export function HomePage() {
   }, [locale, t]);
 
   function continueToSetup() {
-    saveDraft({ sport, mode: "casual" });
+    saveDraft({ sport, format, mode: "casual" });
     navigate(localizedPath("/setup", locale));
   }
 
@@ -84,7 +86,10 @@ export function HomePage() {
                     )
                   }
                 >
-                  <span>{t(journal.definition.sport)}</span>
+                  <span>
+                    {t(journal.definition.sport)} ·{" "}
+                    {t(journal.definition.format ?? "doubles")}
+                  </span>
                   <strong>{t("resumeMatch")}</strong>
                 </button>
               ))}
@@ -94,10 +99,7 @@ export function HomePage() {
 
         <section className={styles.quickStart} aria-label="Quick start">
           <fieldset className={styles.optionGroup}>
-            <legend>
-              <span>1</span>
-              {t("chooseSport")}
-            </legend>
+            <legend>{t("chooseSport")}</legend>
             <div className={styles.optionGrid}>
               <ChoiceCard
                 checked={sport === "badminton"}
@@ -112,6 +114,26 @@ export function HomePage() {
                 hint={t("pickleballHint")}
                 name="sport"
                 onChange={() => setSport("pickleball")}
+              />
+            </div>
+          </fieldset>
+
+          <fieldset className={styles.optionGroup}>
+            <legend>{t("chooseFormat")}</legend>
+            <div className={styles.optionGrid}>
+              <ChoiceCard
+                checked={format === "singles"}
+                label={t("singles")}
+                hint={t("singlesHint")}
+                name="format"
+                onChange={() => setFormat("singles")}
+              />
+              <ChoiceCard
+                checked={format === "doubles"}
+                label={t("doubles")}
+                hint={t("doublesHint")}
+                name="format"
+                onChange={() => setFormat("doubles")}
               />
             </div>
           </fieldset>

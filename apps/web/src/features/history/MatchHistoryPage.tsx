@@ -4,6 +4,7 @@ import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { loadMatch } from "../../lib/session";
+import type { MatchFormat } from "@skor-lapangan/scoring-core";
 import { supabase } from "../../lib/supabase";
 import type { Json } from "../../lib/database.types";
 import styles from "../../styles/App.module.css";
@@ -19,6 +20,7 @@ interface MatchHistoryRow {
 }
 
 interface SavedScore {
+  format: MatchFormat;
   points: { A: number; B: number };
   gamesWon: { A: number; B: number };
 }
@@ -42,6 +44,7 @@ function savedScore(value: Json): SavedScore | null {
   )
     return null;
   return {
+    format: state.format === "singles" ? "singles" : "doubles",
     points: { A: pointValues.A, B: pointValues.B },
     gamesWon: { A: gameValues.A, B: gameValues.B },
   };
@@ -111,7 +114,8 @@ export function MatchHistoryPage() {
                   <strong>
                     {t(
                       match.sport === "pickleball" ? "pickleball" : "badminton",
-                    )}
+                    )}{" "}
+                    · {t(score?.format ?? "doubles")}
                   </strong>
                   <span>
                     {t(
@@ -153,10 +157,7 @@ export function MatchHistoryPage() {
             );
           })}
         </div>
-        <Link
-          className={styles.textButton}
-          to={localizedPath("/", locale)}
-        >
+        <Link className={styles.textButton} to={localizedPath("/", locale)}>
           {t("backToHome")}
         </Link>
       </main>

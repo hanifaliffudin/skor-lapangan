@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(18);
 
 select ok(
   private.take_rate_limit('release-guardrail-test', 'guest_match_create', 2, 3600),
@@ -60,6 +60,45 @@ select ok(
   (select not (definition ? 'playerNames') from public.matches
    where id = '00000000-0000-4000-8000-000000000401'),
   'guest payload sanitization runs after guest classification'
+);
+select ok(
+  (select definition ->> 'format' = 'doubles'
+          and current_state ->> 'format' = 'doubles'
+   from public.matches where id = '00000000-0000-4000-8000-000000000401'),
+  'legacy guest payloads without a match format default to doubles'
+);
+update public.matches
+set definition = '{
+      "id":"00000000-0000-4000-8000-000000000401",
+      "sport":"badminton",
+      "format":"singles",
+      "playerNames":["private"]
+    }'::jsonb,
+    current_state = '{
+      "matchId":"00000000-0000-4000-8000-000000000401",
+      "sport":"badminton",
+      "format":"singles",
+      "gameNumber":1,
+      "gamesWon":{"A":0,"B":0},
+      "points":{"A":0,"B":0},
+      "servingTeam":"A",
+      "currentServer":0,
+      "serverNumber":null,
+      "positions":{"A":{"left":0,"right":0},"B":{"left":0,"right":0}},
+      "status":"active",
+      "winner":null,
+      "completedGames":[],
+      "playerNames":["private"]
+    }'::jsonb,
+    last_client_sequence = 1
+where id = '00000000-0000-4000-8000-000000000401';
+select ok(
+  (select definition ->> 'format' = 'singles'
+          and current_state ->> 'format' = 'singles'
+          and not (definition ? 'playerNames')
+          and not (current_state ? 'playerNames')
+   from public.matches where id = '00000000-0000-4000-8000-000000000401'),
+  'guest singles format reaches viewers while player names stay private'
 );
 select ok(
   (select expires_at > now() + interval '11 hours'

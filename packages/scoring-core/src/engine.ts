@@ -1,14 +1,17 @@
+import { getMatchFormat } from "./types";
 import type {
   CourtSide,
   DomainEvent,
   EventMetadata,
   JournalView,
+  MatchFormat,
   MatchDefinition,
   MatchEvent,
   MatchJournal,
   MatchState,
   PlayerIndex,
   ScoringRules,
+  ScoringMode,
   TeamId,
   TeamPosition,
 } from "./types";
@@ -52,16 +55,83 @@ export const OFFICIAL_RULESETS = {
       openingServerNumber: 2,
     },
   },
+  badmintonSingles: {
+    id: "bwf-singles-3x21-2025",
+    name: "BWF Singles 3 × 21",
+    sport: "badminton",
+    format: "singles",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-08",
+    sourceUrl:
+      "https://system.bwfbadminton.com/documents/folder_1_81/Statutes/CHAPTER-4---RULES-OF-THE-GAME/SECTION%204.1-%20Laws%20of%20Badminton.pdf",
+    configuration: {
+      pointsToWin: 21,
+      winBy: 2,
+      maxPoints: 30,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+  },
+  pickleballSinglesSideOut: {
+    id: "usap-singles-sideout-2026",
+    name: "USA Pickleball Singles Side-Out",
+    sport: "pickleball",
+    format: "singles",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-08",
+    sourceUrl: "https://usapickleball.org/rules/",
+    configuration: {
+      pointsToWin: 11,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "side_out",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+  },
+  pickleballSinglesRally: {
+    id: "usap-singles-rally-2026",
+    name: "USA Pickleball Singles Rally Scoring",
+    sport: "pickleball",
+    format: "singles",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-08",
+    sourceUrl: "https://usapickleball.org/rules/",
+    configuration: {
+      pointsToWin: 11,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+  },
 } as const;
 
-export function officialRulesetFor(sport: MatchDefinition["sport"]) {
-  return OFFICIAL_RULESETS[sport];
+export function officialRulesetFor(
+  sport: MatchDefinition["sport"],
+  format: MatchFormat = "doubles",
+  scoringMode?: ScoringMode,
+) {
+  if (format === "doubles") return OFFICIAL_RULESETS[sport];
+  if (sport === "badminton") return OFFICIAL_RULESETS.badmintonSingles;
+  return scoringMode === "rally"
+    ? OFFICIAL_RULESETS.pickleballSinglesRally
+    : OFFICIAL_RULESETS.pickleballSinglesSideOut;
 }
 
 function rulesFor(definition: MatchDefinition): ScoringRules {
   return (
     definition.ruleset?.configuration ??
-    OFFICIAL_RULESETS[definition.sport].configuration
+    officialRulesetFor(definition.sport, getMatchFormat(definition))
+      .configuration
   );
 }
 
@@ -84,6 +154,13 @@ const swapPosition = (position: TeamPosition): TeamPosition => ({
 function initialPositions(
   definition: MatchDefinition,
 ): Record<TeamId, TeamPosition> {
+  if (getMatchFormat(definition) === "singles") {
+    return {
+      A: { left: 0, right: 0 },
+      B: { left: 0, right: 0 },
+    };
+  }
+
   const standard: TeamPosition = { left: 1, right: 0 };
   const serving: TeamPosition =
     definition.initialServingPlayer === 0
@@ -102,13 +179,20 @@ export function createInitialState(definition: MatchDefinition): MatchState {
   return {
     matchId: definition.id,
     sport: definition.sport,
+    format: getMatchFormat(definition),
     gameNumber: 1,
     gamesWon: { A: 0, B: 0 },
     points: { A: 0, B: 0 },
     servingTeam: definition.initialServingTeam,
-    currentServer: definition.initialServingPlayer,
+    currentServer:
+      getMatchFormat(definition) === "singles"
+        ? 0
+        : definition.initialServingPlayer,
     serverNumber:
-      rules.scoringMode === "side_out" ? rules.openingServerNumber : null,
+      getMatchFormat(definition) === "doubles" &&
+      rules.scoringMode === "side_out"
+        ? rules.openingServerNumber
+        : null,
     positions,
     status: "active",
     winner: null,
@@ -165,7 +249,10 @@ function resetForNextGame(
     servingTeam,
     currentServer,
     serverNumber:
-      rules.scoringMode === "side_out" ? rules.openingServerNumber : null,
+      getMatchFormat(definition) === "doubles" &&
+      rules.scoringMode === "side_out"
+        ? rules.openingServerNumber
+        : null,
     positions,
   };
 }
@@ -204,6 +291,18 @@ function applyRallyScoring(
 ): MatchState {
   const points = clonePoints(state.points);
   points[team] += 1;
+
+  if (getMatchFormat(definition) === "singles") {
+    const next = {
+      ...state,
+      points,
+      servingTeam: team,
+      currentServer: 0 as PlayerIndex,
+      serverNumber: null,
+    };
+    return completeGameIfNeeded(next, definition, team, rules);
+  }
+
   const positions = { ...state.positions };
   let currentServer = state.currentServer;
 
@@ -233,6 +332,22 @@ function applySideOutScoring(
   definition: MatchDefinition,
   rules: ScoringRules,
 ): MatchState {
+  if (getMatchFormat(definition) === "singles") {
+    if (team === state.servingTeam) {
+      const points = clonePoints(state.points);
+      points[team] += 1;
+      const next = { ...state, points, serverNumber: null };
+      return completeGameIfNeeded(next, definition, team, rules);
+    }
+
+    return {
+      ...state,
+      servingTeam: team,
+      currentServer: 0,
+      serverNumber: null,
+    };
+  }
+
   if (team === state.servingTeam) {
     const points = clonePoints(state.points);
     points[team] += 1;
@@ -279,6 +394,23 @@ function applyOverride(
   rules: ScoringRules,
 ): MatchState {
   validateOverride(points);
+
+  if (getMatchFormat(definition) === "singles") {
+    const next = {
+      ...state,
+      points: clonePoints(points),
+      currentServer: 0 as PlayerIndex,
+      serverNumber: null,
+    };
+    const gameWinner = (["A", "B"] as const).find((team) =>
+      hasWonGame(rules, next.points[team], next.points[otherTeam(team)]),
+    );
+
+    return gameWinner
+      ? completeGameIfNeeded(next, definition, gameWinner, rules)
+      : next;
+  }
+
   const positions = { ...state.positions };
   const serverNumber = state.serverNumber;
   const naturalSide = requiredServiceSide(points[state.servingTeam]);
@@ -501,6 +633,10 @@ export function redo(
 }
 
 export function servingSide(state: MatchState): CourtSide {
+  if (getMatchFormat(state) === "singles") {
+    return requiredServiceSide(state.points[state.servingTeam]);
+  }
+
   return state.positions[state.servingTeam].right === state.currentServer
     ? "right"
     : "left";

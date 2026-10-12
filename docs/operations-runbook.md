@@ -37,8 +37,9 @@ For each new environment, run the SQL files once in filename order using the Sup
 4. `supabase/migrations/20261009120000_safe_community_rule_reads.sql`
 5. `supabase/migrations/20261009130000_revoke_community_rule_table_reads.sql`
 6. `supabase/migrations/20261009140000_release_guardrails.sql`
+7. `supabase/migrations/20261012110000_match_format_in_guest_payload.sql`
 
-Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema even though V1.0 does not expose those features. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply `20261009140000_release_guardrails.sql` before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The new migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it.
+Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema even though V1.0 does not expose those features. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply pending migrations `20261009140000_release_guardrails.sql` and `20261012110000_match_format_in_guest_payload.sql` before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The release-guardrail migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it.
 
 ## Configure Supabase Auth
 

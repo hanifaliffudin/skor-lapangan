@@ -1,13 +1,13 @@
 # Player guide
 
-This guide describes the current V1.0 product scope. The app labels are in English by default and Indonesian is available from the language control.
+This guide describes the current product scope. The app labels are in English by default and Indonesian is available from the language control.
 
 ## Start a match
 
-1. Choose Badminton or Pickleball. V1.0 supports doubles for both sports.
+1. Choose Badminton or Pickleball, then choose Singles or Doubles.
 2. Continue to player setup. V1 has one match workflow (Casual); Referee mode is hidden until it offers meaningfully different controls.
 3. Choose Official Rules or guest custom rules.
-4. Enter player names if you want them on this device. Choose which player serves first, then start the match.
+4. Enter one player name per side for Singles or two for Doubles. Choose who serves first, then start the match. Pickleball Singles can use standard side-out scoring or rally scoring; side-out is selected by default.
 
 ## Choose a ruleset
 
@@ -25,7 +25,7 @@ The app keeps the selected ruleset with the match on the device where it was sta
 - Check the court display before the next serve. It shows which side is serving and where the players should stand.
 - A match is marked complete automatically when the selected ruleset's match conditions are met. To leave early, or clear the finished match from this device, use End session in the match controls. This removes the device copy and revokes its Live Viewer link. A guest's server copy remains until expiry.
 
-Pickleball doubles uses a three-number score call. The opening sequence has a special second-server value. The app shows the serving team and server number so players can follow the selected ruleset.
+Pickleball doubles uses a three-number score call. The opening sequence has a special second-server value. The app shows the serving team and server number so players can follow the selected ruleset. Pickleball singles has one server per side and does not use a server number.
 
 ## Guest matches and sync
 

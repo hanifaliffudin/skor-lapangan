@@ -1,10 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
+  getMatchFormat,
   officialRulesetFor,
+  type MatchFormat,
   type MatchDefinition,
   type MatchJournal,
   type ScoringRules,
+  type ScoringMode,
   type RulesetSnapshot,
   type PlayerIndex,
   type TeamId,
@@ -20,15 +23,35 @@ export function SetupPage() {
   const { locale, t } = useLocale();
   const [names, setNames] = useState(["", "", "", ""]);
   const [firstServer, setFirstServer] = useState("A-0");
+  const [officialScoringMode, setOfficialScoringMode] =
+    useState<ScoringMode>("side_out");
   const [ruleSource, setRuleSource] = useState<"official" | "guest_custom">(
     "official",
   );
   const [ruleError, setRuleError] = useState("");
   const [customRules, setCustomRules] = useState<ScoringRules>(() => ({
-    ...officialRulesetFor(draft?.sport ?? "badminton").configuration,
+    ...officialRulesetFor(
+      draft?.sport ?? "badminton",
+      draft?.format ?? "doubles",
+    ).configuration,
   }));
 
   if (!draft) return <Navigate to={localizedPath("/", locale)} replace />;
+
+  const format = getMatchFormat(draft);
+  const playerCount = format === "singles" ? 1 : 2;
+  const serverChoices: Array<[TeamId, PlayerIndex]> =
+    format === "singles"
+      ? [
+          ["A", 0],
+          ["B", 0],
+        ]
+      : [
+          ["A", 0],
+          ["A", 1],
+          ["B", 0],
+          ["B", 1],
+        ];
 
   function updateName(index: number, value: string) {
     setNames((current) =>
@@ -45,7 +68,7 @@ export function SetupPage() {
 
   function changeRuleSource(source: "official" | "guest_custom") {
     setRuleSource(source);
-    if (draft) saveDraft({ sport: draft.sport, mode: draft.mode });
+    if (draft) saveDraft({ sport: draft.sport, format, mode: draft.mode });
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -70,13 +93,24 @@ export function SetupPage() {
     const cleanName = (index: number, teamId: TeamId, playerIndex: number) =>
       names[index]?.trim() || fallback(teamId, playerIndex);
     const id = crypto.randomUUID();
-    const official = officialRulesetFor(draft.sport);
+    const official = officialRulesetFor(
+      draft.sport,
+      format,
+      officialScoringMode,
+    );
+    const customConfiguration: ScoringRules = {
+      ...customRules,
+      ...(format === "singles"
+        ? { serversPerTurn: 1, openingServerNumber: 1 }
+        : {}),
+    };
     const ruleset: RulesetSnapshot =
       ruleSource === "official"
         ? {
             id: official.id,
             name: official.name,
             sport: draft.sport,
+            format,
             source: "official",
             version: official.version,
             configuration: { ...official.configuration },
@@ -85,33 +119,45 @@ export function SetupPage() {
             id: `guest-${crypto.randomUUID()}`,
             name: t("customRules"),
             sport: draft.sport,
+            format,
             source: "guest_custom",
             version: 1,
-            configuration: { ...customRules },
+            configuration: customConfiguration,
           };
+    const makePlayer = (
+      index: number,
+      teamId: TeamId,
+      playerIndex: number,
+    ) => ({
+      id: crypto.randomUUID(),
+      name: cleanName(index, teamId, playerIndex),
+    });
+    const makePlayers = (teamId: TeamId, startIndex: number) =>
+      format === "singles"
+        ? ([makePlayer(startIndex, teamId, 0)] as const)
+        : ([
+            makePlayer(startIndex, teamId, 0),
+            makePlayer(startIndex + 1, teamId, 1),
+          ] as const);
     const definition: MatchDefinition = {
       id,
       sport: draft.sport,
+      format,
       rulesetId: ruleset.id,
       ruleset,
       mode: draft.mode,
       createdAt: new Date().toISOString(),
       initialServingTeam: team,
-      initialServingPlayer: Number(player) as PlayerIndex,
+      initialServingPlayer:
+        format === "singles" ? 0 : (Number(player) as PlayerIndex),
       teams: {
         A: {
           name: t("teamA"),
-          players: [
-            { id: crypto.randomUUID(), name: cleanName(0, "A", 0) },
-            { id: crypto.randomUUID(), name: cleanName(1, "A", 1) },
-          ],
+          players: makePlayers("A", 0),
         },
         B: {
           name: t("teamB"),
-          players: [
-            { id: crypto.randomUUID(), name: cleanName(2, "B", 0) },
-            { id: crypto.randomUUID(), name: cleanName(3, "B", 1) },
-          ],
+          players: makePlayers("B", 2),
         },
       },
     };
@@ -134,7 +180,7 @@ export function SetupPage() {
 
         <div className={styles.sectionHeading}>
           <p className={styles.eyebrow}>
-            {t(draft.sport)} · {t(draft.mode)}
+            {t(draft.sport)} · {t(format)} · {t(draft.mode)}
           </p>
           <h1>{t("setupTitle")}</h1>
           <p>{t("setupIntro")}</p>
@@ -143,21 +189,35 @@ export function SetupPage() {
         <form className={styles.setupForm} onSubmit={submit}>
           <RulesSelector
             customRules={customRules}
+            format={format}
+            officialScoringMode={officialScoringMode}
             onRuleSourceChange={changeRuleSource}
+            onOfficialScoringModeChange={setOfficialScoringMode}
             onRulesChange={updateRules}
             ruleSource={ruleSource}
+            sport={draft.sport}
           />
 
           <TeamFields
             label={t("teamA")}
-            names={[names[0] ?? "", names[1] ?? ""]}
-            playerLabels={[t("player1"), t("player2")]}
+            names={Array.from(
+              { length: playerCount },
+              (_, index) => names[index] ?? "",
+            )}
+            playerLabels={Array.from({ length: playerCount }, (_, index) =>
+              index === 0 ? t("player1") : t("player2"),
+            )}
             onChange={(index, value) => updateName(index, value)}
           />
           <TeamFields
             label={t("teamB")}
-            names={[names[2] ?? "", names[3] ?? ""]}
-            playerLabels={[t("player1"), t("player2")]}
+            names={Array.from(
+              { length: playerCount },
+              (_, index) => names[index + 2] ?? "",
+            )}
+            playerLabels={Array.from({ length: playerCount }, (_, index) =>
+              index === 0 ? t("player1") : t("player2"),
+            )}
             onChange={(index, value) => updateName(index + 2, value)}
           />
 
@@ -167,18 +227,20 @@ export function SetupPage() {
               value={firstServer}
               onChange={(event) => setFirstServer(event.target.value)}
             >
-              <option value="A-0">
-                {names[0]?.trim() || `${t("teamA")} · ${t("player1")}`}
-              </option>
-              <option value="A-1">
-                {names[1]?.trim() || `${t("teamA")} · ${t("player2")}`}
-              </option>
-              <option value="B-0">
-                {names[2]?.trim() || `${t("teamB")} · ${t("player1")}`}
-              </option>
-              <option value="B-1">
-                {names[3]?.trim() || `${t("teamB")} · ${t("player2")}`}
-              </option>
+              {serverChoices.map(([teamId, playerIndex]) => {
+                const nameIndex = (teamId === "A" ? 0 : 2) + playerIndex;
+                const playerLabel =
+                  playerIndex === 0 ? t("player1") : t("player2");
+                return (
+                  <option
+                    key={`${teamId}-${playerIndex}`}
+                    value={`${teamId}-${playerIndex}`}
+                  >
+                    {names[nameIndex]?.trim() ||
+                      `${t(teamId === "A" ? "teamA" : "teamB")} · ${playerLabel}`}
+                  </option>
+                );
+              })}
             </select>
           </label>
 
@@ -198,17 +260,25 @@ export function SetupPage() {
 
 function RulesSelector({
   customRules,
+  format,
+  officialScoringMode,
   onRuleSourceChange,
+  onOfficialScoringModeChange,
   onRulesChange,
   ruleSource,
+  sport,
 }: {
   customRules: ScoringRules;
+  format: MatchFormat;
+  officialScoringMode: ScoringMode;
   onRuleSourceChange: (source: "official" | "guest_custom") => void;
+  onOfficialScoringModeChange: (mode: ScoringMode) => void;
   onRulesChange: <Key extends keyof ScoringRules>(
     key: Key,
     value: ScoringRules[Key],
   ) => void;
   ruleSource: "official" | "guest_custom";
+  sport: MatchDefinition["sport"];
 }) {
   const { t } = useLocale();
 
@@ -247,6 +317,23 @@ function RulesSelector({
           </span>
         </label>
       </div>
+
+      {ruleSource === "official" &&
+      sport === "pickleball" &&
+      format === "singles" ? (
+        <label className={styles.selectField}>
+          <span>{t("scoringMode")}</span>
+          <select
+            value={officialScoringMode}
+            onChange={(event) =>
+              onOfficialScoringModeChange(event.target.value as ScoringMode)
+            }
+          >
+            <option value="side_out">{t("sideOutStandard")}</option>
+            <option value="rally">{t("rallyScoring")}</option>
+          </select>
+        </label>
+      ) : null}
 
       {ruleSource === "guest_custom" ? (
         <div className={styles.ruleEditor}>
@@ -326,7 +413,7 @@ function RulesSelector({
                 <option value="side_out">{t("sideOutScoring")}</option>
               </select>
             </label>
-            {customRules.scoringMode === "side_out" ? (
+            {customRules.scoringMode === "side_out" && format === "doubles" ? (
               <>
                 <label>
                   <span>{t("serversPerTurn")}</span>
@@ -369,8 +456,8 @@ function RulesSelector({
 
 interface TeamFieldsProps {
   label: string;
-  names: [string, string];
-  playerLabels: [string, string];
+  names: string[];
+  playerLabels: string[];
   onChange: (index: number, value: string) => void;
 }
 

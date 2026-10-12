@@ -26,10 +26,11 @@ In Supabase Dashboard, open **SQL Editor** and run each migration once, in filen
 4. `supabase/migrations/20261009120000_safe_community_rule_reads.sql`
 5. `supabase/migrations/20261009130000_revoke_community_rule_table_reads.sql`
 6. `supabase/migrations/20261009140000_release_guardrails.sql`
+7. `supabase/migrations/20261012110000_match_format_in_guest_payload.sql`
 
-The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all six migrations in filename order because the final release-guardrail migration depends on those tables. V1.0 does not expose Community Rules in the app, and Google OAuth stays disabled. The final migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job.
+The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all seven migrations in filename order because the release-guardrail migration depends on those tables and the match-format migration updates the guest payload sanitizer. V1.0 does not expose Community Rules in the app, and Google OAuth stays disabled. The release-guardrail migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job.
 
-For a fresh environment, apply all six migrations in filename order before deploying the V1.0 app. For an existing live environment, apply the Community Rules safe-read migrations in their documented order, then apply `20261009140000_release_guardrails.sql`. Do not rerun earlier migrations to apply a later schema change.
+For a fresh environment, apply all seven migrations in filename order before deploying the app. For an existing live environment, apply any pending migrations in filename order, including `20261012110000_match_format_in_guest_payload.sql`, before deploying code that creates or shares singles matches. Do not rerun earlier migrations to apply a later schema change.
 
 Expired guest records become unreadable at 12 hours after last accepted server activity, capped at 24 hours after creation. Live Viewer links expire within 12 hours and no later than match expiry; reads do not refresh the link. The migration schedules `purge_expired_guest_matches()` hourly, removing expired matches/events and rate-limit counters; anonymous Auth users older than 30 days are also deleted. Cleanup timing is not the access-control boundary. After the next hour, check Supabase Cron run history and verify the job succeeded.
 

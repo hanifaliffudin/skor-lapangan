@@ -211,7 +211,12 @@ export function CommunityRuleDetailPage() {
 
   function useRule() {
     if (!rule || !validSport(rule.sport)) return;
-    saveDraft({ sport: rule.sport, mode: "casual", communityRuleId: rule.id });
+    saveDraft({
+      sport: rule.sport,
+      format: "doubles",
+      mode: "casual",
+      communityRuleId: rule.id,
+    });
     navigate("/setup");
   }
 

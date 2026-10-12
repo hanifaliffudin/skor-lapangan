@@ -117,7 +117,7 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
-  it("stores the selected sport and the single V1 mode before navigation", async () => {
+  it("starts a keyboard-selected pickleball singles match with the chosen scoring mode", async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -129,9 +129,15 @@ describe("quick start", () => {
 
     await user.click(
       screen.getByRole("radio", {
-        name: "Pickleball Doubles · 3-number score",
+        name: "Pickleball Service, rallies, and court positions",
       }),
     );
+    const singlesFormat = screen.getByRole("radio", {
+      name: "Singles 1 player per side",
+    });
+    singlesFormat.focus();
+    await user.keyboard(" ");
+    expect(singlesFormat).toBeChecked();
     expect(
       screen.queryByRole("radio", { name: /referee/i }),
     ).not.toBeInTheDocument();
@@ -143,8 +149,35 @@ describe("quick start", () => {
       screen.getByRole("heading", { name: "Who is playing?" }),
     ).toBeVisible();
     expect(window.sessionStorage.getItem("skor-lapangan:setup-draft")).toBe(
-      JSON.stringify({ sport: "pickleball", mode: "casual" }),
+      JSON.stringify({
+        sport: "pickleball",
+        format: "singles",
+        mode: "casual",
+      }),
     );
+    expect(screen.getAllByLabelText("Player 1")).toHaveLength(2);
+    expect(screen.queryByLabelText("Player 2")).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText("First server").querySelectorAll("option"),
+    ).toHaveLength(2);
+    expect(screen.getByLabelText("Scoring system")).toHaveValue("side_out");
+
+    const [playerA, playerB] = screen.getAllByLabelText("Player 1");
+    await user.type(playerA!, "Rina");
+    await user.type(playerB!, "Bima");
+    await user.selectOptions(screen.getByLabelText("Scoring system"), "rally");
+    await user.selectOptions(screen.getByLabelText("First server"), "B-0");
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    const match = listGuestMatches()[0]!.definition;
+    expect(match.sport).toBe("pickleball");
+    expect(match.format).toBe("singles");
+    expect(match.teams.A.players).toHaveLength(1);
+    expect(match.teams.B.players).toHaveLength(1);
+    expect(match.teams.A.players[0]?.name).toBe("Rina");
+    expect(match.teams.B.players[0]?.name).toBe("Bima");
+    expect(match.initialServingTeam).toBe("B");
+    expect(match.ruleset?.id).toBe("usap-singles-rally-2026");
   });
 
   it("starts without requiring an account", () => {

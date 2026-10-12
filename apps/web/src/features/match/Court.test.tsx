@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   awardRally,
@@ -82,5 +82,50 @@ describe("court service positions", () => {
       "false",
       "true",
     ]);
+  });
+
+  it("shows one player per side in singles at the server's service court", () => {
+    const singles: MatchDefinition = {
+      ...definition,
+      id: "singles-court",
+      format: "singles",
+      rulesetId: "usap-singles-sideout-2026",
+      teams: {
+        A: { name: "Player A", players: [{ id: "a1", name: "A1" }] },
+        B: { name: "Player B", players: [{ id: "b1", name: "B1" }] },
+      },
+    };
+    const state = createInitialState(singles);
+    const { container, rerender } = render(
+      <LocaleProvider>
+        <Court definition={singles} state={state} />
+      </LocaleProvider>,
+    );
+
+    expect(container.querySelectorAll("[data-side]")).toHaveLength(2);
+    expect(
+      [...container.querySelectorAll("[data-team] [data-side]")].map((spot) =>
+        spot.getAttribute("data-side"),
+      ),
+    ).toEqual(["right", "right"]);
+    expect(screen.queryByText("A2")).not.toBeInTheDocument();
+    expect(screen.queryByText("B2")).not.toBeInTheDocument();
+
+    const afterApoint = deriveJournal(
+      awardRally({ definition: singles, events: [] }, "B", {
+        id: "singles-point",
+        createdAt: definition.createdAt,
+      }),
+    ).state;
+    rerender(
+      <LocaleProvider>
+        <Court definition={singles} state={afterApoint} />
+      </LocaleProvider>,
+    );
+    expect(
+      [...container.querySelectorAll("[data-team] [data-side]")].map((spot) =>
+        spot.getAttribute("data-side"),
+      ),
+    ).toEqual(["left", "left"]);
   });
 });

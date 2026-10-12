@@ -29,6 +29,15 @@ const viewerState = {
   completedGames: [],
 };
 
+const singlesViewerState = {
+  ...viewerState,
+  format: "singles",
+  positions: {
+    A: { left: 0, right: 0 },
+    B: { left: 0, right: 0 },
+  },
+};
+
 describe("live viewer", () => {
   beforeEach(() => {
     rpcMock.mockReset();
@@ -76,6 +85,36 @@ describe("live viewer", () => {
     expect(rpcMock).toHaveBeenCalledWith("read_live_viewer", {
       p_token: "secret-capability",
     });
+  });
+
+  it("shows the selected format and one generic player per side", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "badminton",
+          status: "active",
+          current_state: singlesViewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/view/singles-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Badminton · Singles/)).toBeVisible();
+    expect(container.querySelectorAll("[data-side]")).toHaveLength(2);
+    expect(screen.getAllByText("Player 1").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Player 2")).not.toBeInTheDocument();
   });
 
   it("shows an unavailable state for expired or revoked links", async () => {
