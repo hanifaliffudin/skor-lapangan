@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://skor-lapangan.vercel.app/sitemap.xml

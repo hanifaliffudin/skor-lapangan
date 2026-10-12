@@ -1,10 +1,21 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const hcaptchaDevHost = process.env.HCAPTCHA_DEV_HOST?.trim();
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(projectRoot, "index.html"),
+        indonesian: resolve(projectRoot, "id/index.html"),
+      },
+    },
+  },
   test: {
     environment: "jsdom",
     environmentOptions: {

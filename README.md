@@ -12,7 +12,7 @@ V1.0 launches with these two sports. The focus is reliable scoring, quick correc
 - Undo, redo, and one-event score overrides.
 - Guest matches with client-generated UUIDs, local-first scoring, rate-limited server sync, and a 12-hour inactivity expiry capped at 24 hours. Expired records are cleaned hourly.
 - Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
-- Locked Official Rules and public, versioned Community Rules. Community Rules are unofficial, published without pre-approval, and manually reviewed after reports.
+- Locked Official Rules and guest-only custom rules that stay in the current browser and match.
 - One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
 - English by default, with Indonesian available.
 
@@ -21,7 +21,7 @@ V1.0 launches with these two sports. The focus is reliable scoring, quick correc
 - React 19, TypeScript, Vite, and React Router.
 - Vitest and Testing Library.
 - pnpm workspace with the scoring engine kept separate from the UI.
-- Supabase Auth, Postgres, and Row Level Security for temporary guest sync, account history, Live Viewer links, and Community Rules.
+- Supabase Auth, Postgres, and Row Level Security for temporary guest sync and Live Viewer links.
 
 ## Run locally
 
@@ -30,7 +30,7 @@ pnpm install
 pnpm dev
 ```
 
-The app can run locally without Supabase, but server sync, Live Viewer links, account history, and Community Rules require the Supabase setup below. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
+The app can run locally without Supabase, but server sync and Live Viewer links require the Supabase setup below. Google sign-in, account history, and Community Rules are deferred from V1.0. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -50,7 +50,7 @@ pnpm build
 
 ## Supabase setup
 
-Run the migrations in filename order using the Supabase SQL Editor. Enable anonymous sign-ins for guest matches. Google OAuth is optional for guest scoring; it is required for persistent account history and to create or manage Community Rules. See [docs/supabase-setup.md](docs/supabase-setup.md) for dashboard setup and verification steps.
+Run the migrations in filename order using the Supabase SQL Editor. Enable anonymous sign-ins for guest matches. Do not enable Google OAuth for the V1.0 release. The database migration set retains Community Rules schema needed by the release-guardrail migration, but the V1.0 app does not expose those features. See [docs/supabase-setup.md](docs/supabase-setup.md) for setup and verification steps.
 
 ## Deploy to Vercel
 
@@ -70,7 +70,8 @@ Public-facing drafts that need owner and legal review before publication:
 
 - [Privacy notice draft](docs/privacy-notice.md)
 - [Terms of use draft](docs/terms-of-use.md)
-- [Community Rules policy draft](docs/community-rules-policy.md)
+- [Community Rules policy draft for V1.1](docs/community-rules-policy.md)
+- [Account deletion request workflow draft for V1.1](docs/account-deletion-request-draft.md)
 
 ## Project structure
 

@@ -13,7 +13,7 @@ import {
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
-import { useLocale } from "../../lib/i18n";
+import { localizedPath, useLocale } from "../../lib/i18n";
 import { loadMatch, removeMatch, saveMatch } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { syncJournal } from "../../lib/sync";
@@ -31,7 +31,7 @@ const eventMetadata = (): EventMetadata => ({
 export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
   const {
     status: controlStatus,
@@ -151,7 +151,9 @@ export function MatchPage() {
       );
       return;
     }
-    setViewerUrl(`${window.location.origin}/view/${data}`);
+    setViewerUrl(
+      `${window.location.origin}${localizedPath(`/view/${data}`, locale)}`,
+    );
     setShareMessage(t("shareReady"));
   }
 
@@ -203,7 +205,7 @@ export function MatchPage() {
       }
     }
     if (matchId) removeMatch(matchId);
-    navigate("/");
+    navigate(localizedPath("/", locale));
   }
 
   if (!journal || !view) {
@@ -219,7 +221,7 @@ export function MatchPage() {
           <button
             className={styles.primaryButton}
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate(localizedPath("/", locale))}
           >
             {t("newMatch")}
           </button>

@@ -12,9 +12,12 @@ export type Locale = "id" | "en";
 const messages = {
   id: {
     appName: "Skor Lapangan",
-    tagline: "Skor jelas. Laga tetap jalan.",
+    seoTitle: "Papan Skor Badminton & Pickleball | Skor Lapangan",
+    seoDescription:
+      "Catat skor ganda badminton dan pickleball dari ponsel. Pantau giliran servis dan posisi pemain, koreksi poin, lalu bagikan tautan skor langsung.",
+    tagline: "Papan skor Badminton & Pickleball",
     intro:
-      "Scorekeeper dan panduan posisi untuk pertandingan ganda di lapangan.",
+      "Catat skor ganda dari ponsel. Pantau giliran servis dan posisi pemain, lalu bagikan skor langsung lewat tautan viewer.",
     chooseSport: "Pilih olahraga",
     badminton: "Badminton",
     pickleball: "Pickleball",
@@ -54,7 +57,7 @@ const messages = {
     endSession: "Akhiri sesi",
     endTitle: "Akhiri pertandingan ini?",
     endBody:
-      "Salinan perangkat ini dihapus. Data guest di server kedaluwarsa dalam 12 jam; tautan viewer dicabut. Riwayat akun tetap tersimpan.",
+      "Salinan di perangkat ini akan dihapus. Data server pertandingan guest tidak dapat diakses setelah kedaluwarsa, dan tautan viewer dicabut.",
     cancel: "Batal",
     confirmEnd: "Ya, akhiri",
     missingTitle: "Pertandingan tidak ditemukan",
@@ -212,8 +215,12 @@ const messages = {
   },
   en: {
     appName: "Skor Lapangan",
-    tagline: "Clear score. Keep the game moving.",
-    intro: "A scorekeeper and position guide for doubles matches on court.",
+    seoTitle: "Badminton & Pickleball Scoreboard | Skor Lapangan",
+    seoDescription:
+      "Keep score for badminton and pickleball doubles from your phone. Track service and court positions, undo points, and share a live viewer link.",
+    tagline: "Badminton & Pickleball scorekeeper",
+    intro:
+      "Keep score for doubles on your phone. Track service order and court positions, then share the live score with a viewer link.",
     chooseSport: "Choose a sport",
     badminton: "Badminton",
     pickleball: "Pickleball",
@@ -253,7 +260,7 @@ const messages = {
     endSession: "End session",
     endTitle: "End this match?",
     endBody:
-      "This device copy will be removed. Guest server data expires within 12 hours and the viewer link is revoked. Account history stays saved.",
+      "This device copy will be removed. Guest match data becomes inaccessible after expiry, and the viewer link is revoked.",
     cancel: "Cancel",
     confirmEnd: "Yes, end it",
     missingTitle: "Match not found",
@@ -416,9 +423,25 @@ interface LocaleContextValue {
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
+export function localeFromPath(pathname: string): Locale {
+  return pathname === "/id" || pathname.startsWith("/id/") ? "id" : "en";
+}
+
+export function localizedPath(pathname: string, locale: Locale): string {
+  const pathWithoutLocale =
+    pathname === "/id" ? "/" : pathname.replace(/^\/id(?=\/)/, "");
+  const normalizedPath = pathWithoutLocale || "/";
+
+  if (locale === "id") {
+    return normalizedPath === "/" ? "/id/" : `/id${normalizedPath}`;
+  }
+
+  return normalizedPath;
+}
+
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>(() =>
-    window.localStorage.getItem("skor-lapangan:locale") === "id" ? "id" : "en",
+    localeFromPath(window.location.pathname),
   );
 
   useEffect(() => {
@@ -428,7 +451,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<LocaleContextValue>(
     () => ({ locale, setLocale, t: (key) => messages[locale][key] }),
-    [locale],
+    [locale, setLocale],
   );
 
   return (

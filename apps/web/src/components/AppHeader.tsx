@@ -1,40 +1,33 @@
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { useLocale } from "../lib/i18n";
-import { hasSupabaseConfig, hcaptchaSiteKey } from "../lib/supabase";
+import { localizedPath, useLocale } from "../lib/i18n";
+import { hcaptchaSiteKey } from "../lib/supabase";
 import { isRateLimitError } from "../lib/userError";
 import styles from "../styles/App.module.css";
 
 export function AppHeader({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale, t } = useLocale();
-  const {
-    loading,
-    user,
-    isAnonymous,
-    authError,
-    retryGuestSession,
-    signInWithGoogle,
-    signOut,
-  } = useAuth();
-  const [accountError, setAccountError] = useState("");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { loading, authError, retryGuestSession } = useAuth();
+  const [captchaError, setCaptchaError] = useState("");
   const captchaRef = useRef<HCaptcha>(null);
   const needsCaptcha = authError?.toLowerCase().includes("captcha") ?? false;
   const guestSignInRateLimited = isRateLimitError(authError);
 
-  async function handleAccountAction() {
-    setAccountError("");
-    if (user && !isAnonymous) {
-      await signOut();
-      return;
-    }
-    const error = await signInWithGoogle();
-    if (error) setAccountError(error);
+  function changeLocale(nextLocale: "id" | "en") {
+    setLocale(nextLocale);
+    navigate({
+      pathname: localizedPath(location.pathname, nextLocale),
+      search: location.search,
+      hash: location.hash,
+    });
   }
 
   async function handleCaptchaVerified(token: string) {
-    setAccountError("");
+    setCaptchaError("");
     try {
       await retryGuestSession(token);
     } finally {
@@ -46,55 +39,42 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
     <header
       className={`${styles.header} ${compact ? styles.headerCompact : ""}`}
     >
-      <Link className={styles.brand} to="/" aria-label={t("appName")}>
+      <Link
+        className={styles.brand}
+        to={localizedPath("/", locale)}
+        aria-label={t("appName")}
+      >
         <span className={styles.brandMark} aria-hidden="true">
           SL
         </span>
         <span>{t("appName")}</span>
       </Link>
       <div className={styles.headerControls}>
-        {hasSupabaseConfig && (!user || isAnonymous) ? (
-          <button
-            className={styles.accountAction}
-            type="button"
-            disabled={loading}
-            onClick={handleAccountAction}
-          >
-            {t("saveHistory")}
-          </button>
-        ) : null}
-        {hasSupabaseConfig && user && !isAnonymous ? (
-          <Link className={styles.accountStatus} to="/history">
-            {t("historySaved")}
-          </Link>
-        ) : null}
         <div className={styles.languageSwitch} aria-label="Language">
           <button
             type="button"
             aria-pressed={locale === "id"}
-            onClick={() => setLocale("id")}
+            onClick={() => changeLocale("id")}
           >
             ID
           </button>
           <button
             type="button"
             aria-pressed={locale === "en"}
-            onClick={() => setLocale("en")}
+            onClick={() => changeLocale("en")}
           >
             EN
           </button>
         </div>
       </div>
-      {authError || accountError ? (
+      {authError || captchaError ? (
         <div className={styles.authError} role="alert">
           <span>
-            {needsCaptcha
-              ? t("guestCaptchaPrompt")
-              : authError
-                ? `${t("guestSignInError")} ${guestSignInRateLimited ? t("rateLimited") : authError}`
-                : isRateLimitError(accountError)
-                  ? t("rateLimited")
-                  : accountError}
+            {authError
+              ? needsCaptcha
+                ? t("guestCaptchaPrompt")
+                : `${t("guestSignInError")} ${guestSignInRateLimited ? t("rateLimited") : authError}`
+              : captchaError}
           </span>
           {needsCaptcha ? (
             hcaptchaSiteKey ? (
@@ -105,7 +85,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
                   size="compact"
                   languageOverride={locale}
                   onVerify={(token) => void handleCaptchaVerified(token)}
-                  onError={() => setAccountError(t("captchaLoadError"))}
+                  onError={() => setCaptchaError(t("captchaLoadError"))}
                 />
               </div>
             ) : (
@@ -121,7 +101,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               {loading ? t("working") : t("retryGuestSync")}
             </button>
           ) : null}
-          {accountError && needsCaptcha ? <span>{accountError}</span> : null}
+          {captchaError ? <span>{captchaError}</span> : null}
         </div>
       ) : null}
     </header>

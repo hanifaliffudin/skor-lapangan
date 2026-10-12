@@ -19,33 +19,27 @@ The service is a scorekeeping aid. It is not a referee, a federation service, or
 
 Official Rules in the app are based on the sources listed in [rules-sources.md](rules-sources.md). Federations may update their rules, and the app may not reflect a change immediately. Each match uses the ruleset selected when that match starts.
 
-Community Rules are created by users, are unofficial, and are not checked before publication. Review a Community Rule with your group before using it. Do not present a Community Rule as an official federation rule.
+V1.0 supports Official Rules and guest custom rules for the current match. Community Rules are not available in this release.
 
 ## 3. Guest matches and accounts
 
-Guests can play without linking Google. Local guest match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted server activity, capped at 24 hours after creation, and the hourly cleanup job physically deletes it and its event data. Anonymous Auth records are deleted after 30 days. These schedules depend on the Supabase cleanup job succeeding.
-
-Google sign-in enables account history and Community Rules management. Account match records do not use the guest 12-hour expiry. The current app does not provide self-service account deletion. The operator must publish a deletion contact and process before this draft becomes effective.
+Guests can play without an account. Local match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted server activity, capped at 24 hours after creation. The hourly cleanup job physically deletes expired match and event data, and deletes anonymous Auth records after 30 days. A failed or paused cleanup job can delay physical deletion but does not restore access to expired records.
 
 ## 4. Live Viewer links
 
 An owner may create a read-only Live Viewer link. Anyone with the link can view its score and court display until the link expires (within 12 hours and no later than match expiry) or the owner revokes it. Viewing does not extend the expiry. Owners are responsible for choosing where to share a link. Revocation stops future access, but it cannot remove screenshots or information a viewer saved earlier.
 
-## 5. Community content
+## 5. Match conduct
 
-Only publish a Community Rule that you are allowed to share. Do not include private personal information, impersonate a federation or official, or publish content intended to mislead or harm other users.
-
-Community Rules publish without advance approval. Users can submit a report without Google sign-in; reports are rate-limited and reviewed manually. A report does not automatically hide a reported rule, and there is no in-app moderator queue. A report does not guarantee a response or removal.
-
-**Owner decision required:** choose and document the permission or license that applies to Community Rule titles, descriptions, and scoring configurations. Do not activate this clause until that permission is clear and reviewed.
+Guest custom rules apply to the current match only and stay in the browser. They are not published or shared by the service.
 
 ## 6. Acceptable use
 
-Do not use the service to interfere with another user's match, attempt unauthorized access, submit abusive or misleading Community Rules, or use a Live Viewer link to expose information without the match owner's permission.
+Do not use the service to interfere with another user's match, attempt unauthorized access, or use a Live Viewer link to expose information without the match owner's permission.
 
 ## 7. Availability and support
 
-The service depends on the user's browser, network connection, hosting provider, and Supabase configuration. A local match can continue without Supabase, but server sync, account history, Community Rules, and Live Viewer access require the relevant server configuration.
+The service depends on the user's browser, network connection, hosting provider, and Supabase configuration. A local match can continue without Supabase, but server sync and Live Viewer access require the relevant server configuration.
 
 The operator must add a support contact and describe how users can request help before publication. The service currently has no published support response time.
 
@@ -59,8 +53,9 @@ The operator should publish a new effective date when these terms change and sho
 
 - Operator identity, address, support and privacy contacts.
 - Applicable jurisdictions and any required age or parental-consent policy.
-- Privacy notice and account deletion process.
-- Community content license, report handling, and appeal process.
+- Privacy notice and a contact for privacy requests.
 - Any warranty, liability, dispute, or termination terms appropriate to the service and applicable law.
+
+Google account history and Community Rules are planned for V1.1. The operator must approve an account deletion workflow, Community Rules license, report handling, and appeal process before enabling those features.
 
 For an Indonesia-facing release, have a qualified reviewer assess the final terms in context. The official [Indonesian Personal Data Protection Law, Law No. 27 of 2022](https://peraturan.bpk.go.id/Details/229798/uu-no-27-) is one source for privacy review; this draft does not claim compliance with it or any other law.

@@ -10,13 +10,13 @@ Keep the product mobile-first and English by default, with Indonesian available.
 
 ## Release sequence
 
-| Release | Goal                                                  | Scope                                                                                                                                                                              | Exit check                                                                                                                         |
-| ------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| V1.0    | Public MVP for doubles play                           | Badminton and Pickleball, guest matches, score controls, Live Viewer, Official Rules, and Community Rules                                                                          | V1.0 launch checks below pass                                                                                                      |
-| V1.1    | Improve the core using real player feedback           | Fix issues in undo/redo, synchronization, and screen visibility. Revisit Referee only if players need a genuinely different workflow. Do not bundle a new sport into this release. | Critical scoring and sync defects are resolved, regression tests pass, and feedback from real games has been reviewed              |
-| V1.2    | Add Tennis as the next sport candidate                | Implement only after the V1.1 foundation gate passes. Confirm the supported format and current federation rules before development.                                                | Tennis scoring, serve changes, court positions, corrections, and match completion have rules-based tests and a mobile play-through |
-| V1.3    | Add Squash or the next most requested sport           | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                       | The sport passes the same rules, regression, and mobile checks as V1.2                                                             |
-| V2.0    | Reassess product scope after the first sport releases | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                                | A separate product decision defines the scope and reason for a major release                                                       |
+| Release | Goal                                                   | Scope                                                                                                                                                                                                                      | Exit check                                                                                                                                                                       |
+| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.0    | Public MVP for doubles play                            | Badminton and Pickleball, guest matches, score controls, Live Viewer, Official Rules, and local guest custom rules. No Google account history or Community Rules.                                                          | V1.0 launch checks below pass                                                                                                                                                    |
+| V1.1    | Harden the core and add account and community features | Fix issues found in V1.0 scoring, synchronization, and screen visibility. Add Google sign-in, account match history, and Community Rules only after the V1.0 foundation and moderation readiness gates pass. No new sport. | Critical scoring and sync defects are resolved, real-game feedback is reviewed, account deletion and support are ready, and Community Rules security and moderation checks pass. |
+| V1.2    | Add Tennis as the next sport candidate                 | Implement only after the V1.1 foundation gate passes. Confirm the supported format and current federation rules before development.                                                                                        | Tennis scoring, serve changes, court positions, corrections, and match completion have rules-based tests and a mobile play-through                                               |
+| V1.3    | Add Squash or the next most requested sport            | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                                                               | The sport passes the same rules, regression, and mobile checks as V1.2                                                                                                           |
+| V2.0    | Reassess product scope after the first sport releases  | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                                                                        | A separate product decision defines the scope and reason for a major release                                                                                                     |
 
 The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports before launching V1.0. Add one sport at a time, and change the order when player feedback supports a different choice.
 
@@ -30,17 +30,17 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 - Guest play without Google sign-in. Generate match and event UUIDs in the browser, save locally first, and sync idempotently when the server is available.
 - Guest match continuity for up to 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired guest data and Live Viewer links stop being accessible immediately; an hourly database cleanup physically removes expired game data.
 - Owner-created Live Viewer links. Viewers do not need an account and can see only the score and court positions. Owners can revoke links, and links expire within 12 hours and no later than the match data.
-- Optional Google sign-in for persistent match history and for creating and managing public Community Rules.
-- Official Rules stay locked and follow federation sources. Community Rules are public, shareable by link or QR, versioned, marked unofficial, and do not require manual approval. Anyone can report them; creators can unpublish their own rules.
+- Official Rules stay locked and follow federation sources. Guest custom rules apply only to the current match.
 - Guest-created custom rules apply only to that guest's current match. They stay in the browser, are not published or synced, and are discarded when the match ends.
 - Anonymous sign-in and server actions have rate limits. CAPTCHA is a fallback if real abuse appears, not a launch prerequisite.
-- Community Rule reports are available to guests, rate-limited, and reviewed manually after publication. Reports do not automatically unpublish a rule.
 - New matches use the single Casual workflow. Referee is hidden until it has meaningfully different behavior.
 
 ### Not included
 
 - Sports other than Badminton and Pickleball.
 - Singles formats unless a later release defines and validates them.
+- Google sign-in, persistent account match history, and guest-to-account claiming.
+- Public Community Rules, including publishing, sharing, reports, and moderation.
 - Arbitrary rule scripting or complex editing of a match's event history.
 - Server storage or sharing of a guest's private custom rules.
 
@@ -49,7 +49,7 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 - Tests cover scoring and service rotation for both sports, including game changes, undo, redo, and score override behavior.
 - Retrying a sync preserves match and event UUIDs and does not create duplicates. Offline recovery, 12-hour expiry, and single-tab control are verified.
 - A Live Viewer works without sign-in, exposes only the intended score and court-position display, and stops working after revocation or expiry.
-- Official and Community Rules remain visibly distinct. Rule revisions do not change the rule snapshot of a match already in progress.
+- New V1.0 matches can use only Official Rules or guest-only custom rules. Account history and Community Rules routes are unavailable.
 - Supabase row-level security and viewer access tests pass. The frontend contains no service-role secret.
 - Mobile play-through confirms that scores and court positions are readable during play, controls are usable with touch, and no content overflows horizontally.
 - Loading, empty, offline, and error states provide a clear status or next action.
@@ -64,7 +64,9 @@ After V1.0 is used in real games, collect feedback on three areas:
 2. Whether guest sync, reconnect, match resumption, and Live Viewer updates behave reliably across browsers and tabs.
 3. Whether players can read the score, server, and court positions at a glance on a phone placed near the court.
 
-Review actual reports and reproduce issues before prioritizing changes. Do not add paid analytics just to answer these questions. Keep V1.1 focused on problems found in use, and leave a new sport for a separate release.
+Review actual reports and reproduce issues before prioritizing changes. Do not add paid analytics just to answer these questions. Fix critical scoring and sync problems before enabling the V1.1 account and Community Rules features. Keep a new sport for a separate release.
+
+Before V1.1 account and Community Rules work begins, complete the account deletion process, publish a support and privacy contact, approve the Community Rules policy, and confirm that the operator can review reports against the documented response targets. If those conditions are not met, keep the features deferred.
 
 ## Adding a sport
 

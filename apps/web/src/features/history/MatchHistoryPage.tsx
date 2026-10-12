@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
-import { useLocale } from "../../lib/i18n";
+import { localizedPath, useLocale } from "../../lib/i18n";
 import { loadMatch } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import type { Json } from "../../lib/database.types";
@@ -48,7 +48,7 @@ function savedScore(value: Json): SavedScore | null {
 }
 
 export function MatchHistoryPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchHistoryRow[]>([]);
@@ -138,7 +138,9 @@ export function MatchHistoryPage() {
                   <button
                     className={styles.secondaryButton}
                     type="button"
-                    onClick={() => navigate("/match/" + match.id)}
+                    onClick={() =>
+                      navigate(localizedPath(`/match/${match.id}`, locale))
+                    }
                   >
                     {t("openOnThisDevice")}
                   </button>
@@ -151,7 +153,10 @@ export function MatchHistoryPage() {
             );
           })}
         </div>
-        <Link className={styles.textButton} to="/">
+        <Link
+          className={styles.textButton}
+          to={localizedPath("/", locale)}
+        >
           {t("backToHome")}
         </Link>
       </main>

@@ -1,0 +1,10 @@
+.env*
+AGENTS.md
+antislop.md
+.pnpm-store/
+docs/
+skills/
+supabase/
+apps/web/dist/
+**/node_modules/
+**/*.tsbuildinfo

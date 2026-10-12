@@ -89,19 +89,21 @@ describe("quick start", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Clear score. Keep the game moving.",
+        name: "Badminton & Pickleball scorekeeper",
       }),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "ID" }));
     expect(
-      screen.getByRole("heading", { name: "Skor jelas. Laga tetap jalan." }),
+      screen.getByRole("heading", {
+        name: "Papan skor Badminton & Pickleball",
+      }),
     ).toBeVisible();
   });
 
-  it("restores a saved Indonesian preference", () => {
-    window.localStorage.setItem("skor-lapangan:locale", "id");
+  it("uses the Indonesian locale for its dedicated URL", () => {
+    window.localStorage.setItem("skor-lapangan:locale", "en");
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/id/"]}>
         <LocaleProvider>
           <App />
         </LocaleProvider>
@@ -109,7 +111,9 @@ describe("quick start", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Skor jelas. Laga tetap jalan." }),
+      screen.getByRole("heading", {
+        name: "Papan skor Badminton & Pickleball",
+      }),
     ).toBeVisible();
   });
 
@@ -159,6 +163,29 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
+  it.each(["/rules", "/rules/new", "/rules/example", "/history"])(
+    "redirects deferred feature route %s to the home page",
+    (path) => {
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <LocaleProvider>
+            <App />
+          </LocaleProvider>
+        </MemoryRouter>,
+      );
+
+      expect(
+        screen.getByRole("heading", {
+          name: "Badminton & Pickleball scorekeeper",
+        }),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: /Save history with Google/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Community Rules")).not.toBeInTheDocument();
+    },
+  );
+
   it("offers an active match after the tab is reopened on the same device", async () => {
     const user = userEvent.setup();
     const match = completedMatch();
@@ -189,6 +216,9 @@ describe("quick start", () => {
     await user.click(
       screen.getByRole("button", { name: "Continue to player setup" }),
     );
+    expect(screen.getByRole("radio", { name: /Official Rules/ })).toBeVisible();
+    expect(screen.getByRole("radio", { name: /Custom rules/ })).toBeVisible();
+    expect(screen.queryByText("Community Rules")).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("radio", { name: /Custom rules for this match/ }),
     );

@@ -2,13 +2,15 @@
 
 Use this checklist before a public release and again after a scoring, sync, or database change. Record the version, environment, browser/device, tester, date, and result in the release notes or issue tracker. Do not mark a check complete without evidence.
 
+The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). It is not a production release sign-off; database, deployment, real-device, and owner-approval checks remain open.
+
 ## Automated checks
 
 - [ ] `pnpm test` passes. This builds the scoring package and runs the scoring-core and web tests.
 - [ ] `pnpm typecheck` passes.
 - [ ] `pnpm build` passes.
 - [ ] `pnpm exec prettier --check .` passes.
-- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a test database. Never run test setup against production data.
+- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The Community Rules checks cover migration security only; Community Rules are not part of V1.0 user flows. Never run test setup against production data.
 - [ ] `git diff --check` passes and no secret key appears in the browser bundle or repository.
 
 ## Match setup and scoring
@@ -16,7 +18,7 @@ Use this checklist before a public release and again after a scoring, sync, or d
 - [ ] Start a Badminton doubles match with Official Rules, set all four player names, and choose each of the four possible initial servers in separate test matches.
 - [ ] Verify Badminton service court, server change, receiver positions, game completion, next-game opening server, and match completion against the current source in `docs/rules-sources.md`.
 - [ ] Start a Pickleball doubles match with Official Rules. Verify the opening 0-0-2 server sequence, side-out transition, second server, court positions, game completion, and match completion.
-- [ ] Repeat representative scoring cases with a Community Rule and guest custom rules. Confirm that each supported setting changes the engine result as expected.
+- [ ] Repeat representative scoring cases with guest custom rules. Confirm that each supported setting changes the engine result as expected and stays local to the current match.
 - [ ] Confirm the court stays in the intended portrait orientation with a horizontal net and that score, service, and positions are readable at court-side viewing distance.
 
 ## Corrections and event history
@@ -36,7 +38,6 @@ Use this checklist before a public release and again after a scoring, sync, or d
 - [ ] Open the same match in two tabs. Confirm only one tab controls it and the other remains read-only until control is released.
 - [ ] Verify guest expiry refreshes on accepted activity but never exceeds 24 hours from creation. Check expired records become inaccessible immediately and the hourly cleanup physically removes them and their events while the Supabase project is active.
 - [ ] Record that Supabase Free may pause a low-activity project and delay physical cleanup; after any resume, inspect Cron history and remove remaining expired rows through the authorized cleanup procedure.
-- [ ] Link a guest to Google and confirm still-valid guest matches are claimed without changing their IDs.
 
 ## Live Viewer
 
@@ -46,16 +47,12 @@ Use this checklist before a public release and again after a scoring, sync, or d
 - [ ] Revoke the link and confirm later reads fail. Verify an expired link also fails.
 - [ ] Confirm the viewer expires within 12 hours, no later than match data, and that reads do not refresh expiry. Treat the raw link as a bearer secret.
 
-## Accounts and Community Rules
+## V1.0 scope controls
 
-- [ ] Read the public Community Rules directory without signing in.
-- [ ] Sign in with Google. Create a rule, share its URL and QR code, edit it, and confirm the version increments.
-- [ ] Confirm a new match can use the published version and an already-started match keeps its selected local snapshot.
-- [ ] Unpublish the rule. Confirm it disappears from public discovery and cannot be selected for a new match.
-- [ ] Submit a report as a signed-in user and as a guest, with and without optional contact email. Confirm all six reasons are accepted and report data is not readable by public clients.
-- [ ] Submit a fourth report in one hour from the same anonymous session; verify a clear wait-and-retry message. Confirm reports do not automatically hide a rule.
-- [ ] Review one report in Supabase SQL Editor and record a dismissal or unpublish decision using the runbook. Confirm the queue stays private and status/resolution fields update.
-- [ ] Apply `20261009120000_safe_community_rule_reads.sql`, deploy the frontend that uses those read functions, then apply `20261009130000_revoke_community_rule_table_reads.sql`. Confirm public rules and versions still load, direct reads of both underlying tables are denied, and no response contains `author_id` or `created_by`.
+- [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and `/history` redirect to the home page.
+- [ ] Confirm no Google sign-in or account-history control appears in the app, including when Supabase is configured.
+- [ ] Confirm match setup offers Official Rules and guest-only custom rules, with no Community Rules list.
+- [ ] Keep Community Rules policy and report-review checks out of the V1.0 public launch. Reintroduce them only after the V1.1 account deletion, contact, moderation, and security gates pass.
 
 ## Mobile, accessibility, and states
 
@@ -65,13 +62,20 @@ Use this checklist before a public release and again after a scoring, sync, or d
 - [ ] Verify loading, empty, offline, expired, unavailable, and error states explain what happened and what the user can do next.
 - [ ] Check English default and Indonesian copy for truncation or layout changes.
 
+## Search indexing
+
+- [ ] Confirm `/robots.txt` returns plain text and points to the deployed sitemap; confirm `/sitemap.xml` returns valid XML listing the English homepage and `/id/` with matching language alternates.
+- [ ] Confirm `/` and `/id/` return their own language-specific title, description, canonical URL, `hreflang` links, and `WebSite` structured data.
+- [ ] Confirm setup, match, and viewer URLs return `X-Robots-Tag: noindex, nofollow`; confirm deferred rules/history URLs redirect to the homepage.
+- [ ] In Google Search Console, submit the sitemap and inspect both language homepages after deployment. Request indexing if each page is available to Googlebot.
+
 ## Public-launch blockers to resolve
 
 - [ ] Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to Vercel Preview if Preview deployments will be used for server-backed smoke tests. Use only the public publishable key, never a service-role key.
 - [ ] Set and verify the Supabase Auth anonymous sign-in rate limit (initial recommendation: 10 per IP per hour); keep CAPTCHA disabled initially and enable it only if abuse appears.
 - [ ] Confirm new matches expose only Casual mode and old saved Referee matches remain readable.
 - [ ] Apply the release-guardrail migration, verify the hourly `purge-expired-guest-data` Cron job succeeds, and confirm the job removes expired rows.
-- [ ] Publish the approved privacy notice, terms, and Community Rules policy with real owner and contact details.
-- [ ] Publish the report review path and operational contact, and decide the account-deletion request channel before public launch.
-- [ ] Verify the staged Community Rules read and revoke migrations are applied in the intended order before production release.
+- [ ] Publish the approved privacy notice and terms with real operator and privacy contact details.
+- [ ] Keep Google OAuth disabled for V1.0. Decide the account-deletion channel before enabling Google accounts in V1.1.
+- [ ] Verify the staged Community Rules read and revoke migrations are applied in the intended order as required by the migration chain. Do not expose Community Rules in the V1.0 interface.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.

@@ -1,28 +1,56 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   deriveJournal,
   type MatchJournal,
   type Sport,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
-import { useLocale } from "../../lib/i18n";
+import { localizedPath, useLocale } from "../../lib/i18n";
 import { listGuestMatches, saveDraft } from "../../lib/session";
-import { hasSupabaseConfig } from "../../lib/supabase";
 import styles from "../../styles/App.module.css";
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [sport, setSport] = useState<Sport>("badminton");
   const [savedMatches] = useState<MatchJournal[]>(() => listGuestMatches());
   const activeMatches = savedMatches.filter(
     (journal) => deriveJournal(journal).state.status === "active",
   );
 
+  useEffect(() => {
+    const canonicalUrl =
+      locale === "id"
+        ? "https://skor-lapangan.vercel.app/id/"
+        : "https://skor-lapangan.vercel.app/";
+    document.title = t("seoTitle");
+    document
+      .querySelector<HTMLMetaElement>('meta[name="description"]')
+      ?.setAttribute("content", t("seoDescription"));
+    document
+      .querySelector<HTMLLinkElement>('link[rel="canonical"]')
+      ?.setAttribute("href", canonicalUrl);
+    document
+      .querySelector<HTMLMetaElement>('meta[property="og:title"]')
+      ?.setAttribute("content", t("seoTitle"));
+    document
+      .querySelector<HTMLMetaElement>('meta[property="og:description"]')
+      ?.setAttribute("content", t("seoDescription"));
+    document
+      .querySelector<HTMLMetaElement>('meta[property="og:url"]')
+      ?.setAttribute("content", canonicalUrl);
+    document
+      .querySelector<HTMLMetaElement>('meta[name="twitter:title"]')
+      ?.setAttribute("content", t("seoTitle"));
+    document
+      .querySelector<HTMLMetaElement>('meta[name="twitter:description"]')
+      ?.setAttribute("content", t("seoDescription"));
+  }, [locale, t]);
+
   function continueToSetup() {
     saveDraft({ sport, mode: "casual" });
-    navigate("/setup");
+    navigate(localizedPath("/setup", locale));
   }
 
   return (
@@ -50,7 +78,11 @@ export function HomePage() {
                   className={styles.resumeMatch}
                   type="button"
                   key={journal.definition.id}
-                  onClick={() => navigate(`/match/${journal.definition.id}`)}
+                  onClick={() =>
+                    navigate(
+                      localizedPath(`/match/${journal.definition.id}`, locale),
+                    )
+                  }
                 >
                   <span>{t(journal.definition.sport)}</span>
                   <strong>{t("resumeMatch")}</strong>
@@ -98,11 +130,6 @@ export function HomePage() {
       <footer className={styles.footer}>
         <span>{t("officialRules")}</span>
         <span>{t("officialHint")}</span>
-        {hasSupabaseConfig ? (
-          <Link className={styles.communityFooterLink} to="/rules">
-            {t("communityLibraryTitle")}
-          </Link>
-        ) : null}
       </footer>
     </div>
   );

@@ -1,6 +1,6 @@
 # Community Rules policy
 
-**Status: V1.0 operating policy; public-facing legal terms still require owner and legal review.**
+**Status: Draft for V1.1. Community Rules are not available in V1.0. Do not publish or use this as an active policy until the owner approves the feature, moderation capacity, and legal terms.**
 
 ## What Community Rules are
 
