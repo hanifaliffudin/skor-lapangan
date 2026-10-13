@@ -286,4 +286,167 @@ describe("Supabase sync serialization", () => {
     expect(serialized).not.toContain("woman");
     expect(serialized).not.toContain("Private A");
   });
+
+  it("syncs the ITTF Table tennis snapshot, orders, and public score state", () => {
+    const official = officialRulesetFor("table_tennis", "doubles");
+    const tableTennisJournal: MatchJournal = {
+      definition: {
+        id: matchId,
+        sport: "table_tennis",
+        format: "doubles",
+        rulesetId: official.id,
+        ruleset: {
+          id: official.id,
+          name: official.name,
+          sport: "table_tennis",
+          format: "doubles",
+          source: "official",
+          version: official.version,
+          configuration: { ...official.configuration, bestOf: 5 },
+          tableTennisConfiguration: { bestOf: 5 },
+        },
+        mode: "casual",
+        createdAt: "2026-10-13T00:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        tableTennisOrders: {
+          firstServer: { team: "A", player: 0 },
+          firstReceiver: { team: "B", player: 1 },
+        },
+        teams: {
+          A: {
+            name: "Private Team A",
+            players: [
+              { id: "a1", name: "Private A" },
+              { id: "a2", name: "Private A2" },
+            ],
+          },
+          B: {
+            name: "Private Team B",
+            players: [
+              { id: "b1", name: "Private B" },
+              { id: "b2", name: "Private B2" },
+            ],
+          },
+        },
+      },
+      events: [],
+    };
+
+    const payload = serializeJournalForSync(
+      awardRally(tableTennisJournal, "A", {
+        id: eventId,
+        createdAt: "2026-10-13T00:01:00.000Z",
+      }),
+      "guest-user",
+      true,
+    );
+    const serialized = JSON.stringify(payload);
+    expect(payload.match.definition).toMatchObject({
+      sport: "table_tennis",
+      tableTennisOrders: {
+        firstServer: { team: "A", player: 0 },
+        firstReceiver: { team: "B", player: 1 },
+      },
+      ruleset: {
+        id: "ittf-table-tennis-2022",
+        tableTennisConfiguration: { bestOf: 5 },
+      },
+    });
+    expect(payload.match.current_state).toMatchObject({
+      sport: "table_tennis",
+      tableTennis: {
+        currentReceiver: 1,
+        gameOrders: { firstReceiver: { player: 1 } },
+      },
+    });
+    expect(serialized).not.toContain("Private A");
+    expect(serialized).not.toContain("Private B");
+  });
+
+  it("syncs the WSF Squash snapshot, orders, service box, and public score state", () => {
+    const official = officialRulesetFor("squash", "doubles");
+    const squashJournal: MatchJournal = {
+      definition: {
+        id: matchId,
+        sport: "squash",
+        format: "doubles",
+        rulesetId: official.id,
+        ruleset: {
+          id: official.id,
+          name: official.name,
+          sport: "squash",
+          format: "doubles",
+          source: "official",
+          version: official.version,
+          configuration: { ...official.configuration, bestOf: 5 },
+          squashConfiguration: { bestOf: 5 },
+        },
+        mode: "casual",
+        createdAt: "2026-10-13T00:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 1,
+        squashGameOrders: {
+          serviceOrder: { A: [1, 0], B: [0, 1] },
+          receiverBySide: {
+            A: { left: 0, right: 1 },
+            B: { left: 1, right: 0 },
+          },
+          openingServiceBox: "left",
+        },
+        teams: {
+          A: {
+            name: "Private Team A",
+            players: [
+              { id: "a1", name: "Private A" },
+              { id: "a2", name: "Private A2" },
+            ],
+          },
+          B: {
+            name: "Private Team B",
+            players: [
+              { id: "b1", name: "Private B" },
+              { id: "b2", name: "Private B2" },
+            ],
+          },
+        },
+      },
+      events: [],
+    };
+
+    const payload = serializeJournalForSync(
+      awardRally(squashJournal, "A", {
+        id: eventId,
+        createdAt: "2026-10-13T00:01:00.000Z",
+      }),
+      "guest-user",
+      true,
+    );
+    const serialized = JSON.stringify(payload);
+
+    expect(payload.match.definition).toMatchObject({
+      sport: "squash",
+      squashGameOrders: {
+        serviceOrder: { A: [1, 0], B: [0, 1] },
+        receiverBySide: {
+          A: { left: 0, right: 1 },
+          B: { left: 1, right: 0 },
+        },
+        openingServiceBox: "left",
+      },
+      ruleset: {
+        id: "wsf-squash-doubles-2022",
+        squashConfiguration: { bestOf: 5 },
+      },
+    });
+    expect(payload.match.current_state).toMatchObject({
+      sport: "squash",
+      squash: {
+        currentServiceBox: "right",
+        gameOrders: { openingServiceBox: "left" },
+      },
+    });
+    expect(serialized).not.toContain("Private A");
+    expect(serialized).not.toContain("Private B");
+  });
 });

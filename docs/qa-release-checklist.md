@@ -2,7 +2,7 @@
 
 Use this checklist before a public release and again after a scoring, sync, or database change. Record the version, environment, browser/device, tester, date, and result in the release notes or issue tracker. Do not mark a check complete without evidence.
 
-The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). It is not a production release sign-off; database, deployment, real-device, and owner-approval checks remain open.
+The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md). The earlier partial run remains available in [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). Neither is a production release sign-off; database, deployment, real-device, and owner-approval checks remain open.
 
 ## Automated checks
 
@@ -10,7 +10,10 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] `pnpm typecheck` passes.
 - [ ] `pnpm build` passes.
 - [ ] `pnpm exec prettier --check .` passes.
-- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The Community Rules checks cover migration security only; Community Rules are not part of V1.0 user flows. Never run test setup against production data.
+- [ ] `pnpm test:coverage` passes with the configured scoring-core and web thresholds.
+- [ ] `pnpm test:e2e` passes against a local preview or dev server; use the Chrome smoke flow as a manual fallback when the host cannot launch a headless browser.
+- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Community Rules checks cover migration security only; Community Rules are not user-facing yet. Never run test setup against production data.
+- [ ] Review `supabase/tests/atomic_match_sync.test.sql` in the same disposable database. Verify first write, idempotent retry, stale snapshot rejection, divergent snapshot rejection, and rollback when an event fails.
 - [ ] `git diff --check` passes and no secret key appears in the browser bundle or repository.
 
 ## Match setup and scoring
@@ -21,6 +24,10 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Start a Pickleball doubles match with Official Rules. Verify the opening 0-0-2 server sequence, side-out transition, second server, court positions, game completion, and match completion.
 - [ ] Start Pickleball singles with side-out scoring. Verify that a receiving-side rally does not award a point, service changes after the rally, and court side follows the serving player's score parity.
 - [ ] Repeat Pickleball singles with rally scoring. Verify each rally winner scores and becomes the server, with service court following that player's score parity.
+- [ ] Start Table tennis singles with best-of-three and best-of-five. Verify 11-point games, win by two, service changes every two points and every point at 10–10, the selected first server, next-game server, correction, undo/redo, and match completion.
+- [ ] Start Table tennis doubles. Verify first server and receiver setup, previous-receiver/server-partner rotation, required next-game order confirmation, deciding-game side and receiving-order changes at five, and the Live Viewer markers.
+- [ ] Start Squash singles with best-of-five and best-of-three. Verify PARS 11, win-by-two, service-box selection after hand-out, next-game server, score correction, undo/redo, and match completion.
+- [ ] Start Squash doubles. Verify fixed server order, left/right receiver mapping, service-box alternation, next-game order confirmation, 11–10 completion, and Live Viewer state without names.
 - [ ] Repeat representative scoring cases with guest custom rules. Confirm that each supported setting changes the engine result as expected and stays local to the current match.
 - [ ] Confirm the court stays in the intended portrait orientation with a horizontal net and that score, service, and positions are readable at court-side viewing distance.
 
@@ -30,6 +37,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Undo a point, redo it, undo again, then continue scoring. Confirm the final state and event sequence remain consistent.
 - [ ] Override a score to a valid pair of totals. Confirm the app records one override event and derives service and positions from the overridden state.
 - [ ] Repeat point entry, undo, redo, and score correction in singles, and confirm the score, server, service court, history, and Live Viewer stay in sync.
+- [ ] Repeat Table tennis point entry, undo, redo, score correction, history, sync, and Live Viewer checks in both singles and doubles.
 - [ ] Try an invalid or out-of-range correction and confirm the app rejects it with a clear message.
 - [ ] Refresh the match and verify the same score and local ruleset snapshot return.
 
@@ -39,6 +47,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] With Supabase configured, start a guest match and verify its client-generated match and event UUIDs reach the server.
 - [ ] Interrupt the network during scoring, reconnect, and verify queued events sync with the original UUIDs and in order.
 - [ ] Retry the same sync more than once. Confirm no duplicate match or event rows appear.
+- [ ] Force a stale or divergent journal snapshot in a disposable test account. Confirm the atomic sync rejects it and does not change the server state.
 - [ ] Open the same match in two tabs. Confirm only one tab controls it and the other remains read-only until control is released.
 - [ ] Verify a singles match sent to Live Viewer shows one generic player per side and preserves the format while continuing to hide entered names.
 - [ ] Verify guest expiry refreshes on accepted activity but never exceeds 24 hours from creation. Check expired records become inaccessible immediately and the hourly cleanup physically removes them and their events while the Supabase project is active.
@@ -52,10 +61,21 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Revoke the link and confirm later reads fail. Verify an expired link also fails.
 - [ ] Confirm the viewer expires within 12 hours, no later than match data, and that reads do not refresh expiry. Treat the raw link as a bearer secret.
 
-## V1.0 scope controls
+## Account foundation
 
-- [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and `/history` redirect to the home page.
-- [ ] Confirm no Google sign-in or account-history control appears in the app, including when Supabase is configured.
+- [ ] As a guest, click Google login and confirm `linkIdentity` preserves an unexpired match; confirm an expired guest match is not claimed.
+- [ ] Complete OAuth on local and Preview. Confirm the callback updates the session and `claim_guest_matches()` runs once, with a visible claiming state and a recoverable error state.
+- [ ] Refresh the same browser and open `/history`; confirm matches are ordered by `updated_at`, show sport/format/status/score/time, and reopen fully only when the local snapshot exists.
+- [ ] Open `/history` and `/account` in English and Indonesian. Verify loading, empty, error, keyboard focus, 44 px controls, and narrow-phone layout.
+- [ ] Sign out and confirm the account menu disappears and a new anonymous guest session is available.
+- [ ] On Preview, delete a disposable Google test account after the second confirmation. Confirm match history, events, reports, rules, versions, viewer access, local match storage, and the Auth session are gone.
+- [ ] Confirm user A cannot read or delete user B's history, and confirm no service-role key appears in the browser bundle or Vercel client variables.
+- [ ] Repeat the complete account flow in a second browser. Confirm server history persists while full match detail remains device-local.
+
+## Community Rules scope controls
+
+- [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and the Indonesian equivalents redirect to the localized home page.
+- [ ] Confirm Google account controls do not expose Community Rules routes or publishing actions.
 - [ ] Confirm match setup offers Official Rules and guest-only custom rules, with no Community Rules list.
 - [ ] Keep Community Rules policy and report-review checks out of the V1.0 public launch. Reintroduce them only after the V1.1 account deletion, contact, moderation, and security gates pass.
 
@@ -72,7 +92,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 
 - [ ] Confirm `/robots.txt` returns plain text and points to the deployed sitemap; confirm `/sitemap.xml` returns valid XML listing the English homepage and `/id/` with matching language alternates.
 - [ ] Confirm `/` and `/id/` return their own language-specific title, description, canonical URL, `hreflang` links, and `WebSite` structured data.
-- [ ] Confirm setup, match, and viewer URLs return `X-Robots-Tag: noindex, nofollow`; confirm deferred rules/history URLs redirect to the homepage.
+- [ ] Confirm setup, match, and viewer URLs return `X-Robots-Tag: noindex, nofollow`; confirm deferred Community Rules URLs redirect to the homepage.
 - [ ] In Google Search Console, submit the sitemap and inspect both language homepages after deployment. Request indexing if each page is available to Googlebot.
 
 ## Public-launch blockers to resolve
@@ -82,6 +102,7 @@ The partial local evidence run from 2026-10-09 is recorded in [qa-evidence-v1.0-
 - [ ] Confirm new matches expose only Casual mode and old saved Referee matches remain readable.
 - [ ] Apply the release-guardrail migration, verify the hourly `purge-expired-guest-data` Cron job succeeds, and confirm the job removes expired rows.
 - [ ] Publish the approved privacy notice and terms with real operator and privacy contact details.
-- [ ] Keep Google OAuth disabled for V1.0. Decide the account-deletion channel before enabling Google accounts in V1.1.
+- [ ] Deploy Google OAuth and `delete-account` to Preview first. Promote production only after the account foundation smoke test, deletion test, privacy notice, terms, and owner approval pass.
 - [ ] Verify the staged Community Rules read and revoke migrations are applied in the intended order as required by the migration chain. Do not expose Community Rules in the V1.0 interface.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.
+- [ ] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests.

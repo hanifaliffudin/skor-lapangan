@@ -4,20 +4,21 @@ This roadmap records the planned public releases for Skor Lapangan. It has no re
 
 ## Release strategy
 
-Launch V1.0 with Badminton and Pickleball singles and doubles. Use the first public release to learn whether scoring, correction, synchronization, and the live display work during real games. Tennis and Padel development can run in parallel with V1.1 hardening, each with its own rules, database, regression, and mobile release gates. Release each sport separately so it has its own launch and feedback cycle.
+Launch V1.0 with Badminton and Pickleball singles and doubles. Use the first public release to learn whether scoring, correction, synchronization, and the live display work during real games. Tennis, Padel, and Table tennis each have their own rules, database, regression, and mobile release gates. Release each sport separately so it has its own launch and feedback cycle.
 
 Keep the product mobile-first and English by default, with Indonesian available. Keep operating costs at zero or close to it. Do not add paid infrastructure without an explicit decision.
 
 ## Release sequence
 
-| Release | Goal                                                     | Scope                                                                                                                                                                                                                                                | Exit check                                                                                                                                                                                                                   |
-| ------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| V1.0    | Public MVP for Badminton and Pickleball                  | Singles and doubles, guest matches, score controls, Live Viewer, Official Rules, and local guest custom rules. No Google account history or Community Rules.                                                                                         | V1.0 launch checks below pass                                                                                                                                                                                                |
-| V1.1    | Harden the core and develop Tennis and Padel in parallel | Fix issues found in V1.0 scoring, synchronization, and screen visibility. Continue Tennis and Padel implementation alongside core hardening. Add Google sign-in and Community Rules only after their foundation and moderation readiness gates pass. | Critical scoring and sync defects are resolved, real-game feedback is reviewed, and the independent Tennis and Padel launch gates below pass. Account and Community Rules gates also pass before those features are enabled. |
-| V1.2    | Launch Tennis                                            | Enable Tennis singles, standard doubles, and mixed doubles after its own rule, regression, mobile, and Supabase migration checks pass.                                                                                                               | ITF 2026 formats, service/receiver rotation, corrections, history, sync, Live Viewer privacy, and mobile play-through checks pass. Apply the Tennis migration before enabling clients.                                       |
-| V1.3    | Launch Padel                                             | Enable FIP doubles and mixed doubles plus the labeled local club-singles variant after its own rule, regression, mobile, and Supabase migration checks pass.                                                                                         | FIP 2026 formats, court display, service/receiver rotation, mixed receiver eligibility, corrections, sync, Live Viewer privacy, and mobile checks pass. Apply the Padel migration before enabling clients.                   |
-| V1.4    | Add Squash or the next most requested sport              | Select one sport based on player requests and implementation readiness. Verify its federation rules before committing scope.                                                                                                                         | The sport passes the same rules, regression, and mobile checks as V1.3                                                                                                                                                       |
-| V2.0    | Reassess product scope after the first sport releases    | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                                                                                                  | A separate product decision defines the scope and reason for a major release                                                                                                                                                 |
+| Release | Goal                                                         | Scope                                                                                                                                                                                                                                                                                                                                                      | Exit check                                                                                                                                                                                                        |
+| ------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1.0    | Public MVP for Badminton and Pickleball                      | Singles and doubles, guest matches, score controls, Live Viewer, Official Rules, and local guest custom rules. No Google account history or Community Rules.                                                                                                                                                                                               | V1.0 launch checks below pass                                                                                                                                                                                     |
+| V1.1    | Harden the core and release the account foundation in stages | Fix issues found in V1.0 scoring, synchronization, and screen visibility. Continue sport implementation alongside core hardening. Release Google sign-in, guest claiming, permanent match history, account controls, and in-app deletion through local → Vercel Preview → production gates. Keep Community Rules behind its own moderation and legal gate. | Critical scoring and sync defects are resolved, account deletion and security checks pass, Preview smoke tests pass, and production is promoted only after the account foundation gate passes.                    |
+| V1.2    | Launch Tennis                                                | Enable Tennis singles, standard doubles, and mixed doubles after its own rule, regression, mobile, and Supabase migration checks pass.                                                                                                                                                                                                                     | ITF 2026 formats, service/receiver rotation, corrections, history, sync, Live Viewer privacy, and mobile play-through checks pass. Apply the Tennis migration before enabling clients.                            |
+| V1.3    | Launch Padel                                                 | Enable FIP doubles and mixed doubles plus the labeled local club-singles variant after its own rule, regression, mobile, and Supabase migration checks pass.                                                                                                                                                                                               | FIP 2026 formats, court display, service/receiver rotation, mixed receiver eligibility, corrections, sync, Live Viewer privacy, and mobile checks pass. Apply the Padel migration before enabling clients.        |
+| V1.4    | Launch Table tennis                                          | Enable ITTF singles and doubles after its rule, regression, mobile, and Supabase migration checks pass.                                                                                                                                                                                                                                                    | ITTF 2022 game scoring, serve/receiver rotation, deciding-game changes, corrections, sync, history, Live Viewer privacy, and mobile checks pass. Apply the Table tennis migration before enabling clients.        |
+| V1.5    | Launch Squash                                                | Enable WSF singles and doubles with manual rally scoring, service-box tracking, and no mixed doubles after its rule, regression, mobile, and Supabase migration checks pass.                                                                                                                                                                               | WSF singles/doubles scoring, server/receiver order, service-box events, corrections, sync, history, Live Viewer privacy, and mobile play-through checks pass. Apply the Squash migration before enabling clients. |
+| V2.0    | Reassess product scope after the first sport releases        | No feature set is committed yet. Use V1.x feedback to decide whether broader sport coverage or other product changes are warranted.                                                                                                                                                                                                                        | A separate product decision defines the scope and reason for a major release                                                                                                                                      |
 
 The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports before launching V1.0. Add one sport at a time, and change the order when player feedback supports a different choice.
 
@@ -27,6 +28,7 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 
 - Badminton singles and doubles using the Official Rules sources recorded in [rules sources](rules-sources.md).
 - Pickleball singles and doubles using the Official Rules sources recorded in [rules sources](rules-sources.md). Singles supports side-out and rally scoring.
+- Table tennis singles and doubles using the ITTF source recorded in [rules sources](rules-sources.md). Best-of-three is the default; best-of-five is available.
 - Match setup, team and player positions, point entry, automatic service and position changes, undo, redo, and one-event score override.
 - Guest play without Google sign-in. Generate match and event UUIDs in the browser, save locally first, and sync idempotently when the server is available.
 - Guest match continuity for up to 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired guest data and Live Viewer links stop being accessible immediately; an hourly database cleanup physically removes expired game data.
@@ -38,8 +40,7 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 
 ### Not included
 
-- Sports other than Badminton and Pickleball.
-- Google sign-in, persistent account match history, and guest-to-account claiming.
+- Sports other than Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash.
 - Public Community Rules, including publishing, sharing, reports, and moderation.
 - Arbitrary rule scripting or complex editing of a match's event history.
 - Server storage or sharing of a guest's private custom rules.
@@ -49,7 +50,7 @@ The sequence after V1.1 is a proposal, not a promise. Do not wait for six sports
 - Tests cover scoring and service rotation for both sports, including game changes, undo, redo, and score override behavior.
 - Retrying a sync preserves match and event UUIDs and does not create duplicates. Offline recovery, 12-hour expiry, and single-tab control are verified.
 - A Live Viewer works without sign-in, exposes only the intended score and court-position display, and stops working after revocation or expiry.
-- New V1.0 matches can use only Official Rules or guest-only custom rules. Account history and Community Rules routes are unavailable.
+- New V1.0 matches can use only Official Rules or guest-only custom rules. Account foundation routes are introduced only through the staged rollout; Community Rules routes remain unavailable.
 - Supabase row-level security and viewer access tests pass. The frontend contains no service-role secret.
 - Mobile play-through confirms that scores and court positions are readable during play, controls are usable with touch, and no content overflows horizontally.
 - Loading, empty, offline, and error states provide a clear status or next action.
@@ -66,7 +67,17 @@ After V1.0 is used in real games, collect feedback on three areas:
 
 Review actual reports and reproduce issues before prioritizing changes. Do not add paid analytics just to answer these questions. Fix critical scoring and sync problems before enabling the V1.1 account and Community Rules features. Tennis development proceeds in parallel; do not enable Tennis clients until its own rules, regression, mobile, and migration checks pass.
 
-Before V1.1 account and Community Rules work begins, complete the account deletion process, publish a support and privacy contact, approve the Community Rules policy, and confirm that the operator can review reports against the documented response targets. If those conditions are not met, keep the features deferred.
+Before production account rollout, complete the account deletion process, publish a support and privacy contact, and pass local plus Preview smoke tests. Community Rules remain deferred until the separate policy, moderation, contact, and security gates pass.
+
+## Account foundation rollout gate
+
+- Google login uses `linkIdentity` for an anonymous guest so an unexpired guest match remains owned by the same user.
+- `claim_guest_matches()` runs once after OAuth and claims only unexpired guest matches. Expired matches remain unavailable.
+- `/history` lists only the active account's matches, ordered by `updated_at`; full match reopening requires the local snapshot on the same device.
+- `/account` provides the Google email, history link, sign out, and a second-confirmation permanent deletion flow.
+- Account deletion removes owned matches, events, rules, versions, reports, viewer capabilities, local browser matches, and the Auth user through the server-only Edge Function.
+- Verify English and Indonesian routes, loading/error/empty states, keyboard focus, mobile layout, RLS, and no service-role key in the browser bundle.
+- Promote in order: local → Vercel Preview → production. Do not promote if any account, security, privacy, or staging smoke test fails.
 
 ## Adding a sport
 
@@ -78,6 +89,20 @@ Before scheduling a sport release:
 - Add rules-engine tests for scoring, service changes, positions, corrections, and match completion.
 - Verify the court layout and score visibility on mobile.
 - Keep the ruleset snapshot attached to each match so later rule updates do not rewrite match history.
+
+### Table tennis release gate
+
+- Use the ITTF Handbook 2022 as the source of truth. Support singles and standard doubles only; mixed doubles is out of scope.
+- Verify 11-point games, win by two, best-of-three/best-of-five, two-point service rotation, one-point deuce rotation, doubles receiver/server rotation, and deciding-game changes at five points.
+- Verify setup order selection, next-game confirmation, correction, undo/redo, match completion, local persistence, Supabase sanitization, and Live Viewer projection without player names.
+- Keep expedite, let/fault tracking, officiating, and referee workflow out of scope until a separate product decision.
+
+### Squash release gate
+
+- Use World Squash Singles Rules 2025 and International Doubles Squash Rules 2022 as separate official snapshots. Support singles and doubles only; mixed doubles is out of scope.
+- Verify singles PARS 11 win-by-two, doubles 11–10 completion, manual rally scoring, server hand-out, automatic service-box alternation, fixed doubles server order, and receiver mapping per game.
+- Verify setup, service-box choice after hand-out, next-game order confirmation, correction, undo/redo, match completion, local persistence, Supabase sanitization, and Live Viewer projection without names.
+- Keep let, stroke, fault, appeal, injury, referee call, and officiating workflows out of scope until a separate product decision.
 
 ### Tennis release gate
 

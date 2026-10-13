@@ -1,5 +1,12 @@
 import { lazy, Suspense, useEffect, useLayoutEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import { authReturnPathKey, useAuth } from "./lib/auth";
 import { localeFromPath, useLocale } from "./lib/i18n";
 
 const HomePage = lazy(() =>
@@ -22,6 +29,16 @@ const ViewerPage = lazy(() =>
     default: page,
   })),
 );
+const AccountPage = lazy(() =>
+  import("./features/account/AccountPage").then(({ AccountPage: page }) => ({
+    default: page,
+  })),
+);
+const MatchHistoryPage = lazy(() =>
+  import("./features/history/MatchHistoryPage").then(
+    ({ MatchHistoryPage: page }) => ({ default: page }),
+  ),
+);
 
 function RouteLoading() {
   const { t } = useLocale();
@@ -38,7 +55,9 @@ function RouteLoading() {
 
 export function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { setLocale } = useLocale();
+  const { isAnonymous, user } = useAuth();
 
   useLayoutEffect(() => {
     setLocale(localeFromPath(location.pathname));
@@ -47,6 +66,21 @@ export function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 });
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!user || isAnonymous) return;
+    const returnPath = window.sessionStorage.getItem(authReturnPathKey);
+    if (
+      !returnPath ||
+      !returnPath.startsWith("/") ||
+      returnPath.startsWith("//")
+    ) {
+      return;
+    }
+    window.sessionStorage.removeItem(authReturnPathKey);
+    const currentPath = `${location.pathname}${location.search}`;
+    if (returnPath !== currentPath) navigate(returnPath, { replace: true });
+  }, [isAnonymous, location.pathname, location.search, navigate, user]);
 
   return (
     <Suspense fallback={<RouteLoading />}>
@@ -59,6 +93,10 @@ export function App() {
         <Route path="/id/match/:matchId" element={<MatchPage />} />
         <Route path="/view/:token" element={<ViewerPage />} />
         <Route path="/id/view/:token" element={<ViewerPage />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/id/account" element={<AccountPage />} />
+        <Route path="/history" element={<MatchHistoryPage />} />
+        <Route path="/id/history" element={<MatchHistoryPage />} />
         <Route path="/id/*" element={<Navigate to="/id/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

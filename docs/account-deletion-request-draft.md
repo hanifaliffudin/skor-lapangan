@@ -1,10 +1,12 @@
 # Account deletion request workflow draft
 
-**Status: Draft for V1.1. Google accounts and account history are not available in V1.0. Do not publish this workflow until the owner completes the placeholders, tests the deletion path, and approves the privacy terms.**
+**Status: Account-foundation workflow. The in-app path is implemented, but this document remains a draft until the owner completes the placeholders, tests the path on Preview, and approves the privacy terms.**
 
 ## Recommended contact channel
 
-Use a dedicated email alias such as `privasi@[your-domain]` or `privacy@[your-domain]`, forwarded to a mailbox only the operator can access. Email is the simplest channel for a one-person operation and does not require a new in-app form. Publish the address only after it exists and the operator has tested delivery and account security.
+The primary deletion channel is the authenticated in-app flow at `/account`. The user chooses **Delete account**, reads the second confirmation, and confirms. The app invokes the server-only `delete-account` Supabase Edge Function; the function validates the access token, deletes user-owned data through `delete_my_account_data()`, calls `auth.admin.deleteUser`, and returns a result the app can display. Do not expose the service-role key to Vercel client variables or the browser.
+
+Keep a monitored privacy contact such as `privasi@[your-domain]` or `privacy@[your-domain]` for questions and cases where the in-app flow fails. Publish it only after the owner has tested delivery and account security.
 
 Do not ask users to send passwords, access tokens, payment details, or identity documents by email. Do not use a personal inbox that is shared with unrelated services. If the project has no domain, create a separate project mailbox before publishing this draft.
 
@@ -12,11 +14,11 @@ Do not ask users to send passwords, access tokens, payment details, or identity 
 
 ### Indonesian
 
-Untuk meminta penghapusan akun Skor Lapangan, kirim email ke `[PRIVACY CONTACT EMAIL]` dari alamat Google yang terhubung ke akun. Tulis `Permintaan penghapusan akun` pada subjek. Jangan kirim kata sandi atau kode masuk. Kami akan memverifikasi permintaan sebelum menghapus akun dan data terkait. Kami akan menjelaskan jika ada data yang harus kami simpan untuk alasan yang sah. Target tanggapan: `[OWNER TO SET A REALISTIC RESPONSE TARGET]`.
+Untuk menghapus akun Skor Lapangan, buka **Akun**, pilih **Hapus akun**, baca konfirmasi kedua, lalu konfirmasi. Proses ini menghapus data akun yang tercantum pada halaman dan mengeluarkan Anda dari sesi. Jangan kirim kata sandi, token akses, atau kode masuk melalui email. Untuk masalah penghapusan, hubungi `[PRIVACY CONTACT EMAIL]`. Target tanggapan dukungan: `[OWNER TO SET A REALISTIC RESPONSE TARGET]`.
 
 ### English
 
-To request deletion of your Skor Lapangan account, email `[PRIVACY CONTACT EMAIL]` from the Google address linked to your account. Use `Account deletion request` as the subject. Do not send your password or sign-in codes. We will verify the request before deleting the account and related data. We will explain if we must retain any data for a lawful reason. Response target: `[OWNER TO SET A REALISTIC RESPONSE TARGET]`.
+To delete your Skor Lapangan account, open **Account**, choose **Delete account**, read the second confirmation, and confirm. The flow removes the account data listed on the page and signs you out. Do not send passwords, access tokens, or sign-in codes by email. For a failed deletion, contact `[PRIVACY CONTACT EMAIL]`. Support response target: `[OWNER TO SET A REALISTIC RESPONSE TARGET]`.
 
 ## Request email template
 
@@ -24,7 +26,7 @@ To request deletion of your Skor Lapangan account, email `[PRIVACY CONTACT EMAIL
 
 Hello Skor Lapangan,
 
-Please delete my Skor Lapangan account and the personal data associated with it.
+The in-app deletion flow was unavailable or failed. Please help me delete my Skor Lapangan account and the personal data associated with it.
 
 - Google account email: `[EMAIL USED TO SIGN IN]`
 - Optional detail to help locate the account: `[OPTIONAL]`
@@ -66,13 +68,13 @@ Skor Lapangan
 
 ## Operator checklist
 
-- Confirm the request came from the Google address linked to the account. Never request the user's password or one-time sign-in code.
+- Treat the authenticated in-app request as the normal verification path. For fallback support, confirm the request came from the Google address linked to the account. Never request the user's password, access token, or one-time sign-in code.
 - Record the request date, verification result, completion date, and action taken in a restricted log. Do not copy unnecessary personal details into the log.
-- Decide how to handle account match history, user-created Community Rules, reports, and backups before V1.1. Recommended starting point: unpublish and remove rules owned by the account, delete its account match records, and retain no more personal data than the operator can justify and explain in the privacy notice.
+- Confirm the implemented deletion scope: owned matches and cascading events, user-created Community Rules and versions if present, reports created by the user, viewer capabilities stored on those matches, local browser matches, and the Supabase Auth user. Document any provider backups or logs that cannot be removed immediately.
 - Test account deletion and its database cascades in a disposable Supabase project. Do not test against production data.
 - Delete the user through an authorized Supabase administrative path. Never expose a service-role key in the browser or ask the user to send credentials.
 - Confirm the account can no longer sign in and the intended records are gone or retained according to the approved policy.
-- Send the completion response and update the restricted request log.
+- For fallback requests, send the completion response and update the restricted request log. The normal in-app flow does not require manual operator action.
 
 ## Owner decisions required before publication
 

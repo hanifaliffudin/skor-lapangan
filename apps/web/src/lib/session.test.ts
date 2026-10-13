@@ -4,6 +4,7 @@ import {
   loadDraft,
   loadMatch,
   removeMatch,
+  removeAllStoredMatches,
   saveDraft,
   saveMatch,
 } from "./session";
@@ -135,5 +136,55 @@ describe("guest session storage", () => {
         `skor-lapangan:match:${journal.definition.id}`,
       ),
     ).toBeNull();
+  });
+
+  it("rejects malformed journal data before it reaches the scoring engine", () => {
+    const matchId = "malformed-match";
+    window.localStorage.setItem(
+      `skor-lapangan:match:${matchId}`,
+      JSON.stringify({
+        schemaVersion: 1,
+        expiresAt: "2026-10-10T00:00:00.000Z",
+        journal: {
+          definition: { id: matchId },
+          events: "not-an-array",
+        },
+      }),
+    );
+
+    expect(loadMatch(matchId)).toBeNull();
+    expect(window.localStorage.getItem(`skor-lapangan:match:${matchId}`)).toBe(
+      null,
+    );
+  });
+
+  it("does not crash the scorer when local storage is full", () => {
+    const setItem = vi
+      .spyOn(window.localStorage, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("Storage is full", "QuotaExceededError");
+      });
+
+    expect(
+      saveMatch({
+        definition: { id: "quota-match" },
+        events: [],
+      } as unknown as MatchJournal),
+    ).toBe(false);
+    setItem.mockRestore();
+  });
+
+  it("clears every stored match from both browser storage areas", () => {
+    window.localStorage.setItem("skor-lapangan:match:one", "one");
+    window.localStorage.setItem("skor-lapangan:setup-draft", "keep");
+    window.sessionStorage.setItem("skor-lapangan:match:two", "two");
+
+    removeAllStoredMatches();
+
+    expect(window.localStorage.getItem("skor-lapangan:match:one")).toBeNull();
+    expect(window.sessionStorage.getItem("skor-lapangan:match:two")).toBeNull();
+    expect(window.localStorage.getItem("skor-lapangan:setup-draft")).toBe(
+      "keep",
+    );
   });
 });

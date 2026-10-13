@@ -128,4 +128,50 @@ describe("court service positions", () => {
       ),
     ).toEqual(["left", "left"]);
   });
+
+  it("marks the fixed Squash doubles server and receiver positions", () => {
+    const squash: MatchDefinition = {
+      ...definition,
+      id: "squash-court",
+      sport: "squash",
+      format: "doubles",
+      rulesetId: "wsf-squash-doubles-2022",
+      initialServingTeam: "A",
+      initialServingPlayer: 1,
+      squashGameOrders: {
+        serviceOrder: { A: [1, 0], B: [0, 1] },
+        receiverBySide: {
+          A: { left: 0, right: 1 },
+          B: { left: 0, right: 1 },
+        },
+        openingServiceBox: "left",
+      },
+    };
+    const state = createInitialState(squash);
+
+    const { container } = render(
+      <LocaleProvider>
+        <Court definition={squash} state={state} />
+      </LocaleProvider>,
+    );
+
+    const servingSpots = [
+      ...container.querySelectorAll('[data-team="A"] [data-side]'),
+    ];
+    expect(
+      servingSpots.map((spot) => spot.getAttribute("data-serving")),
+    ).toEqual(["true", "false"]);
+    expect(servingSpots.map((spot) => spot.textContent)).toEqual(["A2S", "A1"]);
+
+    const receivingSpots = [
+      ...container.querySelectorAll('[data-team="B"] [data-side]'),
+    ];
+    expect(
+      receivingSpots.map((spot) => spot.getAttribute("data-receiving")),
+    ).toEqual(["false", "true"]);
+    expect(receivingSpots.map((spot) => spot.textContent)).toEqual([
+      "B2",
+      "B1R",
+    ]);
+  });
 });

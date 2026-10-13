@@ -1,6 +1,21 @@
 # Official rules sources
 
-Last verified: 2026-10-12.
+Last verified: 2026-10-13.
+
+## Squash
+
+- Singles ruleset ID: `wsf-squash-singles-2025`
+- Doubles ruleset ID: `wsf-squash-doubles-2022`
+- Sources: [World Squash Singles Rules 2025](https://worldsquashofficiating.com/rules-of-squash/) and [International Doubles Squash Rules 2022](https://www.worldsquash.org/wp-content/uploads/2022/03/2022-International-Doubles-Squash-Rules-V2.pdf)
+- Implemented: singles PARS games to 11, win by two; doubles games to 11 including 11–10; best-of-five by default with best-of-three available; rally winner scores and serves or hands over service. While serving, the service box alternates; after hand-out the new server chooses a box. Doubles keeps a fixed server order and records left/right receiver mappings per game.
+- The app records only the winner of each rally. Let, stroke, fault, appeal, injury, referee calls, and other officiating workflows are outside scope.
+
+## Table tennis
+
+- Ruleset ID: `ittf-table-tennis-2022`
+- Source: [ITTF Handbook 2022](https://db.ittf.com/sites/default/files/public/2022-02/ITTF_HB_2022_clean_v1_0.pdf)
+- Implemented formats: singles and standard doubles. Games use 11 points, win by two, and matches use best of three or five games. Service changes every two points, then every point at 10–10. Doubles follows the ITTF server/receiver rotation; the deciding game changes ends and receiving order when one pair reaches five points.
+- The first server is selected at setup. Doubles first receiver and each later game's order confirmation are recorded. The app records point winners and corrections but does not track expedites, lets, faults, officiating, or referee decisions.
 
 ## Padel
 

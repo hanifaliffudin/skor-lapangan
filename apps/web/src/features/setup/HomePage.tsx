@@ -13,6 +13,7 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { PwaInstallControl } from "../../components/PwaInstallControl";
 import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
+import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { listGuestMatches, removeMatch, saveDraft } from "../../lib/session";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ function pointLabel(state: MatchState, team: TeamId, locale: "en" | "id") {
 export function HomePage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
+  const { isAnonymous, user } = useAuth();
+  const isAccount = Boolean(user && !isAnonymous);
   const [sport, setSport] = useState<Sport>("badminton");
   const [format, setFormat] = useState<MatchFormat>("doubles");
   const [savedMatches, setSavedMatches] = useState<MatchJournal[]>(() =>
@@ -96,9 +99,7 @@ export function HomePage() {
       <main className="mx-auto w-full max-w-[760px] px-[clamp(18px,5vw,40px)] pt-[clamp(44px,8vw,84px)] pb-14 max-[560px]:pt-[38px]">
         <PwaUpdateNotice />
         <section className={styles.hero} aria-labelledby="hero-title">
-          <p className={styles.eyebrow}>
-            Badminton · Pickleball · Tennis · Padel
-          </p>
+          <p className={styles.eyebrow}>{t("sportEyebrow")}</p>
           <h1 id="hero-title">{t("tagline")}</h1>
           <p>{t("intro")}</p>
         </section>
@@ -110,7 +111,7 @@ export function HomePage() {
           >
             <div>
               <h2 id="resume-title">{t("resumeTitle")}</h2>
-              <p>{t("resumeBody")}</p>
+              <p>{t(isAccount ? "resumeBodyAccount" : "resumeBody")}</p>
             </div>
             <div className={styles.resumeList}>
               {activeMatches.map((journal) => {
@@ -262,6 +263,18 @@ export function HomePage() {
                 label={t("padel")}
                 hint={t("padelHint")}
               />
+              <ChoiceCard
+                checked={sport === "table_tennis"}
+                value="table_tennis"
+                label={t("table_tennis")}
+                hint={t("tableTennisHint")}
+              />
+              <ChoiceCard
+                checked={sport === "squash"}
+                value="squash"
+                label={t("squash")}
+                hint={t("squashHint")}
+              />
             </RadioGroup>
           </fieldset>
 
@@ -304,7 +317,9 @@ export function HomePage() {
           >
             {t("continue")} <span aria-hidden="true">→</span>
           </Button>
-          <p className={styles.guestNote}>{t("guestNote")}</p>
+          <p className={styles.guestNote}>
+            {t(isAccount ? "accountNote" : "guestNote")}
+          </p>
           <PwaInstallControl />
         </section>
       </main>

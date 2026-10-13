@@ -26,6 +26,10 @@ import {
   redo,
   selectTennisDecidingSide,
   selectPadelDecidingSide,
+  confirmTableTennisGameOrders,
+  tableTennisFirstReceiverForNextGame,
+  confirmSquashGameOrders,
+  selectSquashServiceBox,
   tennisRulesFor,
   tennisScoreLabel,
   undo,
@@ -33,10 +37,13 @@ import {
   type MatchDefinition,
   type MatchJournal,
   type MatchState,
+  type PlayerIndex,
   type TeamId,
   type TennisSetOrders,
   type PadelSetOrders,
   type PadelRules,
+  type TableTennisGameOrders,
+  type SquashGameOrders,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
@@ -45,6 +52,7 @@ import { loadMatch, removeMatch, saveMatch } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { syncJournal } from "../../lib/sync";
 import {
+  isSyncConflictError,
   isRateLimitError,
   isUnsupportedMatchSportError,
 } from "../../lib/userError";
@@ -86,7 +94,7 @@ export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
-  const { user, isAnonymous } = useAuth();
+  const { action, isAnonymous, signInWithGoogle, user } = useAuth();
   const {
     status: controlStatus,
     canControl,
@@ -116,6 +124,10 @@ export function MatchPage() {
   const [nextPadelOrders, setNextPadelOrders] = useState<PadelSetOrders | null>(
     null,
   );
+  const [nextTableTennisOrders, setNextTableTennisOrders] =
+    useState<TableTennisGameOrders | null>(null);
+  const [nextSquashOrders, setNextSquashOrders] =
+    useState<SquashGameOrders | null>(null);
   const view = useMemo(
     () => (journal ? deriveJournal(journal) : null),
     [journal],
@@ -140,17 +152,57 @@ export function MatchPage() {
   }, [view?.state.padel?.awaitingSetOrders, view?.state.padel?.setNumber]);
 
   useEffect(() => {
+    const current = view?.state.tableTennis;
+    if (!current?.awaitingGameOrders || !view) {
+      setNextTableTennisOrders(null);
+      return;
+    }
+    const firstServer =
+      current.gameOrders.firstServer.team === view.state.servingTeam
+        ? current.gameOrders.firstServer.player
+        : 0;
+    setNextTableTennisOrders({
+      firstServer: { team: view.state.servingTeam, player: firstServer },
+      firstReceiver: {
+        team: view.state.servingTeam === "A" ? "B" : "A",
+        player: tableTennisFirstReceiverForNextGame(view.state, firstServer),
+      },
+    });
+  }, [view?.state.tableTennis?.awaitingGameOrders, view?.state.gameNumber]);
+
+  useEffect(() => {
+    const current = view?.state.squash;
+    if (!current?.awaitingGameOrders) {
+      setNextSquashOrders(null);
+      return;
+    }
+    setNextSquashOrders(current.gameOrders);
+  }, [view?.state.squash?.awaitingGameOrders, view?.state.gameNumber]);
+
+  useEffect(() => {
     const tennisReady = Boolean(
       view?.state.tennis?.awaitingSetOrders && nextSetOrders,
     );
     const padelReady = Boolean(
       view?.state.padel?.awaitingSetOrders && nextPadelOrders,
     );
-    setSetOrdersOpen(tennisReady || padelReady);
+    const tableTennisReady = Boolean(
+      view?.state.tableTennis?.awaitingGameOrders && nextTableTennisOrders,
+    );
+    const squashReady = Boolean(
+      view?.state.squash?.awaitingGameOrders && nextSquashOrders,
+    );
+    setSetOrdersOpen(
+      tennisReady || padelReady || tableTennisReady || squashReady,
+    );
   }, [
     nextPadelOrders,
     nextSetOrders,
+    nextTableTennisOrders,
+    nextSquashOrders,
     view?.state.padel?.awaitingSetOrders,
+    view?.state.tableTennis?.awaitingGameOrders,
+    view?.state.squash?.awaitingGameOrders,
     view?.state.tennis?.awaitingSetOrders,
   ]);
 
@@ -204,11 +256,15 @@ export function MatchPage() {
       setSyncState(
         result.status === "synced"
           ? "synced"
-          : result.status === "failed"
+          : result.status === "failed" || result.status === "conflict"
             ? "error"
             : "local",
       );
-      setSyncError(result.status === "failed" ? result.error : "");
+      setSyncError(
+        result.status === "failed" || result.status === "conflict"
+          ? result.error
+          : "",
+      );
     };
     const handleOnline = () => void synchronize(true);
     void synchronize(manualRetry);
@@ -242,7 +298,7 @@ export function MatchPage() {
       };
     }
     setJournal(next);
-    saveMatch(next);
+    saveMatch(next, { persistent: Boolean(user && !isAnonymous) });
   }
 
   function rally(team: TeamId) {
@@ -378,21 +434,41 @@ export function MatchPage() {
 
   const { definition } = journal;
   const { state } = view;
+  const syncConflict = isSyncConflictError(syncError);
+  const canEditMatch = canControl && !syncConflict;
   const tennis = state.tennis;
   const padel = state.padel;
+  const tableTennis = state.tableTennis;
+  const squash = state.squash;
   const isTennis = definition.sport === "tennis" && Boolean(tennis);
   const isPadel = definition.sport === "padel" && Boolean(padel);
+  const isTableTennis =
+    definition.sport === "table_tennis" && Boolean(tableTennis);
+  const isSquash = definition.sport === "squash" && Boolean(squash);
   const isRacket = isTennis || isPadel;
   const awaitingOrders = Boolean(
-    tennis?.awaitingSetOrders || padel?.awaitingSetOrders,
+    tennis?.awaitingSetOrders ||
+    padel?.awaitingSetOrders ||
+    tableTennis?.awaitingGameOrders ||
+    squash?.awaitingGameOrders ||
+    squash?.serviceBoxChoiceRequired,
   );
   const actionLabel = isTennis
     ? t("tennisPointWon")
     : isPadel
       ? t("padelPointWon")
-      : definition.sport === "badminton"
-        ? t("pointFor")
-        : t("rallyFor");
+      : isTableTennis
+        ? t("tableTennisPointWon")
+        : isSquash
+          ? t("squashPointWon")
+          : definition.sport === "badminton"
+            ? t("pointFor")
+            : t("rallyFor");
+  const bestOf = isSquash
+    ? definition.ruleset?.squashConfiguration?.bestOf
+    : isTableTennis
+      ? definition.ruleset?.tableTennisConfiguration?.bestOf
+      : null;
 
   return (
     <div className="min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
@@ -409,6 +485,11 @@ export function MatchPage() {
                 ? `${t("set")} ${tennis?.setNumber ?? padel?.setNumber ?? 1}`
                 : `${t("game")} ${state.gameNumber}`}
             </h1>
+            {bestOf ? (
+              <p className={styles.matchFormatNote}>
+                {t(bestOf === 3 ? "bestOfThree" : "bestOfFive")}
+              </p>
+            ) : null}
           </div>
           <div
             className={styles.rulesBadge}
@@ -446,11 +527,14 @@ export function MatchPage() {
           )}
           {syncError &&
           (isRateLimitError(syncError) ||
-            isUnsupportedMatchSportError(syncError)) ? (
+            isUnsupportedMatchSportError(syncError) ||
+            isSyncConflictError(syncError)) ? (
             <span className={styles.syncErrorDetail}>
               {isRateLimitError(syncError)
                 ? t("rateLimited")
-                : t("syncUnsupportedSport")}
+                : isSyncConflictError(syncError)
+                  ? t("syncConflict")
+                  : t("syncUnsupportedSport")}
             </span>
           ) : null}
         </p>
@@ -464,6 +548,24 @@ export function MatchPage() {
           >
             {t("retrySync")}
           </Button>
+        ) : null}
+        {isAnonymous ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-3">
+            <p className="m-0 max-w-[560px] text-sm leading-6 text-muted">
+              {t("guestHistoryPrompt")}
+            </p>
+            <Button
+              variant="outline"
+              type="button"
+              className="min-h-11 shrink-0"
+              disabled={action === "google" || action === "claiming"}
+              onClick={() => void signInWithGoogle()}
+            >
+              {action === "google" || action === "claiming"
+                ? t("working")
+                : t("saveHistory")}
+            </Button>
+          </div>
         ) : null}
         {controlStatus !== "active" ? (
           <div className={styles.readOnlyNotice} role="status">
@@ -507,7 +609,14 @@ export function MatchPage() {
               <div className={styles.teamMeta}>
                 <span>{definition.teams[team].name}</span>
                 <small>
-                  {isRacket ? t("tennisSets") : t("sets")}:{" "}
+                  {isRacket
+                    ? t("tennisSets")
+                    : isTableTennis
+                      ? t("tableTennisGames")
+                      : isSquash
+                        ? t("squashGames")
+                        : t("sets")}
+                  :{" "}
                   {isTennis
                     ? tennis!.setsWon[team]
                     : isPadel
@@ -528,10 +637,12 @@ export function MatchPage() {
                 className={styles.scoreButton}
                 data-tennis={isTennis}
                 data-padel={isPadel}
+                data-table-tennis={isTableTennis}
+                data-squash={isSquash}
                 type="button"
                 aria-label={`${t("correction")}: ${definition.teams[team].name}`}
                 disabled={
-                  state.status === "complete" || !canControl || awaitingOrders
+                  state.status === "complete" || !canEditMatch || awaitingOrders
                 }
                 onClick={() => setOverrideOpen(true)}
               >
@@ -545,9 +656,10 @@ export function MatchPage() {
                 variant="outline"
                 className={styles.scoreAction}
                 type="button"
-                aria-label={`+ ${actionLabel} ${definition.teams[team].name}`}
+                aria-label={`${actionLabel} ${definition.teams[team].name} (+1)`}
+                title={`${actionLabel} ${definition.teams[team].name}`}
                 disabled={
-                  state.status === "complete" || !canControl || awaitingOrders
+                  state.status === "complete" || !canEditMatch || awaitingOrders
                 }
                 onClick={() => rally(team)}
               >
@@ -601,7 +713,7 @@ export function MatchPage() {
                     key={side}
                     aria-pressed={tennis.noAdReceivingSide === side}
                     disabled={
-                      !canControl ||
+                      !canEditMatch ||
                       !canSelectTennisDecidingSide(definition, state, side)
                     }
                     onClick={() =>
@@ -661,7 +773,7 @@ export function MatchPage() {
                     key={side}
                     aria-pressed={padel.decidingReceivingSide === side}
                     disabled={
-                      !canControl ||
+                      !canEditMatch ||
                       !canSelectPadelDecidingSide(definition, state, side)
                     }
                     onClick={() =>
@@ -679,6 +791,44 @@ export function MatchPage() {
           </>
         ) : null}
 
+        {isTableTennis && getMatchFormat(definition) === "doubles" ? (
+          <p className={styles.fieldHint}>{t("tableTennisOrderNote")}</p>
+        ) : null}
+
+        {isSquash && getMatchFormat(definition) === "doubles" ? (
+          <p className={styles.fieldHint}>{t("squashOrderNote")}</p>
+        ) : null}
+        {isSquash &&
+        squash?.serviceBoxChoiceRequired &&
+        !squash.awaitingGameOrders ? (
+          <div
+            className={styles.tennisPointChoice}
+            aria-label={t("squashChooseServiceBox")}
+          >
+            <span>{t("squashChooseServiceBox")}</span>
+            <p className={styles.fieldHint}>{t("squashServiceBoxHint")}</p>
+            {(["left", "right"] as const).map((side) => (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                key={side}
+                aria-pressed={squash.currentServiceBox === side}
+                disabled={!canEditMatch}
+                onClick={() =>
+                  commit(selectSquashServiceBox(journal, side, eventMetadata()))
+                }
+              >
+                {t(
+                  side === "left"
+                    ? "squashServiceBoxLeft"
+                    : "squashServiceBoxRight",
+                )}
+              </Button>
+            ))}
+          </div>
+        ) : null}
+
         <Court definition={definition} state={state} />
 
         <section
@@ -690,7 +840,7 @@ export function MatchPage() {
               variant="outline"
               className={styles.controlButton}
               type="button"
-              disabled={!view.canUndo || !canControl}
+              disabled={!view.canUndo || !canEditMatch}
               onClick={() => commit(undo(journal, eventMetadata()))}
             >
               <span aria-hidden="true">↶</span> {t("undo")}
@@ -699,7 +849,7 @@ export function MatchPage() {
               variant="outline"
               className={styles.controlButton}
               type="button"
-              disabled={!view.canRedo || !canControl}
+              disabled={!view.canRedo || !canEditMatch}
               onClick={() => commit(redo(journal, eventMetadata()))}
             >
               {t("redo")} <span aria-hidden="true">↷</span>
@@ -709,7 +859,7 @@ export function MatchPage() {
               className={styles.controlButton}
               type="button"
               disabled={
-                state.status === "complete" || !canControl || awaitingOrders
+                state.status === "complete" || !canEditMatch || awaitingOrders
               }
               onClick={() => setOverrideOpen(true)}
             >
@@ -744,7 +894,7 @@ export function MatchPage() {
                   variant="outline"
                   className={styles.secondaryButton}
                   type="button"
-                  disabled={viewerBusy || !canControl || !user}
+                  disabled={viewerBusy || !canEditMatch || !user}
                   onClick={() => void createViewerLink()}
                 >
                   {viewerBusy ? t("working") : t("createViewerLink")}
@@ -754,7 +904,10 @@ export function MatchPage() {
                   className={styles.dangerTextButton}
                   type="button"
                   disabled={
-                    viewerBusy || !canControl || !user || syncState !== "synced"
+                    viewerBusy ||
+                    !canEditMatch ||
+                    !user ||
+                    syncState !== "synced"
                   }
                   onClick={() => void revokeViewerLink()}
                 >
@@ -867,6 +1020,52 @@ export function MatchPage() {
           onConfirm={() => {
             commit(
               confirmPadelSetOrders(journal, nextPadelOrders, eventMetadata()),
+            );
+            setSetOrdersOpen(false);
+          }}
+        />
+      ) : null}
+
+      {tableTennis && nextTableTennisOrders ? (
+        <TableTennisGameOrdersDialog
+          open={setOrdersOpen && Boolean(tableTennis.awaitingGameOrders)}
+          onOpenChange={(open) => {
+            if (open) setSetOrdersOpen(true);
+          }}
+          definition={definition}
+          state={state}
+          orders={nextTableTennisOrders}
+          onOrdersChange={setNextTableTennisOrders}
+          onConfirm={() => {
+            commit(
+              confirmTableTennisGameOrders(
+                journal,
+                nextTableTennisOrders,
+                eventMetadata(),
+              ),
+            );
+            setSetOrdersOpen(false);
+          }}
+        />
+      ) : null}
+
+      {isSquash && squash && nextSquashOrders ? (
+        <SquashGameOrdersDialog
+          open={setOrdersOpen && squash.awaitingGameOrders}
+          onOpenChange={(open) => {
+            if (open) setSetOrdersOpen(true);
+          }}
+          definition={definition}
+          state={state}
+          orders={nextSquashOrders}
+          onOrdersChange={setNextSquashOrders}
+          onConfirm={() => {
+            commit(
+              confirmSquashGameOrders(
+                journal,
+                nextSquashOrders,
+                eventMetadata(),
+              ),
             );
             setSetOrdersOpen(false);
           }}
@@ -1485,6 +1684,207 @@ function TennisSetOrdersDialog({
               onClick={onConfirm}
             >
               {t("confirmSetOrders")}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TableTennisGameOrdersDialog({
+  open,
+  onOpenChange,
+  definition,
+  state,
+  orders,
+  onOrdersChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  definition: MatchDefinition;
+  state: MatchState;
+  orders: TableTennisGameOrders;
+  onOrdersChange: (orders: TableTennisGameOrders) => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useLocale();
+  const servingTeam = state.servingTeam;
+  const receivingTeam = servingTeam === "A" ? "B" : "A";
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <div className={styles.dialogBody}>
+          <DialogHeader>
+            <DialogTitle>{t("tableTennisOrdersTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("tableTennisAwaitingOrders")}
+            </DialogDescription>
+          </DialogHeader>
+          <fieldset className={styles.overrideFields}>
+            <Label>
+              <span>{t("tableTennisFirstServer")}</span>
+              <SelectControl
+                name="table-tennis-next-server"
+                value={orders.firstServer.player}
+                onChange={(event) => {
+                  const player = Number(event.target.value) as 0 | 1;
+                  const receiver = tableTennisFirstReceiverForNextGame(
+                    state,
+                    player,
+                  );
+                  onOrdersChange({
+                    firstServer: { team: servingTeam, player },
+                    firstReceiver: { team: receivingTeam, player: receiver },
+                  });
+                }}
+              >
+                {[0, 1].map((player) => (
+                  <option key={player} value={player}>
+                    {definition.teams[servingTeam].players[player]?.name ??
+                      `${t(player === 0 ? "player1" : "player2")}`}
+                  </option>
+                ))}
+              </SelectControl>
+            </Label>
+            <Label>
+              <span>{t("tableTennisFirstReceiver")}</span>
+              <SelectControl
+                name="table-tennis-next-receiver"
+                value={orders.firstReceiver.player}
+                disabled
+                onChange={() => undefined}
+              >
+                {[0, 1].map((player) => (
+                  <option key={player} value={player}>
+                    {definition.teams[receivingTeam].players[player]?.name ??
+                      `${t(player === 0 ? "player1" : "player2")}`}
+                  </option>
+                ))}
+              </SelectControl>
+            </Label>
+          </fieldset>
+          <p className={styles.fieldHint}>{t("tableTennisOrderNote")}</p>
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              className={styles.primaryButton}
+              type="button"
+              onClick={onConfirm}
+            >
+              {t("confirmSetOrders")}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SquashGameOrdersDialog({
+  open,
+  onOpenChange,
+  definition,
+  state,
+  orders,
+  onOrdersChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  definition: MatchDefinition;
+  state: MatchState;
+  orders: SquashGameOrders;
+  onOrdersChange: (orders: SquashGameOrders) => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useLocale();
+  const servingTeam = state.servingTeam;
+  const currentServer = orders.serviceOrder[servingTeam][0];
+  const teamOptions =
+    getMatchFormat(definition) === "doubles"
+      ? (["A", "B"] as const)
+      : ([servingTeam] as const);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <div className={styles.dialogBody}>
+          <DialogHeader>
+            <DialogTitle>{t("squashOrdersTitle")}</DialogTitle>
+            <DialogDescription>{t("squashAwaitingOrders")}</DialogDescription>
+          </DialogHeader>
+          <p className={styles.fieldHint}>
+            {t("server")}:{" "}
+            {definition.teams[servingTeam].players[currentServer]?.name}
+          </p>
+          <Label className={styles.selectField}>
+            <span>{t("squashFirstServiceBox")}</span>
+            <SelectControl
+              name="squash-next-service-box"
+              value={orders.openingServiceBox}
+              onChange={(event) =>
+                onOrdersChange({
+                  ...orders,
+                  openingServiceBox: event.target.value as "left" | "right",
+                })
+              }
+            >
+              <option value="right">{t("squashServiceBoxRight")}</option>
+              <option value="left">{t("squashServiceBoxLeft")}</option>
+            </SelectControl>
+          </Label>
+          {getMatchFormat(definition) === "doubles"
+            ? teamOptions.map((team) => (
+                <fieldset className={styles.overrideFields} key={team}>
+                  <legend>{t(team === "A" ? "teamA" : "teamB")}</legend>
+                  {(["left", "right"] as const).map((side) => (
+                    <Label key={side}>
+                      <span>
+                        {side === "left"
+                          ? t("squashReceiverLeft")
+                          : t("squashReceiverRight")}
+                      </span>
+                      <SelectControl
+                        name={`squash-next-receiver-${team}-${side}`}
+                        value={orders.receiverBySide[team][side]}
+                        onChange={(event) =>
+                          onOrdersChange({
+                            ...orders,
+                            receiverBySide: {
+                              ...orders.receiverBySide,
+                              [team]: {
+                                ...orders.receiverBySide[team],
+                                [side]: Number(
+                                  event.target.value,
+                                ) as PlayerIndex,
+                              },
+                            },
+                          })
+                        }
+                      >
+                        <option value="0">
+                          {definition.teams[team].players[0]?.name ??
+                            t("player1")}
+                        </option>
+                        <option value="1">
+                          {definition.teams[team].players[1]?.name ??
+                            t("player2")}
+                        </option>
+                      </SelectControl>
+                    </Label>
+                  ))}
+                </fieldset>
+              ))
+            : null}
+          <p className={styles.fieldHint}>{t("squashOrderNote")}</p>
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              className={styles.primaryButton}
+              type="button"
+              onClick={onConfirm}
+            >
+              {t("confirmGameOrders")}
             </Button>
           </DialogFooter>
         </div>

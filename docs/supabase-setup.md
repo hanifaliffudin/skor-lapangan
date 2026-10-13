@@ -1,6 +1,6 @@
 # Supabase setup
 
-Supabase enables anonymous guest sync and Live Viewer links. Google sign-in, account history, and Community Rules are deferred to V1.1. All sports can be scored locally without Supabase, but server-backed features stay unavailable.
+Supabase enables anonymous guest sync, Google account linking, account history, and Live Viewer links. Community Rules remain disabled until their separate moderation and legal gate passes. All sports can be scored locally without Supabase, but server-backed features stay unavailable.
 
 ## 1. Configure the web app
 
@@ -29,10 +29,15 @@ In Supabase Dashboard, open **SQL Editor** and run each migration once, in filen
 7. `supabase/migrations/20261012110000_match_format_in_guest_payload.sql`
 8. `supabase/migrations/20261012130000_tennis_scoring.sql`
 9. `supabase/migrations/20261012140000_padel_scoring.sql`
+10. `supabase/migrations/20261013100000_table_tennis_scoring.sql`
+11. `supabase/migrations/20261013110000_squash_scoring.sql`
+12. `supabase/migrations/20261013120000_atomic_match_sync.sql`
+13. `supabase/migrations/20261013130000_atomic_match_sync_guard.sql`
+14. `supabase/migrations/20261013140000_account_deletion.sql`
 
-The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all nine migrations in filename order because later migrations replace functions created by earlier ones. The release-guardrail migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job. The Tennis migration adds ITF ruleset validation and privacy-limited Tennis viewer projections. The Padel migration adds FIP ruleset validation, the labeled club-singles variant, and privacy-limited Padel projections.
+The migrations create match and event tables, idempotency constraints, guest retention and payload sanitization, Live Viewer functions, and their access policies. The migration chain also includes Community Rules schema. Keep all fourteen migrations in filename order because later migrations replace functions created by earlier ones. The release-guardrail migration adds rate limits, hard guest retention caps, and an hourly `pg_cron` cleanup job. The Tennis migration adds ITF ruleset validation and privacy-limited Tennis viewer projections. The Padel migration adds FIP ruleset validation, the labeled club-singles variant, and privacy-limited Padel projections. The Table tennis migration adds ITTF ruleset validation, game-order confirmation events, sanitized state projections, and privacy-limited Table tennis viewer state. The Squash migration adds WSF singles/doubles validation, service-box and order events, sanitized state projections, and privacy-limited Squash viewer state. The atomic sync migrations wrap the match snapshot and event journal in one transaction, reject stale or divergent snapshots, and keep the RPC independent of private helper permissions. The account-deletion migration adds a restricted RPC that removes user-owned data before the server-only Edge Function deletes the Auth user.
 
-For a fresh environment, apply all nine migrations in filename order before deploying the app. For an existing live environment, apply pending migrations in filename order before deploying code that depends on them. Apply `20261012110000_match_format_in_guest_payload.sql` before code that creates or shares singles matches, `20261012130000_tennis_scoring.sql` before enabling Tennis clients, and `20261012140000_padel_scoring.sql` before enabling Padel clients. Do not rerun earlier migrations to apply a later schema change.
+For a fresh environment, apply all fourteen migrations in filename order before deploying the app. For an existing live environment, apply pending migrations in filename order before deploying code that depends on them. Apply `20261012110000_match_format_in_guest_payload.sql` before code that creates or shares singles matches, `20261012130000_tennis_scoring.sql` before enabling Tennis clients, `20261012140000_padel_scoring.sql` before enabling Padel clients, `20261013100000_table_tennis_scoring.sql` before enabling Table tennis clients, `20261013110000_squash_scoring.sql` before enabling Squash clients, both atomic sync migrations before deploying the client that uses the atomic sync RPC, and `20261013140000_account_deletion.sql` before deploying the delete-account function. Do not rerun earlier migrations to apply a later schema change.
 
 Expired guest records become unreadable at 12 hours after last accepted server activity, capped at 24 hours after creation. Live Viewer links expire within 12 hours and no later than match expiry; reads do not refresh the link. The migration schedules `purge_expired_guest_matches()` hourly, removing expired matches/events and rate-limit counters; anonymous Auth users older than 30 days are also deleted. Cleanup timing is not the access-control boundary. After the next hour, check Supabase Cron run history and verify the job succeeded.
 
@@ -46,18 +51,19 @@ Start with CAPTCHA disabled and monitor abuse and failed sign-ins. Enable hCaptc
 
 hCaptcha does not accept `localhost` or `127.0.0.1` as the challenge hostname. To test locally, map a development hostname such as `dev.your-domain.com` to `127.0.0.1` in the machine's hosts file, then start Vite with `HCAPTCHA_DEV_HOST=dev.your-domain.com pnpm dev` and open that hostname on port `5173`. If hCaptcha domain allowlisting is enabled, add the development hostname there too. Otherwise, test on a deployed Vercel URL.
 
-Do not enable Google OAuth or manual identity linking for V1.0. Revisit both when the V1.1 account-history release gate is approved.
+## 4. Enable Google sign-in and account foundation
 
-## 4. V1.1 only: enable Google sign-in
-
-Do not follow this section for V1.0. Google OAuth is planned for V1.1, together with account history and Community Rules. Before enabling it, publish the account-deletion channel and approve the Community Rules moderation and privacy process.
+Enable this first on local and Vercel Preview with test accounts. Production promotion waits for the Preview smoke test and the privacy/legal release gate. Community Rules remain disabled; their moderation and legal process is a separate release gate.
 
 1. Create a Google OAuth client for a web application.
 2. In Google Cloud's authorized redirect URIs, add the Supabase callback URL:
    `https://<project-ref>.supabase.co/auth/v1/callback`
 3. In Supabase **Authentication → Providers → Google**, enable the provider and enter the client ID and secret.
 4. In Supabase **Authentication → URL Configuration**, set the local Site URL to `http://127.0.0.1:5173` and add the production URL to the redirect allow list. Add the Vercel domain you use for production (and any preview domains you intend to test).
-5. If your Google Cloud account cannot enable OAuth without billing, leave Google disabled for now. Guest scoring and guest Live Viewer links do not depend on Google.
+5. Deploy the server-only account deletion function from the repository root:
+   `supabase functions deploy delete-account`
+6. Confirm the function has access to the platform-provided `SUPABASE_SERVICE_ROLE_KEY`. Keep that key in Supabase's server-side function environment only.
+7. If your Google Cloud account cannot enable OAuth without billing, keep Google disabled for now. Guest scoring and guest Live Viewer links do not depend on Google.
 
 Keep the Google client secret only in Supabase Dashboard. Do not add it to `.env.local`, Vercel environment variables, or the repository.
 
@@ -66,8 +72,11 @@ Keep the Google client secret only in Supabase Dashboard. Do not add it to `.env
 - Start a match while signed out. The app should use an anonymous Supabase user and show sync status as it saves.
 - Create a Live Viewer link and open it in a private window. The page should show only the score, court positions, serving state, and update time.
 - Revoke the link. A subsequent viewer refresh should show that it is unavailable.
-- Open `/rules` and `/history`; both should redirect to the home page in V1.0. Confirm no Google sign-in control appears.
+- Open `/history` and `/id/history`; as a guest they should show the Google sign-in state. Open `/rules`, `/rules/new`, and `/id/rules`; they must still redirect to the localized home page.
+- Start a guest match, link Google, refresh, and confirm the match appears in history only for that account. Confirm an expired guest match is not claimed.
+- Sign out and confirm the app creates a new anonymous guest session. On Preview, use a disposable Google test account to confirm `/account` deletion removes history, local match storage, and the Auth session.
 - Verify `purge-expired-guest-data` is scheduled hourly and inspect its first successful run in Supabase Cron.
 - Disconnect the browser, score a point, then reconnect. The same client-generated event UUID should be retried rather than creating a second event.
+- Confirm the browser calls `sync_match_journal` and that a rejected stale or divergent snapshot leaves the server score unchanged.
 
-The SQL policy tests live in `supabase/tests/`. They use the Supabase pgTAP testing helpers and should be run in a disposable local Supabase database after migrations; they are not safe to run against production data as a general test suite.
+The SQL policy tests live in `supabase/tests/`. They use the Supabase pgTAP testing helpers and should be run in a disposable local Supabase database after migrations. With Docker and the Supabase CLI available, run `supabase init --force`, `supabase start`, and `supabase test db`; they are not safe to run against production data as a general test suite.

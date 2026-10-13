@@ -15,12 +15,14 @@ const messages = {
     language: "Bahasa",
     loading: "Memuat…",
     seoTitle:
-      "Papan Skor Badminton, Pickleball, Tennis & Padel | Skor Lapangan",
+      "Papan Skor Badminton, Pickleball, Tennis, Padel, Tenis Meja & Squash | Skor Lapangan",
     seoDescription:
-      "Catat skor tunggal atau ganda badminton, pickleball, tenis, dan padel dari ponsel. Pantau servis, koreksi poin, lalu bagikan tautan skor langsung.",
-    tagline: "Papan skor untuk badminton, pickleball, tenis, dan padel",
+      "Catat skor tunggal atau ganda badminton, pickleball, tenis, padel, tenis meja, dan squash dari ponsel. Pantau servis, koreksi poin, lalu bagikan tautan skor langsung.",
+    tagline: "Catat skor olahraga raket",
+    sportEyebrow:
+      "BADMINTON · PICKLEBALL · TENIS · PADEL · TENIS MEJA · SQUASH",
     intro:
-      "Catat skor tunggal atau ganda dari ponsel. Pantau servis dan posisi pemain, lalu bagikan skor langsung lewat tautan viewer.",
+      "Catat skor tunggal atau ganda dari ponsel. Pantau servis, penerima, kotak servis, dan posisi pemain, lalu bagikan skor langsung lewat tautan viewer.",
     chooseSport: "Pilih olahraga",
     chooseFormat: "Pilih format permainan",
     quickStart: "Mulai cepat",
@@ -29,10 +31,14 @@ const messages = {
     pickleball: "Pickleball",
     tennis: "Tenis",
     padel: "Padel",
+    table_tennis: "Tenis meja",
+    squash: "Squash",
     badmintonHint: "Skor reli dan servis",
     pickleballHint: "Servis, reli, dan posisi lapangan",
     tennisHint: "Skor game, set, servis, dan tie-break",
     padelHint: "Skor game, servis, penerima, dan tie-break FIP",
+    tableTennisHint: "Skor 11 poin, servis, penerima, dan rotasi ganda",
+    squashHint: "Skor PARS 11, servis, penerima, dan kotak servis",
     singles: "Tunggal",
     doubles: "Ganda",
     mixedDoubles: "Ganda campuran",
@@ -84,6 +90,27 @@ const messages = {
     tennisOrdersTitle: "Urutan servis dan penerima",
     tennisOrdersIntro:
       "Urutan ganda tetap selama satu set. Tim dapat mengubahnya sebelum set berikutnya.",
+    tableTennisFormatTitle: "Format tenis meja · aturan ITTF 2022",
+    tableTennisRulesSource:
+      "Game berakhir pada 11 poin dengan selisih dua. Pilih best of three atau five.",
+    tableTennisOrdersTitle: "Urutan servis dan penerima tenis meja",
+    tableTennisOrdersIntro:
+      "Tentukan tim dan pemain yang memulai servis, lalu pilih penerima pertama untuk nomor ganda. Rotasi berikutnya dihitung otomatis.",
+    tableTennisFirstServingTeam: "Tim yang servis lebih dulu",
+    tableTennisFirstServer: "Pemain yang servis lebih dulu",
+    tableTennisFirstReceiver: "Penerima pertama",
+    tableTennisReceiverTeam: "Tim penerima",
+    squashFormatTitle: "Format squash · aturan WSF",
+    squashRulesSource:
+      "Setiap reli menghasilkan poin sampai 11. Tunggal harus unggul dua; pada ganda, skor 11–10 langsung mengakhiri game. Pilih best of three atau five.",
+    squashOrdersTitle: "Urutan servis, penerima, dan kotak servis squash",
+    squashOrdersIntro:
+      "Pilih tim dan pemain yang memulai servis serta kotak pembuka. Pada ganda, urutan server tetap dan pasangan menentukan penerima sisi kiri/kanan.",
+    squashFirstServingTeam: "Tim yang servis lebih dulu",
+    squashFirstServer: "Server pertama untuk tim ini",
+    squashFirstServiceBox: "Kotak servis pembuka",
+    squashReceiverLeft: "Penerima dari sisi kiri",
+    squashReceiverRight: "Penerima dari sisi kanan",
     tennisFirstServingTeam: "Tim yang servis lebih dulu",
     tennisPairFirstServer: "Pemain yang servis lebih dulu untuk tim ini",
     tennisDeuceReceiver: "Penerima dari sisi deuce",
@@ -95,7 +122,7 @@ const messages = {
     woman: "Putri",
     man: "Putra",
     sideOutStandard: "Side-out standar",
-    casual: "Kasual",
+    casual: "Pencatatan kasual",
     referee: "Wasit",
     continue: "Lanjut atur pemain",
     guestNote:
@@ -108,6 +135,12 @@ const messages = {
     pwaUpdateButton: "Perbarui aplikasi",
     resumeTitle: "Pertandingan aktif di perangkat ini",
     resumeBody: "Lanjutkan pertandingan tamu yang belum selesai.",
+    resumeBodyAccount:
+      "Lanjutkan pertandingan yang tersimpan di perangkat ini.",
+    accountNote:
+      "Pertandingan baru akan tersimpan di perangkat ini dan disinkronkan ke akun Google Anda.",
+    guestHistoryPrompt:
+      "Masuk dengan Google untuk menyimpan riwayat dan melanjutkan pertandingan di perangkat lain.",
     resumeMatch: "Lanjutkan",
     deleteMatch: "Hapus",
     deleteMatchPromptGroup: "Konfirmasi hapus pertandingan",
@@ -134,6 +167,7 @@ const messages = {
     advantageScore: "Ad",
     awaitingSetOrders: "Konfirmasi urutan sebelum set berikutnya",
     confirmSetOrders: "Mulai set",
+    confirmGameOrders: "Mulai game",
     setOrdersHint:
       "Konfirmasi atau ubah server pertama dan penerima deuce untuk masing-masing pasangan.",
     decidingPoint: "Poin penentu no-ad",
@@ -143,6 +177,7 @@ const messages = {
     correctionTieBreakScore: "Koreksi skor tie-break aktif",
     serves: "servis",
     server: "Server",
+    receives: "Penerima",
     right: "kanan",
     left: "kiri",
     pointFor: "Poin untuk",
@@ -176,6 +211,23 @@ const messages = {
     completedSets: "Set selesai",
     tennisPointWon: "Poin tenis dimenangkan",
     padelPointWon: "Poin padel dimenangkan",
+    tableTennisPointWon: "Poin tenis meja dimenangkan",
+    tableTennisGames: "Game menang",
+    tableTennisAwaitingOrders: "Konfirmasi urutan sebelum game berikutnya",
+    tableTennisOrderNote:
+      "Pada ganda, urutan penerima dan sisi pada game penentuan akan bertukar saat salah satu pasangan mencapai 5 poin.",
+    squashPointWon: "Reli squash dimenangkan",
+    squashGames: "Menang game",
+    squashAwaitingOrders: "Konfirmasi urutan game berikutnya",
+    squashOrderNote:
+      "Urutan server ganda tetap sepanjang pertandingan. Pemenang game menjadi server pertama berikutnya; pemetaan penerima kiri/kanan dapat diubah.",
+    squashChooseServiceBox: "Pilih kotak servis untuk melanjutkan",
+    squashServiceBoxHint:
+      "Server baru harus memilih kotak. Setelah menang reli, kotak berganti otomatis.",
+    courtMarkerServer: "S = Server",
+    courtMarkerReceiver: "R = Penerima",
+    squashServiceBoxLeft: "Kotak kiri",
+    squashServiceBoxRight: "Kotak kanan",
     padelLocalVariant: "Tunggal klub · varian lokal",
     padelAwaitingOrders: "Konfirmasi urutan set ini",
     padelStarStage: "Tahap Star Point",
@@ -208,14 +260,46 @@ const messages = {
       "Batas poin harus sama atau lebih besar dari target.",
     customRulesInvalid:
       "Masukkan angka bulat yang valid: target 1–101, selisih 1–10, dan batas poin minimal sama dengan target.",
+    signInWithGoogle: "Masuk dengan Google",
+    account: "Akun",
+    accountMenu: "Menu akun",
+    accountSettings: "Pengaturan akun",
+    accountTitle: "Akun Google",
+    accountPageTitle: "Akun Google · Skor Lapangan",
+    accountIntro: "Kelola akun dan pertandingan yang tersimpan.",
+    accountSignedInAs: "Masuk sebagai",
+    accountRequiresGoogle: "Masuk dengan Google untuk membuka pengaturan akun.",
+    accountRequiresGoogleBody:
+      "Akun diperlukan untuk membuka riwayat, menyinkronkan pertandingan, dan mengelola data Anda.",
+    accountDeleteSection: "Hapus akun",
+    accountDeleteWarning:
+      "Penghapusan akun bersifat permanen. Riwayat, event skor, tautan Live Viewer, laporan, dan data akun akan dihapus.",
+    accountDeleteButton: "Hapus akun",
+    accountDeleteConfirmTitle: "Hapus akun ini?",
+    accountDeleteConfirmBody:
+      "Match, event skor, tautan Live Viewer, laporan, dan data akun akan dihapus. Data lokal di browser juga dibersihkan. Anda akan kembali sebagai guest.",
+    accountDeleteConfirmButton: "Ya, hapus akun",
+    accountDeleteInProgress: "Menghapus akun…",
+    accountDeleteError: "Akun belum dihapus:",
+    accountError: "Masalah akun:",
+    googleSignInError: "Login Google gagal:",
+    claimError: "Login Google berhasil, tetapi match guest belum tersinkron:",
+    googleLinkFallback:
+      "Akun Google ini sudah memiliki akun Skor Lapangan. Kami akan masuk ke akun tersebut dan mencoba membawa match guest Anda.",
+    signingOut: "Keluar…",
+    savingGuestMatches: "Menyimpan pertandingan guest ke akun Anda…",
+    guestMatchesSaved: "Pertandingan guest sudah tersimpan di akun Anda.",
+    accountDeleted: "Akun dihapus. Anda kembali sebagai guest.",
     saveHistory: "Simpan riwayat dengan Google",
     signOut: "Keluar",
     historySaved: "Riwayat tersimpan",
-    syncSaved: "Tersinkron ke server",
+    syncSaved: "Skor tersimpan",
     syncLocal: "Tersimpan di perangkat ini",
-    syncing: "Menyinkronkan…",
+    syncing: "Menyimpan skor…",
     syncOffline: "Offline · perubahan tersimpan di perangkat",
     syncError: "Gagal menyinkronkan · data masih tersimpan di perangkat",
+    syncConflict:
+      "Versi skor di server lebih baru atau berbeda. Lanjutkan dari perangkat utama.",
     syncUnsupportedSport:
       "Server belum mendukung olahraga ini. Skor tetap tersimpan di perangkat.",
     retrySync: "Coba sinkronkan lagi",
@@ -233,8 +317,8 @@ const messages = {
     retryControl: "Coba lagi",
     liveViewer: "Live Viewer",
     liveViewerDescription:
-      "Tautan hanya menampilkan skor, posisi, dan server. Tautan kedaluwarsa bersama data pertandingan.",
-    createViewerLink: "Buat tautan viewer",
+      "Tautan hanya menampilkan skor, posisi, dan server—tanpa nama pemain. Tautan kedaluwarsa bersama data pertandingan.",
+    createViewerLink: "Bagikan skor langsung",
     revokeViewerLink: "Cabut tautan",
     viewerLink: "Tautan viewer",
     copyLink: "Salin tautan",
@@ -306,6 +390,8 @@ const messages = {
     ruleUnpublished: "Aturan ini tidak lagi tampil di direktori publik.",
     notRuleOwner: "Hanya pembuat aturan yang dapat mengeditnya.",
     googleRequired: "Masuk dengan Google untuk menerbitkan aturan.",
+    historyGoogleRequired: "Masuk dengan Google untuk melihat riwayat.",
+    historyPageTitle: "Riwayat pertandingan · Skor Lapangan",
     googleRequiredBody:
       "Aturan komunitas hanya bisa diterbitkan dan dikelola oleh akun Google.",
     ruleTitle: "Nama aturan",
@@ -317,10 +403,13 @@ const messages = {
     noCap: "Tanpa batas",
     shareLink: "Bagikan tautan",
     matchHistory: "Riwayat pertandingan",
-    historyIntro:
-      "Skor dan status pertandingan yang tersinkron ke akun Google Anda.",
+    historyIntro: "Pertandingan yang tersimpan di akun Google ini.",
     historyRequiresGoogle:
-      "Masuk dengan Google untuk melihat pertandingan tersimpan. Guest tetap bisa bermain tanpa akun.",
+      "Masuk dengan Google untuk melihat riwayat dan membukanya kembali dari perangkat lain. Anda tetap bisa bermain tanpa akun.",
+    historyLoadError:
+      "Riwayat belum bisa dimuat. Periksa koneksi lalu coba lagi.",
+    retryHistory: "Muat ulang riwayat",
+    gamesWon: "game dimenangkan",
     noSavedMatches: "Belum ada pertandingan tersimpan",
     noSavedMatchesBody:
       "Mulai pertandingan saat koneksi aktif, atau sambungkan akun Google Anda.",
@@ -328,6 +417,11 @@ const messages = {
     lastUpdated: "Terakhir diperbarui:",
     openOnThisDevice: "Buka di perangkat ini",
     detailsOnOriginalDevice: "Detail lengkap hanya tersedia di perangkat asal.",
+    deleteHistoryMatch: "Hapus dari riwayat",
+    confirmDeleteHistoryMatch: "Ya, hapus pertandingan",
+    deletingHistoryMatch: "Menghapus…",
+    historyDeleteError:
+      "Pertandingan belum dihapus. Periksa koneksi lalu coba lagi.",
     backToHome: "Kembali ke beranda",
   },
   en: {
@@ -335,12 +429,14 @@ const messages = {
     language: "Language",
     loading: "Loading…",
     seoTitle:
-      "Badminton, Pickleball, Tennis & Padel Scoreboard | Skor Lapangan",
+      "Badminton, Pickleball, Tennis, Padel, Table Tennis & Squash Scoreboard | Skor Lapangan",
     seoDescription:
-      "Keep score for badminton, pickleball, tennis, and padel singles or doubles from your phone. Track service, correct points, and share a live viewer link.",
-    tagline: "Scoreboards for badminton, pickleball, tennis, and padel",
+      "Keep score for badminton, pickleball, tennis, padel, table tennis, and squash singles or doubles from your phone. Track service, correct points, and share a live viewer link.",
+    tagline: "Keep score for racket sports",
+    sportEyebrow:
+      "BADMINTON · PICKLEBALL · TENNIS · PADEL · TABLE TENNIS · SQUASH",
     intro:
-      "Keep score for singles or doubles on your phone. Track service and court positions, then share the live score with a viewer link.",
+      "Keep score for singles or doubles on your phone. Track service, receivers, service boxes, and court positions, then share the live score with a viewer link.",
     chooseSport: "Choose a sport",
     chooseFormat: "Choose match format",
     quickStart: "Quick start",
@@ -349,10 +445,15 @@ const messages = {
     pickleball: "Pickleball",
     tennis: "Tennis",
     padel: "Padel",
+    table_tennis: "Table tennis",
+    squash: "Squash",
     badmintonHint: "Rally scoring and service",
     pickleballHint: "Service, rallies, and court positions",
     tennisHint: "Track games, sets, service, and tie-breaks",
     padelHint: "Track games, service, receivers, and FIP tie-breaks",
+    tableTennisHint:
+      "Track 11-point games, service, receivers, and doubles rotation",
+    squashHint: "Track PARS 11, service, receivers, and service boxes",
     singles: "Singles",
     doubles: "Doubles",
     mixedDoubles: "Mixed doubles",
@@ -404,6 +505,27 @@ const messages = {
     tennisOrdersTitle: "Service and receiving order",
     tennisOrdersIntro:
       "Doubles orders stay fixed for a set. Teams can change them before the next set.",
+    tableTennisFormatTitle: "Table tennis format · 2022 ITTF rules",
+    tableTennisRulesSource:
+      "Games end at 11 points, win by two. Choose best of three or five.",
+    tableTennisOrdersTitle: "Table tennis service and receiving order",
+    tableTennisOrdersIntro:
+      "Choose the team and player serving first, then select the first receiver for doubles. Later rotation is calculated automatically.",
+    tableTennisFirstServingTeam: "Team serving first",
+    tableTennisFirstServer: "Player serving first",
+    tableTennisFirstReceiver: "First receiver",
+    tableTennisReceiverTeam: "Receiving team",
+    squashFormatTitle: "Squash format · WSF rules",
+    squashRulesSource:
+      "Every rally scores a point to 11. Singles must win by two; in doubles, 11–10 ends the game. Choose best of three or five.",
+    squashOrdersTitle: "Squash service, receiving, and service-box order",
+    squashOrdersIntro:
+      "Choose the team, first server, and opening box. In doubles, the server order stays fixed and each pair sets its left/right receivers.",
+    squashFirstServingTeam: "Team serving first",
+    squashFirstServer: "First server for this team",
+    squashFirstServiceBox: "Opening service box",
+    squashReceiverLeft: "Receiver from the left side",
+    squashReceiverRight: "Receiver from the right side",
     tennisFirstServingTeam: "Team serving first",
     tennisPairFirstServer: "Player who serves first for this team",
     tennisDeuceReceiver: "Deuce-court receiver",
@@ -415,7 +537,7 @@ const messages = {
     woman: "Woman",
     man: "Man",
     sideOutStandard: "Standard side-out",
-    casual: "Casual",
+    casual: "Casual scoring",
     referee: "Referee",
     continue: "Continue to player setup",
     guestNote:
@@ -428,6 +550,11 @@ const messages = {
     pwaUpdateButton: "Update app",
     resumeTitle: "Active matches on this device",
     resumeBody: "Continue an unfinished guest match.",
+    resumeBodyAccount: "Continue a match saved on this device.",
+    accountNote:
+      "New matches stay on this device and sync to your Google account.",
+    guestHistoryPrompt:
+      "Sign in with Google to keep match history and continue on another device.",
     resumeMatch: "Resume",
     deleteMatch: "Delete",
     deleteMatchPromptGroup: "Confirm match deletion",
@@ -454,6 +581,7 @@ const messages = {
     advantageScore: "Ad",
     awaitingSetOrders: "Confirm the order before the next set",
     confirmSetOrders: "Start set",
+    confirmGameOrders: "Start game",
     setOrdersHint:
       "Confirm or change each pair’s first server and deuce-court receiver.",
     decidingPoint: "No-ad deciding point",
@@ -463,6 +591,7 @@ const messages = {
     correctionTieBreakScore: "Correct active tie-break score",
     serves: "serves",
     server: "Server",
+    receives: "Receiver",
     right: "right",
     left: "left",
     pointFor: "Point for",
@@ -497,6 +626,23 @@ const messages = {
     completedSets: "Completed sets",
     tennisPointWon: "Tennis point won by",
     padelPointWon: "Padel point won by",
+    tableTennisPointWon: "Table tennis point won by",
+    tableTennisGames: "Games won",
+    tableTennisAwaitingOrders: "Confirm the order before the next game",
+    tableTennisOrderNote:
+      "In doubles, receiving order and court ends switch in the deciding game when either pair reaches five points.",
+    squashPointWon: "Squash rally won by",
+    squashGames: "Games won",
+    squashAwaitingOrders: "Confirm the next game's order",
+    squashOrderNote:
+      "Doubles server order stays fixed for the match. The game winner serves first next; left/right receiver mapping can change.",
+    squashChooseServiceBox: "Choose a service box to continue",
+    squashServiceBoxHint:
+      "The new server chooses a box. It switches automatically after a winning rally.",
+    courtMarkerServer: "S = Server",
+    courtMarkerReceiver: "R = Receiver",
+    squashServiceBoxLeft: "Left box",
+    squashServiceBoxRight: "Right box",
     padelLocalVariant: "Club singles · local variant",
     padelAwaitingOrders: "Confirm this set’s orders",
     padelStarStage: "Star Point stage",
@@ -528,14 +674,47 @@ const messages = {
     capMustBeAtLeastTarget: "The point cap must be at least the target score.",
     customRulesInvalid:
       "Enter whole numbers: target 1–101, win-by 1–10, and a point cap at least as high as the target.",
+    signInWithGoogle: "Sign in with Google",
+    account: "Account",
+    accountMenu: "Account menu",
+    accountSettings: "Account settings",
+    accountTitle: "Google account",
+    accountPageTitle: "Google account · Skor Lapangan",
+    accountIntro: "Manage your account and saved matches.",
+    accountSignedInAs: "Signed in as",
+    accountRequiresGoogle: "Sign in with Google to open account settings.",
+    accountRequiresGoogleBody:
+      "An account is needed to open history, sync matches, and manage your data.",
+    accountDeleteSection: "Delete account",
+    accountDeleteWarning:
+      "Account deletion is permanent. History, score events, Live Viewer links, reports, and account data will be removed.",
+    accountDeleteButton: "Delete account",
+    accountDeleteConfirmTitle: "Delete this account?",
+    accountDeleteConfirmBody:
+      "Matches, score events, Live Viewer links, reports, and account data will be deleted. Browser data will also be cleared. You will return as a guest.",
+    accountDeleteConfirmButton: "Yes, delete account",
+    accountDeleteInProgress: "Deleting account…",
+    accountDeleteError: "The account was not deleted:",
+    accountError: "Account problem:",
+    googleSignInError: "Google sign-in failed:",
+    claimError:
+      "Google sign-in succeeded, but guest matches are not synced yet:",
+    googleLinkFallback:
+      "This Google account already has a Skor Lapangan account. We will sign you in there and try to bring over your guest matches.",
+    signingOut: "Signing out…",
+    savingGuestMatches: "Saving your guest matches to your account…",
+    guestMatchesSaved: "Your guest matches are now saved to your account.",
+    accountDeleted: "Account deleted. You are back in guest mode.",
     saveHistory: "Save history with Google",
     signOut: "Sign out",
     historySaved: "History saved",
-    syncSaved: "Synced to server",
+    syncSaved: "Score saved",
     syncLocal: "Saved on this device",
-    syncing: "Syncing…",
+    syncing: "Saving score…",
     syncOffline: "Offline · changes are saved on this device",
     syncError: "Could not sync · this match is still saved on this device",
+    syncConflict:
+      "The server has a newer or different score. Continue from the controlling device.",
     syncUnsupportedSport:
       "The server does not support this sport yet. The score is still saved on this device.",
     retrySync: "Retry sync",
@@ -552,8 +731,8 @@ const messages = {
     retryControl: "Try again",
     liveViewer: "Live Viewer",
     liveViewerDescription:
-      "The link shows score, positions, and server only. It expires with the match data.",
-    createViewerLink: "Create viewer link",
+      "The link shows score, positions, and server only—never player names. It expires with the match data.",
+    createViewerLink: "Share live score",
     revokeViewerLink: "Revoke link",
     viewerLink: "Viewer link",
     copyLink: "Copy link",
@@ -621,6 +800,7 @@ const messages = {
     ruleUnpublished: "This rule is no longer listed publicly.",
     notRuleOwner: "Only the rule creator can edit it.",
     googleRequired: "Sign in with Google to publish rules.",
+    historyGoogleRequired: "Sign in with Google to view your history.",
     googleRequiredBody:
       "Community Rules can only be published and managed by a Google account.",
     ruleTitle: "Rule name",
@@ -632,9 +812,14 @@ const messages = {
     noCap: "No cap",
     shareLink: "Share link",
     matchHistory: "Match history",
-    historyIntro: "Scores and match status synced to your Google account.",
+    historyPageTitle: "Match history · Skor Lapangan",
+    historyIntro: "Matches saved to this Google account.",
     historyRequiresGoogle:
-      "Sign in with Google to see saved matches. Guests can still play without an account.",
+      "Sign in with Google to view history and reopen it on another device. You can still play without an account.",
+    historyLoadError:
+      "History could not be loaded. Check your connection and try again.",
+    retryHistory: "Reload history",
+    gamesWon: "games won",
     noSavedMatches: "No saved matches yet",
     noSavedMatchesBody:
       "Start a match while online, or link your Google account.",
@@ -643,6 +828,11 @@ const messages = {
     openOnThisDevice: "Open on this device",
     detailsOnOriginalDevice:
       "Full details are only available on the original device.",
+    deleteHistoryMatch: "Delete from history",
+    confirmDeleteHistoryMatch: "Yes, delete match",
+    deletingHistoryMatch: "Deleting…",
+    historyDeleteError:
+      "The match was not deleted. Check your connection and try again.",
     backToHome: "Back to home",
   },
 } as const;

@@ -1,8 +1,8 @@
 # Skor Lapangan
 
-A mobile-first scorekeeper for Badminton, Pickleball, Tennis, and Padel. It tracks scores, service turns, the active server, and court positions for singles, doubles, and supported mixed-doubles formats.
+A mobile-first scorekeeper for Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash. It tracks scores, service turns, the active server, receivers, and court positions for singles, doubles, and supported mixed-doubles formats.
 
-V1.0 launched with Badminton and Pickleball. Tennis and Padel have separate federation-rule, database, regression, and mobile release checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
+V1.0 launched with Badminton and Pickleball. Tennis, Padel, Table tennis, and Squash have separate federation-rule, database, regression, and mobile release checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
 
 ## Features
 
@@ -13,9 +13,13 @@ V1.0 launched with Badminton and Pickleball. Tennis and Padel have separate fede
 - Tennis doubles service and receiver orders are stored per set. Mixed-doubles role labels remain local to the controlling device and are not shared with Live Viewer.
 - Padel doubles and mixed doubles: FIP Advantage, Star Point, or Golden Point games; standard or mini-sets; and standard, advantage, or 7-/10-point deciding-set match tie-break by two. Doubles uses a 10 × 20 m court. Club singles is a non-FIP, FIP-derived local variant on a 6 × 20 m court.
 - Padel doubles service and deuce-court receiver orders are stored per set. Mixed-doubles role labels remain on the controlling device and are excluded from synced viewer data.
+- Table tennis singles and doubles: ITTF 2022 games to 11, win by two, best of three or five, two-point service rotation changing to one-point rotation at 10–10, doubles server/receiver rotation, and deciding-game side and receiving-order changes at five points.
+- Table tennis setup stores the first server and, for doubles, the first receiver. Later game order confirmation is required for doubles; the server and receiver markers are shown on a responsive portrait table with a horizontal net.
+- Squash singles and doubles: WSF 2025/2022 PARS rally scoring, best-of-five by default with best-of-three available, server/receiver order, service-box selection, and a responsive court with front wall, tin, service line, short line, half-court line, and service boxes.
+- Squash doubles keeps a fixed server order and lets each pair confirm its left/right receiver mapping before the next game. Let, stroke, fault, appeal, injury, and referee calls remain outside the scorekeeper scope.
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
-- Guest matches with client-generated UUIDs, local-first scoring, rate-limited server sync, and a 12-hour inactivity expiry capped at 24 hours. Expired records are cleaned hourly.
+- Guest matches with client-generated UUIDs, local-first scoring, rate-limited atomic server sync, and a 12-hour inactivity expiry capped at 24 hours. Stale or divergent multi-device snapshots are rejected; expired records are cleaned hourly.
 - Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
 - Locked Official Rules and guest-only custom rules that stay in the current browser and match.
 - One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
@@ -35,7 +39,7 @@ pnpm install
 pnpm dev
 ```
 
-The app can run locally without Supabase, but server sync and Live Viewer links require the Supabase setup below. Google sign-in, account history, and Community Rules are deferred from V1.0. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
+The app can run locally without Supabase, but server sync, Google account features, and Live Viewer links require the Supabase setup below. The account foundation is implemented for local and Preview rollout; Community Rules remain gated. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -51,11 +55,15 @@ Verification commands:
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm format:check
+git diff --check
+pnpm test:coverage
+pnpm test:e2e
 ```
 
 ## Supabase setup
 
-Run the migrations in filename order using the Supabase SQL Editor. Apply `20261012130000_tennis_scoring.sql` before enabling Tennis clients and `20261012140000_padel_scoring.sql` before enabling Padel clients. Enable anonymous sign-ins for guest matches. Do not enable Google OAuth for the V1.0 release. The database migration set retains Community Rules schema needed by the release-guardrail migration, but the V1.0 app does not expose those features. See [docs/supabase-setup.md](docs/supabase-setup.md) for setup and verification steps.
+Run all fourteen migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply both atomic sync migrations and the account-deletion migration before deploying the account foundation. Enable anonymous sign-ins for guest matches and deploy the server-only `delete-account` Edge Function. Community Rules schema remains present for compatibility, but its routes and user flows stay disabled. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 
@@ -63,20 +71,24 @@ Import the repository with its root directory unchanged. `vercel.json` builds th
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Product roadmap](docs/product-roadmap.md)
 - [V1.0 implementation specification](docs/v1-implementation-spec.md)
 - [Player guide](docs/user-guide.md)
 - [QA and release checklist](docs/qa-release-checklist.md)
+- [Latest QA evidence](docs/qa-evidence-v1.0-2026-10-13.md)
 - [Operations runbook](docs/operations-runbook.md)
 - [Official rules sources](docs/rules-sources.md)
 - [Supabase setup](docs/supabase-setup.md)
+- [Architecture decisions](docs/adr/0001-local-first-stack.md) and [atomic sync ADR](docs/adr/0002-atomic-match-sync.md)
+- [Legal and owner release gate](docs/legal-release-gate.md)
 
 Public-facing drafts that need owner and legal review before publication:
 
 - [Privacy notice draft](docs/privacy-notice.md)
 - [Terms of use draft](docs/terms-of-use.md)
 - [Community Rules policy draft for V1.1](docs/community-rules-policy.md)
-- [Account deletion request workflow draft for V1.1](docs/account-deletion-request-draft.md)
+- [Account deletion workflow](docs/account-deletion-request-draft.md)
 
 ## Project structure
 

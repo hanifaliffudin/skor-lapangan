@@ -38,6 +38,8 @@ function isViewerState(value: unknown): value is MatchState {
   const positions = state.positions;
   const tennisState = state.tennis;
   const padelState = state.padel;
+  const tableTennisState = state.tableTennis;
+  const squashState = state.squash;
   const positionIsValid = (position: unknown) => {
     if (!position || typeof position !== "object") return false;
     const sides = position as { left?: unknown; right?: unknown };
@@ -99,13 +101,59 @@ function isViewerState(value: unknown): value is MatchState {
         padelState.decidingReceivingSide === "left" ||
         padelState.decidingReceivingSide === "right"),
     );
+  const tableTennisIsValid =
+    state.sport !== "table_tennis" ||
+    Boolean(
+      tableTennisState &&
+      typeof tableTennisState.awaitingGameOrders === "boolean" &&
+      (tableTennisState.currentReceiver === 0 ||
+        tableTennisState.currentReceiver === 1) &&
+      typeof tableTennisState.courtEndsSwapped === "boolean" &&
+      typeof tableTennisState.receivingOrderSwapped === "boolean" &&
+      tableTennisState.gameOrders &&
+      isTeamId(tableTennisState.gameOrders.firstServer.team) &&
+      isTeamId(tableTennisState.gameOrders.firstReceiver.team) &&
+      (tableTennisState.gameOrders.firstServer.player === 0 ||
+        tableTennisState.gameOrders.firstServer.player === 1) &&
+      (tableTennisState.gameOrders.firstReceiver.player === 0 ||
+        tableTennisState.gameOrders.firstReceiver.player === 1),
+    );
+  const squashIsValid =
+    state.sport !== "squash" ||
+    Boolean(
+      squashState &&
+      (squashState.currentServiceBox === null ||
+        squashState.currentServiceBox === "left" ||
+        squashState.currentServiceBox === "right") &&
+      typeof squashState.serviceBoxChoiceRequired === "boolean" &&
+      typeof squashState.awaitingGameOrders === "boolean" &&
+      isTeamId(squashState.serviceRotationStartTeam) &&
+      [0, 1, 2, 3].includes(squashState.serviceRotationIndex) &&
+      squashState.gameOrders &&
+      (["A", "B"] as const).every((team) => {
+        const serviceOrder = squashState.gameOrders.serviceOrder[team];
+        const receiverBySide = squashState.gameOrders.receiverBySide[team];
+        return (
+          Array.isArray(serviceOrder) &&
+          serviceOrder.length === 2 &&
+          serviceOrder.every((player) => player === 0 || player === 1) &&
+          receiverBySide &&
+          (receiverBySide.left === 0 || receiverBySide.left === 1) &&
+          (receiverBySide.right === 0 || receiverBySide.right === 1)
+        );
+      }) &&
+      (squashState.gameOrders.openingServiceBox === "left" ||
+        squashState.gameOrders.openingServiceBox === "right"),
+    );
 
   return (
     typeof state.matchId === "string" &&
     (state.sport === "badminton" ||
       state.sport === "pickleball" ||
       state.sport === "tennis" ||
-      state.sport === "padel") &&
+      state.sport === "padel" ||
+      state.sport === "table_tennis" ||
+      state.sport === "squash") &&
     (state.format === undefined ||
       state.format === "singles" ||
       state.format === "doubles" ||
@@ -134,7 +182,9 @@ function isViewerState(value: unknown): value is MatchState {
         scoreIsValid((game as { score?: unknown }).score),
     ) &&
     tennisIsValid &&
-    padelIsValid
+    padelIsValid &&
+    tableTennisIsValid &&
+    squashIsValid
   );
 }
 
@@ -159,6 +209,11 @@ function viewerDefinition(state: MatchState): MatchDefinition {
     createdAt: new Date().toISOString(),
     initialServingTeam: state.servingTeam,
     initialServingPlayer: state.currentServer,
+    ...(state.tableTennis
+      ? { tableTennisOrders: state.tableTennis.gameOrders }
+      : state.squash
+        ? { squashGameOrders: state.squash.gameOrders }
+        : {}),
     teams: { A: genericTeam("A"), B: genericTeam("B") },
   };
 }
@@ -203,7 +258,9 @@ export function ViewerPage() {
         sport:
           row.sport === "pickleball" ||
           row.sport === "tennis" ||
-          row.sport === "padel"
+          row.sport === "padel" ||
+          row.sport === "table_tennis" ||
+          row.sport === "squash"
             ? row.sport
             : "badminton",
         status: row.status === "complete" ? "complete" : "active",
@@ -279,7 +336,16 @@ export function ViewerPage() {
                   <div className={styles.teamMeta}>
                     <span>{team === "A" ? t("teamA") : t("teamB")}</span>
                     <small>
-                      {t(state.tennis || state.padel ? "tennisSets" : "sets")}:{" "}
+                      {t(
+                        state.tennis || state.padel
+                          ? "tennisSets"
+                          : state.tableTennis || state.squash
+                            ? state.squash
+                              ? "squashGames"
+                              : "tableTennisGames"
+                            : "sets",
+                      )}
+                      :{" "}
                       {state.tennis?.setsWon[team] ??
                         state.padel?.setsWon[team] ??
                         state.gamesWon[team]}

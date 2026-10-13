@@ -143,7 +143,33 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      sync_match_journal: {
+        Args: {
+          p_match_id: string;
+          p_owner_id: string;
+          p_sport: string;
+          p_ruleset_id: string;
+          p_mode: string;
+          p_definition: Json;
+          p_status: string;
+          p_winner: string | null;
+          p_current_state: Json;
+          p_last_client_sequence: number;
+          p_created_at: string;
+          p_is_guest: boolean;
+          p_events: Json;
+        };
+        Returns: string;
+      };
       claim_guest_matches: { Args: Record<string, never>; Returns: number };
+      transfer_guest_matches: {
+        Args: { p_guest_owner_id: string; p_account_owner_id: string };
+        Returns: number;
+      };
+      delete_my_account_data: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
       create_live_viewer_link: {
         Args: { p_match_id: string };
         Returns: string;

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
   OFFICIAL_RULESETS,
+  officialRulesetFor,
   type ScoringRules,
   type Sport,
 } from "@skor-lapangan/scoring-core";
@@ -469,7 +470,7 @@ export function CommunityRuleEditorPage() {
 
   function changeSport(nextSport: Sport) {
     setSport(nextSport);
-    setRules({ ...OFFICIAL_RULESETS[nextSport].configuration });
+    setRules({ ...officialRulesetFor(nextSport).configuration });
   }
 
   function updateRules<Key extends keyof ScoringRules>(

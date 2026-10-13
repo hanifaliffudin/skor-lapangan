@@ -16,3 +16,9 @@ export function isUnsupportedMatchSportError(
     normalized.includes("match_events_event_type_check")
   );
 }
+
+export function isSyncConflictError(
+  message: string | null | undefined,
+): boolean {
+  return message === "SYNC_CONFLICT";
+}

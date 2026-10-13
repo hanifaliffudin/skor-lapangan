@@ -11,7 +11,7 @@ The owner must complete the bracketed fields, decide the open product terms, and
 
 ## 1. What the service does
 
-Skor Lapangan provides a browser-based scorekeeper for Badminton and Pickleball singles and doubles. Pickleball singles offers side-out or rally scoring. It records scores, service and court positions, and may sync match state or display it through a Live Viewer when server features are configured.
+Skor Lapangan provides a browser-based scorekeeper for Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash in supported singles and doubles formats. Pickleball singles offers side-out or rally scoring. It records scores, service and court positions, and may sync match state or display it through a Live Viewer when server features are configured.
 
 The service is a scorekeeping aid. It is not a referee, a federation service, or a substitute for the rules and decisions of an organizer or match official. Players should verify the applicable rules before play, especially for organized competition.
 
@@ -19,11 +19,13 @@ The service is a scorekeeping aid. It is not a referee, a federation service, or
 
 Official Rules in the app are based on the sources listed in [rules-sources.md](rules-sources.md). Federations may update their rules, and the app may not reflect a change immediately. Each match uses the ruleset selected when that match starts.
 
-V1.0 supports Official Rules and guest custom rules for the current match. Community Rules are not available in this release.
+The current release supports Official Rules and guest custom rules for the current match. Community Rules are not available. Google account linking, account history, and account deletion are being rolled out through local and Preview checks before production promotion.
 
 ## 3. Guest matches and accounts
 
 Guests can play without an account. Local match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted server activity, capped at 24 hours after creation. The hourly cleanup job physically deletes expired match and event data, and deletes anonymous Auth records after 30 days. A failed or paused cleanup job can delay physical deletion but does not restore access to expired records.
+
+Guests may link the current anonymous session to Google. This preserves eligible guest matches and makes them available in account history. Account history is scoped by Supabase row-level security. A Google-linked user can sign out, and can permanently delete the account from `/account`; deletion removes the account's match data, related events, reports, user-created rules and versions if present, associated viewer capabilities, local match journals, and the Auth user. Community Rules are not currently available to publish or browse through the app.
 
 ## 4. Live Viewer links
 
@@ -56,6 +58,6 @@ The operator should publish a new effective date when these terms change and sho
 - Privacy notice and a contact for privacy requests.
 - Any warranty, liability, dispute, or termination terms appropriate to the service and applicable law.
 
-Google account history and Community Rules are planned for V1.1. The operator must approve an account deletion workflow, Community Rules license, report handling, and appeal process before enabling those features.
+The account foundation requires an approved privacy notice, terms, deletion workflow, server-only Edge Function, and local/Preview smoke test before production promotion. Community Rules still require a separate license, report handling, moderation, and appeal process before enabling those features.
 
 For an Indonesia-facing release, have a qualified reviewer assess the final terms in context. The official [Indonesian Personal Data Protection Law, Law No. 27 of 2022](https://peraturan.bpk.go.id/Details/229798/uu-no-27-) is one source for privacy review; this draft does not claim compliance with it or any other law.

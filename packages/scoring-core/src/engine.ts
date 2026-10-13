@@ -19,6 +19,22 @@ import {
   initializeTennisMatchState,
   tennisServingSide,
 } from "./tennis";
+import {
+  applyTableTennisGameOrdersEvent,
+  applyTableTennisPoint,
+  applyTableTennisScoreOverride,
+  createTableTennisState,
+  initializeTableTennisMatchState,
+} from "./table-tennis";
+import {
+  applySquashGameOrdersEvent,
+  applySquashPoint,
+  applySquashScoreOverride,
+  applySquashServiceBoxEvent,
+  createSquashState,
+  initializeSquashMatchState,
+  squashServingSide,
+} from "./squash";
 import type {
   CourtSide,
   DomainEvent,
@@ -38,6 +54,10 @@ import type {
   TennisSetOrders,
   PadelScoreOverriddenEvent,
   PadelSetOrders,
+  TableTennisGameOrders,
+  SquashGameOrders,
+  SquashServiceBoxSelectedEvent,
+  SquashRules,
 } from "./types";
 
 export const OFFICIAL_RULESETS = {
@@ -214,6 +234,73 @@ export const OFFICIAL_RULESETS = {
       matchTieBreakPoints: 7,
     },
   },
+  tableTennis: {
+    id: "ittf-table-tennis-2022",
+    name: "ITTF Laws of Table Tennis 2022",
+    sport: "table_tennis",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-13",
+    sourceUrl:
+      "https://db.ittf.com/sites/default/files/public/2022-02/ITTF_HB_2022_clean_v1_0.pdf",
+    configuration: {
+      pointsToWin: 11,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 3,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    tableTennisConfiguration: {
+      bestOf: 3,
+    },
+  },
+  squashSingles: {
+    id: "wsf-squash-singles-2025",
+    name: "World Squash Singles Rules 2025",
+    sport: "squash",
+    format: "singles",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-13",
+    sourceUrl: "https://worldsquashofficiating.com/rules-of-squash/",
+    configuration: {
+      pointsToWin: 11,
+      winBy: 2,
+      maxPoints: null,
+      bestOf: 5,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    squashConfiguration: {
+      bestOf: 5,
+    },
+  },
+  squashDoubles: {
+    id: "wsf-squash-doubles-2022",
+    name: "World Squash Doubles Rules 2022",
+    sport: "squash",
+    format: "doubles",
+    source: "official",
+    version: 1,
+    checkedAt: "2026-10-13",
+    sourceUrl:
+      "https://www.worldsquash.org/wp-content/uploads/2022/03/2022-International-Doubles-Squash-Rules-V2.pdf",
+    configuration: {
+      pointsToWin: 11,
+      winBy: 1,
+      maxPoints: 11,
+      bestOf: 5,
+      scoringMode: "rally",
+      serversPerTurn: 1,
+      openingServerNumber: 1,
+    },
+    squashConfiguration: {
+      bestOf: 5,
+    },
+  },
 } as const;
 
 export function officialRulesetFor(
@@ -226,6 +313,12 @@ export function officialRulesetFor(
     return format === "singles"
       ? OFFICIAL_RULESETS.padelSingles
       : OFFICIAL_RULESETS.padel;
+  }
+  if (sport === "table_tennis") return OFFICIAL_RULESETS.tableTennis;
+  if (sport === "squash") {
+    return format === "singles"
+      ? OFFICIAL_RULESETS.squashSingles
+      : OFFICIAL_RULESETS.squashDoubles;
   }
   if (format === "doubles") return OFFICIAL_RULESETS[sport];
   if (sport === "badminton") return OFFICIAL_RULESETS.badmintonSingles;
@@ -315,7 +408,17 @@ export function createInitialState(definition: MatchDefinition): MatchState {
           ...initial,
           padel: createPadelState(definition)!,
         })
-      : initial;
+      : definition.sport === "table_tennis"
+        ? initializeTableTennisMatchState(definition, {
+            ...initial,
+            tableTennis: createTableTennisState(definition),
+          })
+        : definition.sport === "squash"
+          ? initializeSquashMatchState(definition, {
+              ...initial,
+              squash: createSquashState(definition),
+            })
+          : initial;
 }
 
 function requiredServiceSide(score: number): CourtSide {
@@ -601,6 +704,30 @@ function applyDomainEvent(
     }
     return state;
   }
+  if (definition.sport === "table_tennis") {
+    switch (event.type) {
+      case "rally_awarded":
+        return applyTableTennisPoint(state, event.team, definition);
+      case "table_tennis_game_orders_confirmed":
+        return applyTableTennisGameOrdersEvent(state, event, definition);
+      case "state_overridden":
+        return applyTableTennisScoreOverride(state, event.points, definition);
+    }
+    return state;
+  }
+  if (definition.sport === "squash") {
+    switch (event.type) {
+      case "rally_awarded":
+        return applySquashPoint(state, event.team, definition);
+      case "squash_game_orders_confirmed":
+        return applySquashGameOrdersEvent(state, event, definition);
+      case "squash_service_box_selected":
+        return applySquashServiceBoxEvent(state, event);
+      case "state_overridden":
+        return applySquashScoreOverride(state, event.points, definition);
+    }
+    return state;
+  }
   const rules = rulesFor(definition);
 
   if (event.type === "state_overridden") {
@@ -624,7 +751,10 @@ function domainEvents(events: MatchEvent[]): Map<string, DomainEvent> {
       event.type === "tennis_score_overridden" ||
       event.type === "padel_set_orders_confirmed" ||
       event.type === "padel_deciding_side_selected" ||
-      event.type === "padel_score_overridden"
+      event.type === "padel_score_overridden" ||
+      event.type === "table_tennis_game_orders_confirmed" ||
+      event.type === "squash_game_orders_confirmed" ||
+      event.type === "squash_service_box_selected"
     ) {
       byId.set(event.id, event);
     }
@@ -649,7 +779,10 @@ function activeTimeline(events: MatchEvent[]): {
       event.type === "tennis_score_overridden" ||
       event.type === "padel_set_orders_confirmed" ||
       event.type === "padel_deciding_side_selected" ||
-      event.type === "padel_score_overridden"
+      event.type === "padel_score_overridden" ||
+      event.type === "table_tennis_game_orders_confirmed" ||
+      event.type === "squash_game_orders_confirmed" ||
+      event.type === "squash_service_box_selected"
     ) {
       if (seenDomainEvents.has(event.id)) continue;
       seenDomainEvents.add(event.id);
@@ -815,6 +948,81 @@ export function confirmPadelSetOrders(
   };
 }
 
+export function confirmTableTennisGameOrders(
+  journal: MatchJournal,
+  orders: TableTennisGameOrders,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "table_tennis" ||
+    state.status === "complete" ||
+    !state.tableTennis?.awaitingGameOrders
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "table_tennis_game_orders_confirmed",
+        orders,
+      },
+    ],
+  };
+}
+
+export function confirmSquashGameOrders(
+  journal: MatchJournal,
+  orders: SquashGameOrders,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "squash" ||
+    state.status === "complete" ||
+    !state.squash?.awaitingGameOrders
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "squash_game_orders_confirmed",
+        orders,
+      },
+    ],
+  };
+}
+
+export function selectSquashServiceBox(
+  journal: MatchJournal,
+  side: CourtSide,
+  metadata: EventMetadata,
+): MatchJournal {
+  const state = deriveJournal(journal).state;
+  if (
+    journal.definition.sport !== "squash" ||
+    state.status === "complete" ||
+    !state.squash?.serviceBoxChoiceRequired
+  )
+    return journal;
+  return {
+    ...journal,
+    events: [
+      ...journal.events,
+      {
+        ...baseEvent(journal, metadata),
+        type: "squash_service_box_selected",
+        side,
+      },
+    ],
+  };
+}
+
 export function selectPadelDecidingSide(
   journal: MatchJournal,
   side: CourtSide,
@@ -953,6 +1161,12 @@ export function servingSide(
 ): CourtSide {
   if (state.sport === "tennis") return tennisServingSide(state);
   if (state.sport === "padel") return padelServingSide(state);
+  if (state.sport === "table_tennis") {
+    return state.positions[state.servingTeam].right === state.currentServer
+      ? "right"
+      : "left";
+  }
+  if (state.sport === "squash") return squashServingSide(state);
   if (getMatchFormat(state) === "singles") {
     return requiredServiceSide(state.points[state.servingTeam]);
   }

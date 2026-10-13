@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
@@ -8,8 +9,11 @@ const historyQuery = vi.hoisted(() => {
   const query = {
     select: vi.fn(),
     order: vi.fn(),
+    delete: vi.fn(),
+    eq: vi.fn(),
   };
   query.select.mockReturnValue(query);
+  query.delete.mockReturnValue(query);
   return {
     query,
     from: vi.fn(() => query),
@@ -121,5 +125,86 @@ describe("Tennis match history", () => {
     expect(screen.getByText("Sets 1–0")).toBeVisible();
     expect(screen.getByText(/Games in set: 6–6/)).toBeVisible();
     expect(screen.getByText(/Score: Golden–Golden/)).toBeVisible();
+  });
+
+  it("renders Squash games and numeric rally score in history", async () => {
+    historyQuery.query.order.mockResolvedValue({
+      data: [
+        {
+          id: "squash-history-match",
+          sport: "squash",
+          status: "active",
+          winner: null,
+          current_state: {
+            sport: "squash",
+            format: "doubles",
+            points: { A: 10, B: 8 },
+            gamesWon: { A: 1, B: 0 },
+          },
+          created_at: "2026-10-12T00:00:00.000Z",
+          updated_at: "2026-10-12T01:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <MatchHistoryPage />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Squash · Doubles/)).toBeVisible();
+    expect(screen.getByText("Games won 1–0")).toBeVisible();
+    expect(screen.getByText("Game · Score: 10–8")).toBeVisible();
+  });
+
+  it("confirms and deletes a match from the account history", async () => {
+    const user = userEvent.setup();
+    historyQuery.query.order.mockResolvedValue({
+      data: [
+        {
+          id: "deletable-history-match",
+          sport: "badminton",
+          status: "complete",
+          winner: "A",
+          current_state: {
+            sport: "badminton",
+            format: "doubles",
+            points: { A: 21, B: 12 },
+            gamesWon: { A: 1, B: 0 },
+          },
+          created_at: "2026-10-12T00:00:00.000Z",
+          updated_at: "2026-10-12T01:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    historyQuery.query.eq.mockResolvedValue({ data: [], error: null });
+
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <MatchHistoryPage />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Delete from history" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Yes, delete match" }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Yes, delete match" }));
+
+    expect(historyQuery.query.delete).toHaveBeenCalledTimes(1);
+    expect(historyQuery.query.eq).toHaveBeenCalledWith(
+      "id",
+      "deletable-history-match",
+    );
+    expect(screen.queryByText(/Badminton · Doubles/)).not.toBeInTheDocument();
   });
 });

@@ -44,6 +44,16 @@ export default defineConfig({
       },
     },
     setupFiles: "./src/test/setup.ts",
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "json-summary"],
+      thresholds: {
+        lines: 70,
+        statements: 70,
+        functions: 55,
+        branches: 70,
+      },
+    },
   },
   server: {
     host: hcaptchaDevHost || "127.0.0.1",

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
-import { loadMatch } from "../../lib/session";
+import { loadMatch, removeMatch } from "../../lib/session";
 import {
   padelPointLabel,
   tennisPointLabel,
@@ -13,6 +13,7 @@ import {
 } from "@skor-lapangan/scoring-core";
 import { supabase } from "../../lib/supabase";
 import type { Json } from "../../lib/database.types";
+import { Button } from "@/components/ui/button";
 import styles from "../../styles/App.module.css";
 
 interface MatchHistoryRow {
@@ -199,18 +200,29 @@ function savedScore(value: Json): SavedScore | null {
 
 export function MatchHistoryPage() {
   const { locale, t } = useLocale();
-  const { user, isAnonymous } = useAuth();
+  const { action, isAnonymous, signInWithGoogle, user } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+
+  useEffect(() => {
+    document.title = t("historyPageTitle");
+  }, [t]);
 
   useEffect(() => {
     if (!supabase || !user || isAnonymous) {
+      setMatches([]);
       setLoading(false);
       return;
     }
     let active = true;
+    setLoading(true);
+    setError("");
     void supabase
       .from("matches")
       .select("id,sport,status,winner,current_state,created_at,updated_at")
@@ -224,7 +236,26 @@ export function MatchHistoryPage() {
     return () => {
       active = false;
     };
-  }, [user, isAnonymous]);
+  }, [user, isAnonymous, retryAttempt]);
+
+  async function handleDeleteMatch(matchId: string) {
+    if (!supabase) return;
+    setDeleteError("");
+    setDeletingMatchId(matchId);
+    const { error: deleteQueryError } = await supabase
+      .from("matches")
+      .delete()
+      .eq("id", matchId);
+    if (deleteQueryError) {
+      setDeleteError(deleteQueryError.message);
+      setDeletingMatchId(null);
+      return;
+    }
+    removeMatch(matchId);
+    setMatches((current) => current.filter((match) => match.id !== matchId));
+    setConfirmDeleteId(null);
+    setDeletingMatchId(null);
+  }
 
   return (
     <div className={styles.pageShell}>
@@ -235,15 +266,33 @@ export function MatchHistoryPage() {
         <p className={styles.historyIntro}>{t("historyIntro")}</p>
         {!user || isAnonymous ? (
           <section className={styles.rulesEmpty}>
-            <h2>{t("googleRequired")}</h2>
+            <h2>{t("historyGoogleRequired")}</h2>
             <p>{t("historyRequiresGoogle")}</p>
+            <Button
+              type="button"
+              className="mt-4 min-h-11"
+              disabled={action === "google" || action === "claiming"}
+              onClick={() => void signInWithGoogle()}
+            >
+              {action === "google" || action === "claiming"
+                ? t("working")
+                : t("signInWithGoogle")}
+            </Button>
           </section>
         ) : null}
         {loading ? <p role="status">{t("loading")}</p> : null}
         {error ? (
-          <p className={styles.formError} role="alert">
-            {error}
-          </p>
+          <div className="grid gap-3" role="alert">
+            <p className={styles.formError}>{t("historyLoadError")}</p>
+            <Button
+              variant="outline"
+              type="button"
+              className="min-h-11 justify-self-start"
+              onClick={() => setRetryAttempt((current) => current + 1)}
+            >
+              {t("retryHistory")}
+            </Button>
+          </div>
         ) : null}
         {!loading && !error && user && !isAnonymous && matches.length === 0 ? (
           <section className={styles.rulesEmpty}>
@@ -264,7 +313,9 @@ export function MatchHistoryPage() {
                       : t(
                           match.sport === "pickleball" ||
                             match.sport === "tennis" ||
-                            match.sport === "padel"
+                            match.sport === "padel" ||
+                            match.sport === "table_tennis" ||
+                            match.sport === "squash"
                             ? match.sport
                             : "badminton",
                         )}{" "}
@@ -306,34 +357,109 @@ export function MatchHistoryPage() {
                         : ` · ${t(score.tennis.phase === "match_tiebreak" ? "matchTieBreak" : "tieBreak")}: ${score.tennis.tieBreakScore?.A ?? 0}–${score.tennis.tieBreakScore?.B ?? 0}`}
                     </small>
                   </div>
+                ) : score?.sport === "table_tennis" ? (
+                  <div className={styles.historyScore}>
+                    <p>
+                      {t("tableTennisGames")} {score.gamesWon.A}–
+                      {score.gamesWon.B}
+                    </p>
+                    <small>
+                      {t("game")} · {t("score")}: {score.points.A}–
+                      {score.points.B}
+                    </small>
+                  </div>
+                ) : score?.sport === "squash" ? (
+                  <div className={styles.historyScore}>
+                    <p>
+                      {t("squashGames")} {score.gamesWon.A}–{score.gamesWon.B}
+                    </p>
+                    <small>
+                      {t("game")} · {t("score")}: {score.points.A}–
+                      {score.points.B}
+                    </small>
+                  </div>
                 ) : score ? (
                   <p className={styles.historyScore}>
                     {t("teamA")} {score.points.A}–{score.points.B} {t("teamB")}
                     <small>
-                      {score.gamesWon.A}–{score.gamesWon.B}{" "}
-                      {t("sets").toLowerCase()}
+                      {score.gamesWon.A}–{score.gamesWon.B} {t("gamesWon")}
                     </small>
                   </p>
                 ) : null}
                 <p className={styles.historyDate}>
                   {t("lastUpdated")}{" "}
-                  {new Date(match.updated_at).toLocaleString()}
+                  {new Date(match.updated_at).toLocaleString(
+                    locale === "id" ? "id-ID" : "en-US",
+                    {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    },
+                  )}
                 </p>
-                {localMatch ? (
-                  <button
-                    className={styles.secondaryButton}
-                    type="button"
-                    onClick={() =>
-                      navigate(localizedPath(`/match/${match.id}`, locale))
-                    }
-                  >
-                    {t("openOnThisDevice")}
-                  </button>
-                ) : (
-                  <span className={styles.historyDeviceOnly}>
-                    {t("detailsOnOriginalDevice")}
-                  </span>
-                )}
+                <div className={styles.historyCardActions}>
+                  {localMatch ? (
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() =>
+                        navigate(localizedPath(`/match/${match.id}`, locale))
+                      }
+                    >
+                      {t("openOnThisDevice")}
+                    </button>
+                  ) : (
+                    <span className={styles.historyDeviceOnly}>
+                      {t("detailsOnOriginalDevice")}
+                    </span>
+                  )}
+                  {confirmDeleteId === match.id ? (
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      role="group"
+                    >
+                      <Button
+                        variant="destructive"
+                        type="button"
+                        className="min-h-11"
+                        disabled={deletingMatchId === match.id}
+                        onClick={() => void handleDeleteMatch(match.id)}
+                      >
+                        {deletingMatchId === match.id
+                          ? t("deletingHistoryMatch")
+                          : t("confirmDeleteHistoryMatch")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        className="min-h-11"
+                        disabled={deletingMatchId === match.id}
+                        onClick={() => setConfirmDeleteId(null)}
+                      >
+                        {t("cancel")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="min-h-11 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setDeleteError("");
+                        setConfirmDeleteId(match.id);
+                      }}
+                    >
+                      {t("deleteHistoryMatch")}
+                    </Button>
+                  )}
+                </div>
+                {deleteError && confirmDeleteId === match.id ? (
+                  <p className={styles.formError} role="alert">
+                    {t("historyDeleteError")}
+                  </p>
+                ) : null}
               </article>
             );
           })}

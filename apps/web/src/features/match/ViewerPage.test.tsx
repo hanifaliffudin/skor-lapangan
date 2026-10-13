@@ -89,6 +89,36 @@ const mixedPadelViewerState = {
   padelLocalRoles: { A: ["woman", "man"], B: ["man", "woman"] },
 };
 
+const squashViewerState = {
+  ...viewerState,
+  sport: "squash",
+  format: "doubles",
+  points: { A: 10, B: 8 },
+  gamesWon: { A: 1, B: 0 },
+  servingTeam: "A",
+  currentServer: 1,
+  serverNumber: 1,
+  positions: {
+    A: { left: 0, right: 1 },
+    B: { left: 0, right: 1 },
+  },
+  squash: {
+    gameOrders: {
+      serviceOrder: { A: [1, 0], B: [0, 1] },
+      receiverBySide: {
+        A: { left: 0, right: 1 },
+        B: { left: 0, right: 1 },
+      },
+      openingServiceBox: "left",
+    },
+    currentServiceBox: "left",
+    serviceBoxChoiceRequired: false,
+    awaitingGameOrders: false,
+    serviceRotationStartTeam: "A",
+    serviceRotationIndex: 0,
+  },
+};
+
 describe("live viewer", () => {
   beforeEach(() => {
     rpcMock.mockReset();
@@ -232,6 +262,46 @@ describe("live viewer", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/woman|man|padelLocalRoles|Private Mixed Player/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows Squash score, games, service box, and public court markers", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "squash",
+          status: "active",
+          current_state: squashViewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/view/squash-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Squash · Doubles/)).toBeVisible();
+    expect(screen.getByText("10")).toBeVisible();
+    expect(screen.getByText("8")).toBeVisible();
+    expect(screen.getAllByText(/Games won/)).toHaveLength(2);
+    expect(screen.getByText(/Receiver: Player 1/)).toBeVisible();
+    expect(
+      container.querySelector('[data-sport="squash"] [data-serving="true"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-sport="squash"] [data-receiving="true"]'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/squashGameOrders|private name/i),
     ).not.toBeInTheDocument();
   });
 

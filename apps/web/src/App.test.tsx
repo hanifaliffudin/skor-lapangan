@@ -91,7 +91,7 @@ function restoreLocks() {
 
 async function renderApp(ui: Parameters<typeof render>[0]) {
   render(ui);
-  await screen.findByRole("banner");
+  await screen.findByRole("banner", undefined, { timeout: 5000 });
 }
 
 describe("quick start", () => {
@@ -118,13 +118,13 @@ describe("quick start", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Scoreboards for badminton, pickleball, tennis, and padel",
+        name: "Keep score for racket sports",
       }),
     ).toBeVisible();
     await user.click(screen.getByRole("button", { name: "ID" }));
     expect(
       screen.getByRole("heading", {
-        name: "Papan skor untuk badminton, pickleball, tenis, dan padel",
+        name: "Catat skor olahraga raket",
       }),
     ).toBeVisible();
   });
@@ -141,7 +141,7 @@ describe("quick start", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "Papan skor untuk badminton, pickleball, tenis, dan padel",
+        name: "Catat skor olahraga raket",
       }),
     ).toBeVisible();
   });
@@ -346,7 +346,9 @@ describe("quick start", () => {
         "FIP does not define singles. This is an unofficial FIP-derived scoring option.",
       ),
     ).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Start match" }));
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Start match" }).closest("form")!,
+    );
 
     const saved = listGuestMatches()[0]!;
     expect(saved.definition).toMatchObject({
@@ -426,6 +428,182 @@ describe("quick start", () => {
     expect(match.ruleset?.id).toBe("usap-singles-rally-2026");
   });
 
+  it("sets up table tennis doubles with best-of-five and order choices", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: /Table tennis Track 11-point games/i,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Who is playing?" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Table tennis format · 2022 ITTF rules"),
+    ).toBeVisible();
+    expect(screen.getByText("Best of three")).toBeVisible();
+    expect(screen.getByLabelText("First receiver")).toBeVisible();
+
+    await selectOption(user, "Games per match", "Best of five");
+    await selectOption(user, "Team serving first", "Team B");
+    await selectOption(user, "Player serving first", "Player 2");
+    await selectOption(user, "First receiver", "Player 2");
+    await user.click(screen.getByRole("button", { name: "Start match" }));
+
+    const match = listGuestMatches()[0]!.definition;
+    expect(match.sport).toBe("table_tennis");
+    expect(match.format).toBe("doubles");
+    expect(match.ruleset?.tableTennisConfiguration?.bestOf).toBe(5);
+    expect(match.tableTennisOrders).toEqual({
+      firstServer: { team: "B", player: 1 },
+      firstReceiver: { team: "A", player: 1 },
+    });
+  });
+
+  it("sets up Squash singles with best-of-three and service-box choice", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Squash Track PARS 11, service, receivers, and service boxes",
+      }),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: "Singles 1 player per side" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+
+    expect(await screen.findByText("Squash format · WSF rules")).toBeVisible();
+    await selectOption(user, "Games per match", "Best of three");
+    await selectOption(user, "Team serving first", "Team B");
+    await selectOption(user, "Opening service box", "Left box");
+    await selectOption(user, "First server for this team", "Player 1");
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Start match" }).closest("form")!,
+    );
+
+    const saved = listGuestMatches()[0]!;
+    expect(saved.definition).toMatchObject({
+      sport: "squash",
+      format: "singles",
+      rulesetId: "wsf-squash-singles-2025",
+      ruleset: { squashConfiguration: { bestOf: 3 } },
+      initialServingTeam: "B",
+      squashGameOrders: {
+        serviceOrder: { A: [0, 0], B: [0, 0] },
+        receiverBySide: {
+          A: { left: 0, right: 0 },
+          B: { left: 0, right: 0 },
+        },
+        openingServiceBox: "left",
+      },
+    });
+
+    await screen.findByRole("button", { name: /Squash rally won by Team A/ });
+    await user.click(
+      screen.getByRole("button", { name: /Squash rally won by Team A/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: /Squash rally won by Team A/ }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Right box" }));
+    await user.click(
+      screen.getByRole("button", { name: /Squash rally won by Team A/ }),
+    );
+
+    expect(listGuestMatches()[0]?.events).toHaveLength(3);
+    expect(listGuestMatches()[0]?.events[1]).toMatchObject({
+      type: "squash_service_box_selected",
+      side: "right",
+    });
+    expect(
+      screen.getByRole("button", { name: "Correct score: Team A" }),
+    ).toHaveTextContent("2");
+  });
+
+  it("opens the Squash doubles order dialog after a completed game", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("radio", {
+        name: "Squash Track PARS 11, service, receivers, and service boxes",
+      }),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: "Doubles 2 players per side" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+    await selectOption(user, "Games per match", "Best of three");
+    await selectOption(user, "Opening service box", "Left box");
+    const firstServers = screen.getAllByLabelText("First server for this team");
+    await user.click(firstServers[0]!);
+    await user.click(await screen.findByRole("option", { name: "Player 2" }));
+    await user.click(firstServers[1]!);
+    await user.click(await screen.findByRole("option", { name: "Player 1" }));
+    fireEvent.submit(
+      screen.getByRole("button", { name: "Start match" }).closest("form")!,
+    );
+    await screen.findByRole("button", { name: /Squash rally won by Team B/ });
+
+    const pointForTeamB = screen.getByRole("button", {
+      name: /Squash rally won by Team B/,
+    });
+    await user.click(pointForTeamB);
+    expect(pointForTeamB).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Right box" }));
+    for (let index = 0; index < 10; index += 1) {
+      await user.click(pointForTeamB);
+    }
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(
+      "Squash service, receiving, and service-box order",
+    );
+    expect(dialog).toHaveTextContent("Confirm the next game's order");
+    expect(screen.getByLabelText("Opening service box")).toBeVisible();
+    expect(
+      screen.getAllByLabelText("Receiver from the left side"),
+    ).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Start game" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Start game" }));
+
+    const events = listGuestMatches()[0]?.events ?? [];
+    expect(events.at(-1)).toMatchObject({
+      type: "squash_game_orders_confirmed",
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("starts without requiring an account", async () => {
     await renderApp(
       <MemoryRouter>
@@ -442,7 +620,7 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
-  it.each(["/rules", "/rules/new", "/rules/example", "/history"])(
+  it.each(["/rules", "/rules/new", "/rules/example"])(
     "redirects deferred feature route %s to the home page",
     async (path) => {
       await renderApp(
@@ -455,13 +633,41 @@ describe("quick start", () => {
 
       expect(
         screen.getByRole("heading", {
-          name: "Scoreboards for badminton, pickleball, tennis, and padel",
+          name: "Keep score for racket sports",
         }),
       ).toBeVisible();
       expect(
         screen.queryByRole("button", { name: /Save history with Google/i }),
       ).not.toBeInTheDocument();
       expect(screen.queryByText("Community Rules")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["/history", "/id/history"])(
+    "opens the match history route %s",
+    async (path) => {
+      await renderApp(
+        <MemoryRouter initialEntries={[path]}>
+          <LocaleProvider>
+            <App />
+          </LocaleProvider>
+        </MemoryRouter>,
+      );
+
+      expect(
+        screen.getByRole("heading", {
+          name: path.startsWith("/id/")
+            ? "Riwayat pertandingan"
+            : "Match history",
+        }),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", {
+          name: path.startsWith("/id/")
+            ? "Masuk dengan Google"
+            : "Sign in with Google",
+        }),
+      ).toBeVisible();
     },
   );
 
@@ -528,7 +734,7 @@ describe("quick start", () => {
     expect(loadMatch(id)).toBeNull();
     expect(
       await screen.findByRole("heading", {
-        name: "Scoreboards for badminton, pickleball, tennis, and padel",
+        name: "Keep score for racket sports",
       }),
     ).toBeVisible();
   });
@@ -566,7 +772,7 @@ describe("quick start", () => {
     expect(loadMatch(id)).toBeNull();
     expect(
       await screen.findByRole("heading", {
-        name: "Scoreboards for badminton, pickleball, tennis, and padel",
+        name: "Keep score for racket sports",
       }),
     ).toBeVisible();
   });
@@ -656,7 +862,7 @@ describe("quick start", () => {
     await selectOption(user, "Games per match", "One game");
     await user.click(screen.getByRole("button", { name: "Start match" }));
     await user.click(
-      screen.getByRole("button", { name: "+ Point for Team A" }),
+      screen.getByRole("button", { name: "Point for Team A (+1)" }),
     );
 
     expect(screen.getByText("Match complete")).toBeVisible();
@@ -757,7 +963,7 @@ describe("quick start", () => {
     );
 
     const rallyButton = screen.getByRole("button", {
-      name: "+ Point for Team A",
+      name: "Point for Team A (+1)",
     });
     expect(rallyButton).toBeDisabled();
 

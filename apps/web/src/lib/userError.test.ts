@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRateLimitError } from "./userError";
+import { isRateLimitError, isSyncConflictError } from "./userError";
 
 describe("isRateLimitError", () => {
   it("recognizes app and Supabase authentication rate limits", () => {
@@ -13,5 +13,12 @@ describe("isRateLimitError", () => {
   it("does not mask unrelated errors", () => {
     expect(isRateLimitError("Network request failed")).toBe(false);
     expect(isRateLimitError(undefined)).toBe(false);
+  });
+});
+
+describe("isSyncConflictError", () => {
+  it("recognizes a rejected multi-device snapshot", () => {
+    expect(isSyncConflictError("SYNC_CONFLICT")).toBe(true);
+    expect(isSyncConflictError("Network request failed")).toBe(false);
   });
 });

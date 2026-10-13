@@ -5,12 +5,16 @@
   "scripts": {
     "build": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/web build",
     "dev": "pnpm --filter @skor-lapangan/web dev",
+    "test:e2e": "playwright test",
+    "test:coverage": "pnpm --filter @skor-lapangan/scoring-core exec vitest run --coverage && pnpm --filter @skor-lapangan/web exec vitest run --coverage",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/scoring-core test && pnpm --filter @skor-lapangan/web test",
     "typecheck": "pnpm --filter @skor-lapangan/scoring-core typecheck && pnpm --filter @skor-lapangan/web typecheck"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.1",
+    "@vitest/coverage-v8": "3.2.7",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3"
   },

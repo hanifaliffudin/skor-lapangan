@@ -1,4 +1,5 @@
-export type Sport = "badminton" | "pickleball" | "tennis" | "padel";
+export type Sport =
+  "badminton" | "pickleball" | "tennis" | "padel" | "table_tennis" | "squash";
 export type MatchFormat = "singles" | "doubles" | "mixed_doubles";
 export type MatchMode = "casual" | "referee";
 export type TeamId = "A" | "B";
@@ -11,7 +12,10 @@ export type OfficialRulesetId =
   | "usap-singles-sideout-2026"
   | "usap-singles-rally-2026"
   | "fip-padel-2026"
-  | "club-padel-singles-2026";
+  | "club-padel-singles-2026"
+  | "ittf-table-tennis-2022"
+  | "wsf-squash-singles-2025"
+  | "wsf-squash-doubles-2022";
 export type RulesetSource =
   "official" | "community" | "guest_custom" | "local_variant";
 export type ScoringMode = "rally" | "side_out";
@@ -75,6 +79,42 @@ export interface PadelRules {
   matchTieBreakPoints: 7 | 10;
 }
 
+export interface TableTennisRules {
+  bestOf: 3 | 5;
+}
+
+export interface TableTennisGameOrders {
+  firstServer: { team: TeamId; player: PlayerIndex };
+  firstReceiver: { team: TeamId; player: PlayerIndex };
+}
+
+export interface TableTennisMatchState {
+  gameOrders: TableTennisGameOrders;
+  currentReceiver: PlayerIndex;
+  awaitingGameOrders: boolean;
+  courtEndsSwapped: boolean;
+  receivingOrderSwapped: boolean;
+}
+
+export interface SquashRules {
+  bestOf: 3 | 5;
+}
+
+export interface SquashGameOrders {
+  serviceOrder: Record<TeamId, readonly [PlayerIndex, PlayerIndex]>;
+  receiverBySide: Record<TeamId, { left: PlayerIndex; right: PlayerIndex }>;
+  openingServiceBox: CourtSide;
+}
+
+export interface SquashMatchState {
+  gameOrders: SquashGameOrders;
+  currentServiceBox: CourtSide | null;
+  serviceBoxChoiceRequired: boolean;
+  awaitingGameOrders: boolean;
+  serviceRotationStartTeam: TeamId;
+  serviceRotationIndex: 0 | 1 | 2 | 3;
+}
+
 export interface PadelSetOrders {
   serviceOrder: Record<TeamId, readonly [PlayerIndex, PlayerIndex]>;
   deuceReceiver: Record<TeamId, PlayerIndex>;
@@ -129,6 +169,8 @@ export interface RulesetSnapshot {
   configuration?: ScoringRules;
   tennisConfiguration?: TennisRules;
   padelConfiguration?: PadelRules;
+  tableTennisConfiguration?: TableTennisRules;
+  squashConfiguration?: SquashRules;
 }
 
 export interface TennisLocalRoles {
@@ -169,6 +211,8 @@ export interface MatchDefinition {
   /** Local-only mixed-doubles labels. Never include in shared viewer payloads. */
   padelLocalRoles?: PadelLocalRoles;
   padelSetOrders?: PadelSetOrders;
+  tableTennisOrders?: TableTennisGameOrders;
+  squashGameOrders?: SquashGameOrders;
 }
 
 export interface TeamPosition {
@@ -193,6 +237,8 @@ export interface MatchState {
   completedGames: Array<{ winner: TeamId; score: Record<TeamId, number> }>;
   tennis?: TennisMatchState;
   padel?: PadelMatchState;
+  tableTennis?: TableTennisMatchState;
+  squash?: SquashMatchState;
 }
 
 export function getMatchFormat(match: { format?: MatchFormat }): MatchFormat {
@@ -253,6 +299,21 @@ export interface PadelScoreOverriddenEvent extends EventBase {
   gamePointCount: number;
 }
 
+export interface TableTennisGameOrdersConfirmedEvent extends EventBase {
+  type: "table_tennis_game_orders_confirmed";
+  orders: TableTennisGameOrders;
+}
+
+export interface SquashGameOrdersConfirmedEvent extends EventBase {
+  type: "squash_game_orders_confirmed";
+  orders: SquashGameOrders;
+}
+
+export interface SquashServiceBoxSelectedEvent extends EventBase {
+  type: "squash_service_box_selected";
+  side: CourtSide;
+}
+
 export type DomainEvent =
   | RallyAwardedEvent
   | StateOverriddenEvent
@@ -261,7 +322,10 @@ export type DomainEvent =
   | TennisScoreOverriddenEvent
   | PadelSetOrdersConfirmedEvent
   | PadelDecidingSideSelectedEvent
-  | PadelScoreOverriddenEvent;
+  | PadelScoreOverriddenEvent
+  | TableTennisGameOrdersConfirmedEvent
+  | SquashGameOrdersConfirmedEvent
+  | SquashServiceBoxSelectedEvent;
 
 export interface UndoAppliedEvent extends EventBase {
   type: "undo_applied";

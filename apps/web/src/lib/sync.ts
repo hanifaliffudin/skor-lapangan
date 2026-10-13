@@ -19,6 +19,7 @@ export interface SyncPayload {
 export type SyncResult =
   | { status: "synced" }
   | { status: "skipped"; reason: "not_configured" | "not_signed_in" }
+  | { status: "conflict"; error: "SYNC_CONFLICT" }
   | { status: "failed"; error: string };
 
 function toJson(value: unknown): Json {
@@ -102,7 +103,39 @@ export function serializeJournalForSync(
                     }
                   : undefined,
               }
-            : {}),
+            : definition.sport === "table_tennis"
+              ? {
+                  tableTennisOrders: definition.tableTennisOrders,
+                  ruleset: definition.ruleset
+                    ? {
+                        id: definition.ruleset.id,
+                        name: definition.ruleset.name,
+                        sport: definition.ruleset.sport,
+                        format: definition.ruleset.format,
+                        source: definition.ruleset.source,
+                        version: definition.ruleset.version,
+                        tableTennisConfiguration:
+                          definition.ruleset.tableTennisConfiguration,
+                      }
+                    : undefined,
+                }
+              : definition.sport === "squash"
+                ? {
+                    squashGameOrders: definition.squashGameOrders,
+                    ruleset: definition.ruleset
+                      ? {
+                          id: definition.ruleset.id,
+                          name: definition.ruleset.name,
+                          sport: definition.ruleset.sport,
+                          format: definition.ruleset.format,
+                          source: definition.ruleset.source,
+                          version: definition.ruleset.version,
+                          squashConfiguration:
+                            definition.ruleset.squashConfiguration,
+                        }
+                      : undefined,
+                  }
+                : {}),
       }),
       status: state.status,
       winner: state.winner,
@@ -133,20 +166,30 @@ export async function syncJournal(
 
   try {
     const payload = serializeJournalForSync(journal, userId, isGuest);
-    const { error: matchError } = await supabase
-      .from("matches")
-      .upsert(payload.match, { onConflict: "id" });
+    const { data, error } = await supabase.rpc("sync_match_journal", {
+      p_match_id: payload.match.id,
+      p_owner_id: payload.match.owner_id,
+      p_sport: payload.match.sport,
+      p_ruleset_id: payload.match.ruleset_id,
+      p_mode: payload.match.mode,
+      p_definition: payload.match.definition,
+      p_status: payload.match.status,
+      p_winner: payload.match.winner ?? null,
+      p_current_state: payload.match.current_state,
+      p_last_client_sequence: payload.match.last_client_sequence,
+      p_created_at: payload.match.created_at,
+      p_is_guest: payload.match.is_guest,
+      p_events: toJson(payload.events),
+    });
 
-    if (matchError) return { status: "failed", error: matchError.message };
-    if (payload.events.length === 0) return { status: "synced" };
-
-    const { error: eventsError } = await supabase
-      .from("match_events")
-      .upsert(payload.events, { ignoreDuplicates: true, onConflict: "id" });
-
-    return eventsError
-      ? { status: "failed", error: eventsError.message }
-      : { status: "synced" };
+    if (error) return { status: "failed", error: error.message };
+    if (data === "stale" || data === "conflict") {
+      return { status: "conflict", error: "SYNC_CONFLICT" };
+    }
+    if (data !== "applied" && data !== "already_synced") {
+      return { status: "failed", error: "Unexpected sync response." };
+    }
+    return { status: "synced" };
   } catch (error) {
     return {
       status: "failed",

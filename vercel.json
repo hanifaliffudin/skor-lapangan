@@ -7,10 +7,8 @@
     { "source": "/id", "destination": "/id/", "permanent": true },
     { "source": "/rules", "destination": "/", "permanent": true },
     { "source": "/rules/:path*", "destination": "/", "permanent": true },
-    { "source": "/history", "destination": "/", "permanent": true },
     { "source": "/id/rules", "destination": "/id/", "permanent": true },
-    { "source": "/id/rules/:path*", "destination": "/id/", "permanent": true },
-    { "source": "/id/history", "destination": "/id/", "permanent": true }
+    { "source": "/id/rules/:path*", "destination": "/id/", "permanent": true }
   ],
   "headers": [
     {
@@ -35,6 +33,22 @@
     },
     {
       "source": "/id/view/:token*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/account",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/id/account",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/history",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/id/history",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     }
   ],

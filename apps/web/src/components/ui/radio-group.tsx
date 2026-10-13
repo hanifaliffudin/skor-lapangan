@@ -35,7 +35,7 @@ function RadioGroupItem({
         data-slot="radio-group-indicator"
         className={cn(
           isCard
-            ? "ml-auto flex size-5 shrink-0 items-center justify-center rounded-full border border-line-strong group-data-checked/radio-card:border-cobalt group-data-checked/radio-card:bg-cobalt"
+            ? "relative ml-auto flex size-5 shrink-0 items-center justify-center rounded-full border border-line-strong group-data-checked/radio-card:border-cobalt group-data-checked/radio-card:bg-cobalt"
             : "flex size-5 items-center justify-center",
         )}
       >
