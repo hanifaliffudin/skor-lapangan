@@ -9,6 +9,7 @@ import {
   type AuthProviderProps,
 } from "./auth-context";
 import {
+  getStoredMatchInfo,
   listStoredMatches,
   removeAllStoredMatches,
   saveMatch,
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [authErrorKind, setAuthErrorKind] = useState<AuthErrorKind>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const claimAttempted = useRef<string | null>(null);
+  const googleFlowActive = useRef(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -111,6 +113,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (_event === "INITIAL_SESSION" && hasGuestGoogleFallbackCallback()) {
         authEventObserved = true;
+        googleFlowActive.current = true;
         if (nextSession?.user.is_anonymous && nextSession.access_token) {
           window.sessionStorage.setItem(
             guestTransferTokenKey,
@@ -147,6 +150,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (_event === "INITIAL_SESSION" && !nextSession) return;
       authEventObserved = true;
+      if (
+        _event !== "INITIAL_SESSION" &&
+        nextSession &&
+        !nextSession.user.is_anonymous
+      ) {
+        googleFlowActive.current = false;
+      }
       setSession(nextSession);
       setAuthError(null);
       setAuthErrorKind(null);
@@ -195,6 +205,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
+    if (!supabase || action !== "google") return;
+
+    const resetInterruptedGoogleFlow = () => {
+      if (!googleFlowActive.current || hasGuestGoogleFallbackCallback()) return;
+      googleFlowActive.current = false;
+      setAction("idle");
+      setLoading(false);
+    };
+
+    window.addEventListener("pageshow", resetInterruptedGoogleFlow);
+    window.addEventListener("popstate", resetInterruptedGoogleFlow);
+
+    return () => {
+      window.removeEventListener("pageshow", resetInterruptedGoogleFlow);
+      window.removeEventListener("popstate", resetInterruptedGoogleFlow);
+    };
+  }, [action]);
+
+  useEffect(() => {
     if (!supabase || !session || session.user.is_anonymous) return;
     if (claimAttempted.current === session.user.id) return;
     claimAttempted.current = session.user.id;
@@ -203,7 +232,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAction("claiming");
     void (async () => {
       for (const match of listStoredMatches()) {
-        saveMatch(match, { persistent: true });
+        const storedMatchInfo = getStoredMatchInfo(match.definition.id);
+        saveMatch(match, {
+          ownerId:
+            storedMatchInfo?.persistent && storedMatchInfo.ownerId
+              ? storedMatchInfo.ownerId
+              : session.user.id,
+          persistent: true,
+        });
       }
 
       const guestAccessToken = window.sessionStorage.getItem(
@@ -283,6 +319,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setAuthError("Supabase is not configured.");
           return "Supabase is not configured.";
         }
+        googleFlowActive.current = true;
         setAction("google");
         setAuthError(null);
         setAuthErrorKind(null);
@@ -307,6 +344,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         const message = result.error?.message ?? null;
         if (message) {
+          googleFlowActive.current = false;
           setAction("idle");
           setAuthError(message);
           setAuthErrorKind("google");

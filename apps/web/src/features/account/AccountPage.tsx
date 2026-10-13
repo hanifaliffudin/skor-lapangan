@@ -83,7 +83,7 @@ export function AccountPage() {
         ) : (
           <div className="grid gap-4">
             <section className="grid gap-3 rounded-lg border border-line-strong bg-surface p-5">
-              <p className="m-0 text-sm font-bold text-muted">
+              <p className="m-0 text-sm font-bold text-text-muted">
                 {t("accountSignedInAs")}
               </p>
               <p className="m-0 break-words text-base font-extrabold text-ink">
@@ -111,7 +111,7 @@ export function AccountPage() {
               <h2 className="m-0 text-xl font-extrabold text-ink">
                 {t("accountDeleteSection")}
               </h2>
-              <p className="m-0 text-sm leading-6 text-muted">
+              <p className="m-0 text-sm leading-6 text-text-muted">
                 {t("accountDeleteWarning")}
               </p>
               <Button

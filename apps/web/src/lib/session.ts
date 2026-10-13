@@ -13,9 +13,15 @@ interface StoredMatch {
   schemaVersion: 1;
   journal: MatchJournal;
   expiresAt?: string;
+  ownerId?: string;
 }
 
 const currentMatchSchemaVersion = 1;
+
+export interface StoredMatchInfo {
+  persistent: boolean;
+  ownerId: string | null;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -102,14 +108,17 @@ export function loadDraft(): SetupDraft | null {
 
 export function saveMatch(
   journal: MatchJournal,
-  options: { persistent?: boolean } = {},
+  options: { ownerId?: string; persistent?: boolean } = {},
 ): boolean {
   const stored: StoredMatch = {
     schemaVersion: currentMatchSchemaVersion,
     journal,
     ...(options.persistent
       ? {}
-      : { expiresAt: new Date(Date.now() + guestMatchRetentionMs).toISOString() }),
+      : {
+          expiresAt: new Date(Date.now() + guestMatchRetentionMs).toISOString(),
+        }),
+    ...(options.ownerId ? { ownerId: options.ownerId } : {}),
   };
   try {
     window.localStorage.setItem(
@@ -157,6 +166,39 @@ export function loadMatch(matchId: string): MatchJournal | null {
   } catch {
     return null;
   }
+}
+
+export function getStoredMatchInfo(matchId: string): StoredMatchInfo | null {
+  if (!loadMatch(matchId)) return null;
+
+  const key = `${matchPrefix}${matchId}`;
+  const value =
+    window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
+  if (!value) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!isRecord(parsed) || !("journal" in parsed)) return null;
+    return {
+      persistent: typeof parsed.expiresAt !== "string",
+      ownerId: typeof parsed.ownerId === "string" ? parsed.ownerId : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function canSyncStoredMatch(
+  matchId: string,
+  userId: string,
+  isAnonymous: boolean,
+): boolean {
+  const storedMatchInfo = getStoredMatchInfo(matchId);
+  return !(
+    storedMatchInfo?.persistent &&
+    (isAnonymous ||
+      (storedMatchInfo.ownerId !== null && storedMatchInfo.ownerId !== userId))
+  );
 }
 
 export function listStoredMatches(): MatchJournal[] {

@@ -2,7 +2,7 @@
 
 ## Product scope
 
-V1.0 supports singles and doubles Badminton and Pickleball. Pickleball singles supports side-out and rally scoring, with side-out as the default. The product focuses on correct service rotation, score correction, reliable guest matches, and a shareable live score view. Tennis, Padel, and Table tennis are separate sport extensions with their own release gates.
+V1.0 supports singles and doubles Badminton and Pickleball. Pickleball singles supports side-out and rally scoring, with side-out as the default. The product focuses on correct service rotation, score correction, reliable guest matches, and a shareable live score view. The preview code also contains Tennis, Padel, Table tennis, and Squash; each remains outside the V1.0 public scope until its own promotion gate passes.
 
 The app remains mobile-first and English-default, with Indonesian available. The visual direction comes from `DESIGN.md`: outdoor readability, large tabular scores, cobalt for primary actions, lime for score/confirmation, portrait court layouts, and concise motion.
 
@@ -52,13 +52,13 @@ The app remains mobile-first and English-default, with Indonesian available. The
 
 ## Data integrity and access control
 
-- Supabase Auth anonymous users own guest records until they link Google. The account foundation uses the existing Auth identity and owner-scoped history; it does not add a profile table.
+- Supabase Auth anonymous users own guest records until the OAuth account session is restored and the server-only transfer flow moves unexpired matches to the Google-linked account. The account foundation uses the existing Auth identity and owner-scoped history; it does not add a profile table.
 - RLS enforces ownership. The frontend never receives a service-role key.
 - Event UUID and `(match_id, client_sequence)` uniqueness make retries idempotent and protect ordering.
 - Guest expiry is checked in database read/write paths and viewer authorization. A cleanup job is for storage reclamation, not the security boundary.
 - Database action limits reduce guest match, event, and viewer abuse. Supabase Auth's anonymous sign-in limit is configured separately; CAPTCHA remains a fallback if abuse warrants it.
 - New V1 matches use the single Casual workflow. Referee is hidden until it has distinct behavior; historical matches retain their stored label.
-- Supabase migrations and SQL policy tests are versioned in the repository. Applying migrations, enabling anonymous sign-ins, configuring Google OAuth, and deploying the server-only deletion function are explicit release steps. Keep Community Rules disabled until their separate gate is approved.
+- Supabase migrations and SQL policy tests are versioned in the repository. Applying migrations, enabling anonymous sign-ins, configuring Google OAuth, and deploying both server-only account functions are explicit release steps. Keep Community Rules disabled until their separate gate is approved.
 
 ## Implementation order
 

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import {
   getMatchFormat,
@@ -423,7 +423,10 @@ export function SetupPage() {
       },
     };
     const journal: MatchJournal = { definition, events: [] };
-    saveMatch(journal, { persistent: Boolean(user && !isAnonymous) });
+    saveMatch(journal, {
+      persistent: Boolean(user && !isAnonymous),
+      ...(user?.id ? { ownerId: user.id } : {}),
+    });
     navigate(localizedPath(`/match/${id}`, locale));
   }
 
@@ -707,6 +710,62 @@ function RulesSelector({
   sport: MatchDefinition["sport"];
 }) {
   const { t } = useLocale();
+  const [customNumberDrafts, setCustomNumberDrafts] = useState({
+    pointsToWin: String(customRules.pointsToWin),
+    winBy: String(customRules.winBy),
+    maxPoints:
+      customRules.maxPoints === null ? "" : String(customRules.maxPoints),
+  });
+
+  useEffect(() => {
+    setCustomNumberDrafts({
+      pointsToWin: String(customRules.pointsToWin),
+      winBy: String(customRules.winBy),
+      maxPoints:
+        customRules.maxPoints === null ? "" : String(customRules.maxPoints),
+    });
+  }, [customRules.maxPoints, customRules.pointsToWin, customRules.winBy]);
+
+  function updateCustomNumberDraft(
+    field: "pointsToWin" | "winBy" | "maxPoints",
+    value: string,
+  ) {
+    if (!/^\d*$/.test(value)) return;
+    setCustomNumberDrafts((current) => ({ ...current, [field]: value }));
+
+    if (value === "") {
+      if (field === "maxPoints") onRulesChange("maxPoints", null);
+      return;
+    }
+
+    const numericValue = Number(value);
+    if (Number.isInteger(numericValue)) {
+      onRulesChange(field, numericValue);
+    }
+  }
+
+  function commitCustomNumberDraft(
+    field: "pointsToWin" | "winBy" | "maxPoints",
+  ) {
+    const rawValue = customNumberDrafts[field];
+    if (field === "maxPoints" && rawValue === "") {
+      onRulesChange("maxPoints", null);
+      return;
+    }
+
+    if (rawValue === "") {
+      setCustomNumberDrafts((current) => ({
+        ...current,
+        [field]: String(customRules[field]),
+      }));
+      return;
+    }
+
+    const value = Number(rawValue);
+    if (Number.isInteger(value)) {
+      onRulesChange(field, value);
+    }
+  }
 
   if (sport === "tennis") {
     return (
@@ -795,15 +854,17 @@ function RulesSelector({
               <span>{t("pointsToWin")}</span>
               <Input
                 name="custom-points-to-win"
-                type="number"
+                type="text"
                 min="1"
                 max="101"
                 step="1"
                 inputMode="numeric"
-                value={customRules.pointsToWin}
+                pattern="[0-9]*"
+                value={customNumberDrafts.pointsToWin}
                 onChange={(event) =>
-                  onRulesChange("pointsToWin", Number(event.target.value))
+                  updateCustomNumberDraft("pointsToWin", event.target.value)
                 }
+                onBlur={() => commitCustomNumberDraft("pointsToWin")}
                 required
               />
             </Label>
@@ -811,15 +872,17 @@ function RulesSelector({
               <span>{t("winBy")}</span>
               <Input
                 name="custom-win-by"
-                type="number"
+                type="text"
                 min="1"
                 max="10"
                 step="1"
                 inputMode="numeric"
-                value={customRules.winBy}
+                pattern="[0-9]*"
+                value={customNumberDrafts.winBy}
                 onChange={(event) =>
-                  onRulesChange("winBy", Number(event.target.value))
+                  updateCustomNumberDraft("winBy", event.target.value)
                 }
+                onBlur={() => commitCustomNumberDraft("winBy")}
                 required
               />
             </Label>
@@ -827,20 +890,17 @@ function RulesSelector({
               <span>{t("maxPoints")}</span>
               <Input
                 name="custom-max-points"
-                type="number"
+                type="text"
                 min={customRules.pointsToWin}
                 max="101"
                 step="1"
                 inputMode="numeric"
-                value={customRules.maxPoints ?? ""}
+                pattern="[0-9]*"
+                value={customNumberDrafts.maxPoints}
                 onChange={(event) =>
-                  onRulesChange(
-                    "maxPoints",
-                    event.target.value === ""
-                      ? null
-                      : Number(event.target.value),
-                  )
+                  updateCustomNumberDraft("maxPoints", event.target.value)
                 }
+                onBlur={() => commitCustomNumberDraft("maxPoints")}
               />
             </Label>
             <Label>

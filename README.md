@@ -2,7 +2,7 @@
 
 A mobile-first scorekeeper for Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash. It tracks scores, service turns, the active server, receivers, and court positions for singles, doubles, and supported mixed-doubles formats.
 
-V1.0 launched with Badminton and Pickleball. Tennis, Padel, Table tennis, and Squash have separate federation-rule, database, regression, and mobile release checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
+V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, Padel, Table tennis, and Squash, each with separate federation-rule, database, regression, and mobile promotion checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
 
 ## Features
 
@@ -63,7 +63,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all fourteen migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply both atomic sync migrations and the account-deletion migration before deploying the account foundation. Enable anonymous sign-ins for guest matches and deploy the server-only `delete-account` Edge Function. Community Rules schema remains present for compatibility, but its routes and user flows stay disabled. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all sixteen migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply both atomic sync migrations, the account-deletion migration, and both guest-transfer migrations before deploying the account foundation. Enable anonymous sign-ins for guest matches and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Community Rules schema remains present for compatibility, but its routes and user flows stay disabled. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 

@@ -48,7 +48,13 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
-import { loadMatch, removeMatch, saveMatch } from "../../lib/session";
+import {
+  canSyncStoredMatch,
+  getStoredMatchInfo,
+  loadMatch,
+  removeMatch,
+  saveMatch,
+} from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { syncJournal } from "../../lib/sync";
 import {
@@ -234,6 +240,11 @@ export function MatchPage() {
         return;
       }
       const currentMatchId = journal.definition.id;
+      if (!canSyncStoredMatch(currentMatchId, user.id, isAnonymous)) {
+        setSyncState("local");
+        setSyncError("");
+        return;
+      }
       if (
         schemaBlockedMatches.current.has(currentMatchId) &&
         !retrySchemaBlocked
@@ -298,7 +309,17 @@ export function MatchPage() {
       };
     }
     setJournal(next);
-    saveMatch(next, { persistent: Boolean(user && !isAnonymous) });
+    const storedMatchInfo = matchId ? getStoredMatchInfo(matchId) : null;
+    const accountOwnerId = user && !isAnonymous ? user.id : null;
+    const localOwnerId =
+      storedMatchInfo?.persistent && storedMatchInfo.ownerId
+        ? storedMatchInfo.ownerId
+        : (accountOwnerId ?? user?.id);
+    saveMatch(next, {
+      persistent:
+        Boolean(accountOwnerId) || Boolean(storedMatchInfo?.persistent),
+      ...(localOwnerId ? { ownerId: localOwnerId } : {}),
+    });
   }
 
   function rally(team: TeamId) {
@@ -550,8 +571,8 @@ export function MatchPage() {
           </Button>
         ) : null}
         {isAnonymous ? (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-3">
-            <p className="m-0 max-w-[560px] text-sm leading-6 text-muted">
+          <div className={`${styles.matchAuthNotice} mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-3`}>
+            <p className="m-0 max-w-[560px] text-sm leading-6 text-text-muted">
               {t("guestHistoryPrompt")}
             </p>
             <Button

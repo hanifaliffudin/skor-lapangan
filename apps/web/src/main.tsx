@@ -19,7 +19,7 @@ createRoot(document.getElementById("root")!).render(
       <Suspense
         fallback={
           <div
-            className="grid min-h-screen min-h-dvh place-items-center bg-paper px-6 text-sm font-semibold text-muted"
+            className="grid min-h-screen min-h-dvh place-items-center bg-paper px-6 text-sm font-semibold text-text-muted"
             role="status"
             aria-live="polite"
           >

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocale } from "../lib/i18n";
 import { Button } from "@/components/ui/button";
+import styles from "../styles/App.module.css";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -24,11 +25,33 @@ function isIosDevice(): boolean {
   );
 }
 
-export function PwaInstallControl() {
+const installSnoozeKey = "skor-lapangan:install-snoozed-until";
+const installSnoozeDuration = 7 * 24 * 60 * 60 * 1000;
+
+function isInstallSnoozed(): boolean {
+  const snoozedUntil = Number(
+    window.localStorage.getItem(installSnoozeKey) ?? "0",
+  );
+  return Number.isFinite(snoozedUntil) && snoozedUntil > Date.now();
+}
+
+function snoozeInstallPrompt(): void {
+  window.localStorage.setItem(
+    installSnoozeKey,
+    String(Date.now() + installSnoozeDuration),
+  );
+}
+
+export function PwaInstallControl({
+  hasUserEngaged,
+}: {
+  hasUserEngaged: boolean;
+}) {
   const { t } = useLocale();
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(isStandalone);
+  const [snoozed, setSnoozed] = useState(isInstallSnoozed);
   const ios = isIosDevice();
 
   useEffect(() => {
@@ -55,36 +78,72 @@ export function PwaInstallControl() {
       await installPrompt.prompt();
       const choice = await installPrompt.userChoice;
       setInstalled(choice.outcome === "accepted");
+      if (choice.outcome === "dismissed") {
+        snoozeInstallPrompt();
+        setSnoozed(true);
+      }
     } catch {
       setInstallPrompt(null);
     }
     setInstallPrompt(null);
   }
 
-  if (installed) return null;
-
-  if (installPrompt) {
-    return (
-      <div className="mt-[14px]">
-        <Button
-          className="h-12 w-full border border-line-strong bg-surface px-[14px] font-extrabold text-ink hover:bg-[#eef0f2]"
-          type="button"
-          onClick={() => void install()}
-        >
-          {t("installApp")}
-        </Button>
-      </div>
-    );
+  function dismiss() {
+    snoozeInstallPrompt();
+    setSnoozed(true);
   }
 
-  if (!ios) return null;
+  if (installed || snoozed || !hasUserEngaged || (!installPrompt && !ios)) {
+    return null;
+  }
 
   return (
-    <details className="mt-3 border-t border-line text-left [&>summary]:flex [&>summary]:min-h-11 [&>summary]:items-center [&>summary]:text-sm [&>summary]:font-extrabold [&>summary]:text-cobalt-dark">
-      <summary>{t("installToHomeScreen")}</summary>
-      <p className="m-0 px-0 pt-0 pb-3 text-[13px] leading-[1.5] text-text-muted">
-        {t("installOnIosInstructions")}
-      </p>
-    </details>
+    <aside
+      className={styles.installControl}
+      aria-labelledby="install-app-title"
+    >
+      <h2 id="install-app-title" className={styles.installPromptTitle}>
+        {t("installPromptTitle")}
+      </h2>
+      <p className={styles.installPromptBody}>{t("installPromptBody")}</p>
+
+      {installPrompt ? (
+        <div className={styles.installPromptActions}>
+          <Button
+            className={styles.installButton}
+            type="button"
+            onClick={() => void install()}
+          >
+            {t("installApp")}
+          </Button>
+          <Button
+            variant="outline"
+            className={styles.installLaterButton}
+            type="button"
+            onClick={dismiss}
+          >
+            {t("installLater")}
+          </Button>
+        </div>
+      ) : null}
+
+      {ios ? (
+        <details className={styles.installInstructions}>
+          <summary>{t("installToHomeScreen")}</summary>
+          <p>{t("installOnIosInstructions")}</p>
+        </details>
+      ) : null}
+
+      {!installPrompt ? (
+        <Button
+          variant="outline"
+          className={styles.installLaterButton}
+          type="button"
+          onClick={dismiss}
+        >
+          {t("installLater")}
+        </Button>
+      ) : null}
+    </aside>
   );
 }

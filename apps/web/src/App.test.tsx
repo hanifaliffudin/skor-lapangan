@@ -831,6 +831,7 @@ describe("quick start", () => {
     );
     await user.clear(screen.getByLabelText("Points to win"));
     await user.type(screen.getByLabelText("Points to win"), "15");
+    expect(screen.getByLabelText("Points to win")).toHaveValue("15");
     await user.click(screen.getByRole("button", { name: "Start match" }));
 
     expect(screen.getByText("Custom rules for this match only")).toBeVisible();

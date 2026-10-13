@@ -45,8 +45,11 @@ For each new environment, run the SQL files once in filename order using the Sup
 12. `supabase/migrations/20261013120000_atomic_match_sync.sql`
 13. `supabase/migrations/20261013130000_atomic_match_sync_guard.sql`
 14. `supabase/migrations/20261013140000_account_deletion.sql`
+15. `supabase/migrations/20261013150000_guest_match_transfer.sql`
+16. `supabase/migrations/20261014001000_fix_guest_transfer_anonymous_check.sql`
 
 Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema even though V1.0 does not expose those features. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply pending migrations in filename order before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The release-guardrail migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it. The atomic sync migration must be applied before deploying a client that calls `sync_match_journal`.
+The `20261014001000_fix_guest_transfer_anonymous_check.sql` migration updates the guest-transfer RPC to use Supabase's `auth.users.is_anonymous` flag, so apply it before testing OAuth guest transfer on an existing deployment.
 
 ## Forward-only migration recovery and rollback
 
@@ -87,8 +90,8 @@ The atomic sync path reports `stale` and `conflict` instead of overwriting a new
 ## Configure Supabase Auth
 
 - Enable Anonymous Sign-Ins for guest play and sync.
-- Enable Google OAuth and guest identity linking for local and Preview after applying the account-deletion migration. Keep Community Rules disabled until its separate moderation and legal gate passes.
-- Deploy `supabase/functions/delete-account` with `supabase functions deploy delete-account`. The service-role key must remain in the Edge Function environment and must never be added to Vercel client variables.
+- Enable Google OAuth and the guest-match transfer flow for local and Preview after applying the account-deletion and guest-transfer migrations. Keep Community Rules disabled until its separate moderation and legal gate passes.
+- Deploy `supabase/functions/delete-account` with `supabase functions deploy delete-account` and `supabase/functions/transfer-guest-matches` with `supabase functions deploy transfer-guest-matches`. The service-role key must remain in the Edge Function environment and must never be added to Vercel client variables.
 - Set the Anonymous Sign-Ins rate limit in Supabase Auth to 10 sign-ins per IP per hour for the initial public release, if that control is available in the project. The database migration separately limits guest match creation (10/hour), match-state updates (500/hour), event inserts (500/hour), Live Viewer link creation (10/hour), and viewer reads (600/minute per match). Community Rule report limits remain in the schema for V1.1. These are safety ceilings, not expected usage targets.
 - Start with CAPTCHA disabled and monitor Auth errors and report volume. If repeated guest-signup abuse appears, enable Supabase CAPTCHA with hCaptcha, configure its secret in Supabase, the public site key in Vercel, and allowed hostnames in hCaptcha, then verify the challenge on the deployed hostname. The UI already supports a CAPTCHA response when Supabase requests one.
 - Do not assume an authentication provider is active because its environment variables exist. Test it from the deployed app.

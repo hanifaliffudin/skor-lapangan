@@ -127,7 +127,11 @@ const messages = {
     continue: "Lanjut atur pemain",
     guestNote:
       "Pertandingan guest tersimpan di perangkat ini. Jika sinkronisasi server tersedia, data yang tersinkron kedaluwarsa setelah 12 jam tanpa aktivitas (maksimal 24 jam).",
+    installPromptTitle: "Pasang Skor Lapangan",
+    installPromptBody:
+      "Buka lebih cepat dan gunakan layar penuh saat mencatat skor.",
     installApp: "Pasang Skor Lapangan",
+    installLater: "Nanti saja",
     installToHomeScreen: "Tambahkan ke Layar Utama",
     installOnIosInstructions:
       "Di Safari, ketuk Bagikan, lalu pilih Tambahkan ke Layar Utama.",
@@ -542,7 +546,11 @@ const messages = {
     continue: "Continue to player setup",
     guestNote:
       "Guest matches stay on this device. If server sync is available, synced data expires after 12 hours without activity (24-hour maximum).",
+    installPromptTitle: "Install Skor Lapangan",
+    installPromptBody:
+      "Open it faster and use a full screen while keeping score.",
     installApp: "Install Skor Lapangan",
+    installLater: "Not now",
     installToHomeScreen: "Add to Home Screen",
     installOnIosInstructions:
       "In Safari, tap Share, then choose Add to Home Screen.",

@@ -391,7 +391,7 @@
   font-weight: 800;
 }
 
-.optionGroup legend span {
+.optionStep {
   width: 26px;
   height: 26px;
   display: grid;
@@ -486,6 +486,10 @@
   background: var(--cobalt);
 }
 
+.primaryAction {
+  position: relative;
+}
+
 .primaryButton:hover {
   background: var(--cobalt-dark);
 }
@@ -514,26 +518,56 @@
 }
 
 .installControl {
-  margin-top: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 2px solid var(--cobalt);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.installPromptTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.installPromptBody {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .installButton {
-  width: 100%;
   min-height: 48px;
-  padding: 10px 14px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink);
-  font-weight: 800;
+  flex: 1 1 190px;
+  border: 2px solid var(--ink);
+  background: var(--cobalt);
+  color: white;
+  font-weight: 850;
 }
 
 .installButton:hover {
-  background: #eef0f2;
+  background: var(--cobalt-dark);
+}
+
+.installPromptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.installLaterButton {
+  min-height: 48px;
+  flex: 1 1 130px;
+  font-weight: 800;
 }
 
 .installInstructions {
-  margin-top: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
   text-align: left;
 }
@@ -554,6 +588,26 @@
   font-size: 13px;
   line-height: 1.5;
   text-align: left;
+}
+
+.installControl > .installLaterButton {
+  margin-top: 16px;
+  width: 100%;
+}
+
+@media (max-width: 560px) {
+  .installControl {
+    padding: 16px;
+  }
+
+  .installPromptActions {
+    flex-direction: column;
+  }
+
+  .installPromptActions > button,
+  .installControl > .installLaterButton {
+    width: 100%;
+  }
 }
 
 .pwaUpdateNotice {
@@ -652,6 +706,14 @@
   padding: 10px 12px;
   border-left: 4px solid var(--cobalt);
   background: var(--surface);
+}
+
+.matchAuthNotice p {
+  color: var(--text-muted);
+}
+
+.matchAuthNotice {
+  margin-bottom: 16px;
 }
 
 .syncErrorDetail {
@@ -1244,6 +1306,7 @@
 }
 
 .rulesBadge {
+  min-width: 0;
   min-height: 44px;
   padding: 8px 12px;
   display: flex;
@@ -1253,6 +1316,16 @@
   border-radius: 7px;
   background: var(--surface);
   font-size: 12px;
+}
+
+.rulesBadge strong {
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.rulesBadge span {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .rulesBadge[data-source="official"] span {
@@ -2085,7 +2158,11 @@
   }
 
   .homeMain {
-    padding-top: 38px;
+    padding-top: 32px;
+  }
+
+  .hero {
+    margin-bottom: 28px;
   }
 
   .pwaUpdateNotice {
@@ -2137,17 +2214,80 @@
     grid-template-columns: 1fr;
   }
 
+  .optionGroup {
+    margin-bottom: 24px;
+  }
+
+  .optionGroup legend {
+    margin-bottom: 10px;
+  }
+
+  .choiceCard {
+    min-height: 72px;
+    min-width: 0;
+    padding: 12px 14px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .choiceCard[data-selected="true"] {
+    border-width: 3px;
+  }
+
+  .choiceCopy {
+    gap: 3px;
+  }
+
+  .choiceCopy strong {
+    font-size: 16px;
+  }
+
+  .choiceCopy small {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .rulesPageHeading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .matchTopline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .rulesBadge {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .matchAuthNotice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .matchAuthNotice p,
+  .matchAuthNotice button {
+    width: 100%;
+    max-width: none;
   }
 
   .quickStart {
     box-shadow: 5px 5px 0 var(--ink);
   }
 
-  .rulesBadge strong {
-    max-width: 100px;
+  .primaryAction {
+    margin-top: -8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
   }
 
   .teamMeta {
@@ -2185,10 +2325,6 @@
 
   .matchTopline {
     align-items: flex-start;
-  }
-
-  .rulesBadge strong {
-    display: none;
   }
 
   .scoreCard {

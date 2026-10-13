@@ -63,8 +63,8 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 
 ## Account foundation
 
-- [ ] As a guest, click Google login and confirm `linkIdentity` preserves an unexpired match; confirm an expired guest match is not claimed.
-- [ ] Complete OAuth on local and Preview. Confirm the callback updates the session and `claim_guest_matches()` runs once, with a visible claiming state and a recoverable error state.
+- [ ] As a guest, click Google login and confirm the OAuth callback transfers an unexpired guest match through `transfer-guest-matches`; confirm an expired guest match is not transferred or claimed.
+- [ ] Complete OAuth on local and Preview. Confirm the callback updates the session, guest transfer runs when a source guest token exists, and `claim_guest_matches()` runs once for matches already owned by the account, with a visible claiming state and a recoverable error state.
 - [ ] Refresh the same browser and open `/history`; confirm matches are ordered by `updated_at`, show sport/format/status/score/time, and reopen fully only when the local snapshot exists.
 - [ ] Open `/history` and `/account` in English and Indonesian. Verify loading, empty, error, keyboard focus, 44 px controls, and narrow-phone layout.
 - [ ] Sign out and confirm the account menu disappears and a new anonymous guest session is available.
@@ -102,7 +102,7 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 - [ ] Confirm new matches expose only Casual mode and old saved Referee matches remain readable.
 - [ ] Apply the release-guardrail migration, verify the hourly `purge-expired-guest-data` Cron job succeeds, and confirm the job removes expired rows.
 - [ ] Publish the approved privacy notice and terms with real operator and privacy contact details.
-- [ ] Deploy Google OAuth and `delete-account` to Preview first. Promote production only after the account foundation smoke test, deletion test, privacy notice, terms, and owner approval pass.
+- [ ] Deploy Google OAuth, `delete-account`, and `transfer-guest-matches` to Preview first. Promote production only after the account foundation smoke test, guest-transfer test, deletion test, privacy notice, terms, and owner approval pass.
 - [ ] Verify the staged Community Rules read and revoke migrations are applied in the intended order as required by the migration chain. Do not expose Community Rules in the V1.0 interface.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.
 - [ ] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests.

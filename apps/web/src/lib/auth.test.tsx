@@ -231,6 +231,30 @@ describe("guest authentication", () => {
     expect(auth.linkIdentity).not.toHaveBeenCalled();
   });
 
+  it("resets the Google button when the OAuth page is left with Back", async () => {
+    const user = userEvent.setup();
+    auth.getSession.mockResolvedValue({
+      data: { session: auth.guestSession },
+      error: null,
+    });
+    auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null });
+
+    render(<TestApp />);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Sign in with Google" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Working…" }),
+    ).toBeDisabled();
+
+    window.dispatchEvent(new Event("pageshow"));
+
+    expect(
+      await screen.findByRole("button", { name: "Sign in with Google" }),
+    ).toBeEnabled();
+  });
+
   it("uses OAuth sign-in for an existing non-guest session", async () => {
     const user = userEvent.setup();
     const accountSession = {

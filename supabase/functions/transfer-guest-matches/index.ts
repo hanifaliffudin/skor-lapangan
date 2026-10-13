@@ -67,8 +67,15 @@ Deno.serve(async (request) => {
 
   if (guestError || !guestUser)
     return json({ error: "The guest session is no longer available." }, 400);
-  if (!guestUser.is_anonymous)
-    return json({ error: "The source session is not an anonymous guest." }, 400);
+  if (!guestUser.is_anonymous) {
+    // Supabase may upgrade the anonymous user in place when Google is linked.
+    // The matches already belong to the account, so no transfer is needed.
+    if (guestUser.id === accountUser.id) return json({ transferred: 0 });
+    return json(
+      { error: "The source session is not an anonymous guest." },
+      400,
+    );
+  }
 
   const { data, error: transferError } = await adminClient.rpc(
     "transfer_guest_matches",

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MatchJournal } from "@skor-lapangan/scoring-core";
 import {
+  canSyncStoredMatch,
   loadDraft,
   loadMatch,
+  getStoredMatchInfo,
   removeMatch,
   removeAllStoredMatches,
   saveDraft,
@@ -89,6 +91,20 @@ describe("guest session storage", () => {
       ),
     ).toMatchObject({ journal, expiresAt: expect.any(String) });
     expect(loadMatch(journal.definition.id)).toEqual(journal);
+    saveMatch(journal, { ownerId: "account-id", persistent: true });
+    expect(getStoredMatchInfo(journal.definition.id)).toEqual({
+      ownerId: "account-id",
+      persistent: true,
+    });
+    expect(canSyncStoredMatch(journal.definition.id, "guest-id", true)).toBe(
+      false,
+    );
+    expect(canSyncStoredMatch(journal.definition.id, "account-id", false)).toBe(
+      true,
+    );
+    expect(canSyncStoredMatch(journal.definition.id, "other-id", false)).toBe(
+      false,
+    );
     removeMatch(journal.definition.id);
     expect(loadMatch(journal.definition.id)).toBeNull();
   });

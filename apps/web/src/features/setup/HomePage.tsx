@@ -34,6 +34,7 @@ export function HomePage() {
   const isAccount = Boolean(user && !isAnonymous);
   const [sport, setSport] = useState<Sport>("badminton");
   const [format, setFormat] = useState<MatchFormat>("doubles");
+  const [hasUserEngaged, setHasUserEngaged] = useState(false);
   const [savedMatches, setSavedMatches] = useState<MatchJournal[]>(() =>
     listGuestMatches(),
   );
@@ -228,13 +229,19 @@ export function HomePage() {
 
         <section className={styles.quickStart} aria-label={t("quickStart")}>
           <fieldset className={styles.optionGroup}>
-            <legend>{t("chooseSport")}</legend>
+            <legend>
+              <span className={styles.optionStep} aria-hidden="true">
+                1
+              </span>
+              <span>{t("chooseSport")}</span>
+            </legend>
             <RadioGroup
               className={styles.optionGrid}
               name="sport"
               value={sport}
               onValueChange={(value) => {
                 const nextSport = value as Sport;
+                setHasUserEngaged(true);
                 setSport(nextSport);
                 if (format === "mixed_doubles") setFormat("doubles");
               }}
@@ -279,12 +286,20 @@ export function HomePage() {
           </fieldset>
 
           <fieldset className={styles.optionGroup}>
-            <legend>{t("chooseFormat")}</legend>
+            <legend>
+              <span className={styles.optionStep} aria-hidden="true">
+                2
+              </span>
+              <span>{t("chooseFormat")}</span>
+            </legend>
             <RadioGroup
               className={styles.optionGrid}
               name="format"
               value={format}
-              onValueChange={(value) => setFormat(value as MatchFormat)}
+              onValueChange={(value) => {
+                setHasUserEngaged(true);
+                setFormat(value as MatchFormat);
+              }}
             >
               <ChoiceCard
                 checked={format === "singles"}
@@ -309,18 +324,20 @@ export function HomePage() {
             </RadioGroup>
           </fieldset>
 
-          <Button
-            variant="default"
-            className={styles.primaryButton}
-            type="button"
-            onClick={continueToSetup}
-          >
-            {t("continue")} <span aria-hidden="true">→</span>
-          </Button>
+          <div className={styles.primaryAction}>
+            <Button
+              variant="default"
+              className={styles.primaryButton}
+              type="button"
+              onClick={continueToSetup}
+            >
+              {t("continue")} <span aria-hidden="true">→</span>
+            </Button>
+          </div>
           <p className={styles.guestNote}>
             {t(isAccount ? "accountNote" : "guestNote")}
           </p>
-          <PwaInstallControl />
+          <PwaInstallControl hasUserEngaged={hasUserEngaged} />
         </section>
       </main>
 
@@ -349,7 +366,7 @@ function ChoiceCard({ checked, hint, label, value }: ChoiceCardProps) {
     >
       <span className={`${styles.choiceCopy} flex min-w-0 flex-col gap-1`}>
         <strong>{label}</strong>
-        <small>{hint}</small>
+        <small title={hint}>{hint}</small>
       </span>
     </RadioGroupItem>
   );

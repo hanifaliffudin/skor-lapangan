@@ -6,6 +6,7 @@ import { localizedPath, useLocale } from "../lib/i18n";
 import { hcaptchaSiteKey } from "../lib/runtime-config";
 import { isRateLimitError } from "../lib/userError";
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 
 const HCaptchaComponent = lazy(() =>
   import("@hcaptcha/react-hcaptcha").then(({ default: component }) => ({
@@ -108,8 +109,8 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
       </Link>
       <div className="flex items-center gap-[10px] max-[560px]:gap-[5px]">
         {user && !isAnonymous ? (
-          <details className="relative">
-            <summary className="flex min-h-11 max-w-[220px] cursor-pointer list-none items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-extrabold text-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 max-[560px]:max-w-11 max-[560px]:justify-center max-[560px]:px-0">
+          <details className="relative max-[560px]:static">
+            <summary className="flex min-h-11 max-w-[220px] cursor-pointer list-none items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-extrabold text-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 max-[560px]:min-w-14 max-[560px]:max-w-14 max-[560px]:justify-center max-[560px]:px-1 max-[360px]:min-w-12 max-[360px]:max-w-12">
               <span
                 className="grid size-7 shrink-0 place-items-center rounded-full bg-cobalt text-[11px] font-extrabold text-white"
                 aria-hidden="true"
@@ -119,12 +120,32 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               <span className="max-w-[148px] truncate max-[560px]:hidden">
                 {user.email ?? t("account")}
               </span>
+              <ChevronDown
+                className="size-3.5 shrink-0 max-[360px]:size-3"
+                aria-hidden="true"
+              />
               <span className="sr-only">{t("accountMenu")}</span>
             </summary>
-            <div className="absolute top-[calc(100%+8px)] right-0 z-30 grid w-[min(280px,calc(100vw-28px))] gap-1 rounded-lg border border-line-strong bg-surface p-2 shadow-lg">
-              <p className="m-0 px-3 py-2 text-xs leading-5 text-muted">
-                {user.email ?? t("account")}
-              </p>
+            <div className="absolute top-[calc(100%+8px)] right-0 z-30 grid w-[min(280px,calc(100vw-28px))] gap-1 rounded-lg border-2 border-line-strong bg-surface p-2 shadow-[4px_4px_0_var(--ink)] max-[560px]:right-[14px] max-[560px]:w-[min(320px,calc(100vw-28px))]">
+              <div className="mb-1 flex min-w-0 items-center gap-3 border-b border-line px-3 pb-3 pt-1">
+                <span
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-cobalt text-xs font-extrabold text-white"
+                  aria-hidden="true"
+                >
+                  {(user.email?.[0] ?? "G").toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.12em] text-text-muted">
+                    {t("account")}
+                  </p>
+                  <p
+                    className="m-0 truncate text-sm font-bold text-ink"
+                    title={user.email ?? t("account")}
+                  >
+                    {user.email ?? t("account")}
+                  </p>
+                </div>
+              </div>
               <Link
                 className="flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-ink no-underline hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 to={localizedPath("/history", locale)}
@@ -137,22 +158,24 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               >
                 {t("accountSettings")}
               </Link>
-              <Button
-                variant="ghost"
-                type="button"
-                className="min-h-11 justify-start px-3 text-sm font-semibold"
-                disabled={loading || isGoogleBusy}
-                onClick={() => void handleSignOut()}
-              >
-                {action === "signing-out" ? t("signingOut") : t("signOut")}
-              </Button>
+              <div className="mt-1 border-t border-line pt-1">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  className="min-h-11 w-full justify-start px-3 text-sm font-semibold"
+                  disabled={loading || isGoogleBusy}
+                  onClick={() => void handleSignOut()}
+                >
+                  {action === "signing-out" ? t("signingOut") : t("signOut")}
+                </Button>
+              </div>
             </div>
           </details>
         ) : isAccountRoute ? null : (
           <Button
             variant="secondary"
             type="button"
-            className="min-h-11 px-3 text-[13px] font-extrabold max-[560px]:px-2 max-[560px]:text-[11px]"
+            className="min-h-11 px-3 text-[13px] font-extrabold max-[560px]:px-2 max-[560px]:text-[11px] max-[360px]:max-w-[118px] max-[360px]:overflow-hidden max-[360px]:text-ellipsis max-[360px]:whitespace-nowrap max-[360px]:text-[10px]"
             disabled={loading || isGoogleBusy}
             onClick={() => void signInWithGoogle()}
           >
