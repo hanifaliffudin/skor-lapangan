@@ -34,17 +34,23 @@ Environment: local Vite app at `http://127.0.0.1:5173/`, Codex in-app browser, w
 
 Production deployment: `https://skor-lapangan.vercel.app/`. Vercel deployment `EC8iVmge7BrqcRYDs5JY8muBrdPC` reached `READY` after the remote build completed.
 
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Release tests | Pass | Scoring core: 18 tests. Web: 34 tests. Total: 52 passed. |
-| Production build and typecheck | Pass | Local build and forced TypeScript build passed. Vercel also built the production deployment. |
-| English and Indonesian landing pages | Pass | `/` and `/id/` returned 200 with distinct language, title, description, canonical, and hreflang metadata. |
-| Google Tag Manager snippet | Pass | Container `GTM-WXQ5CHST` is present in both landing page documents. Tag firing and GA4 event receipt were not checked in Tag Assistant. |
-| Crawl files and ownership verification | Pass | `robots.txt`, `sitemap.xml`, and `google1e47e11c0010212d.html` returned 200. The sitemap lists `/` and `/id/`. |
-| Deferred routes | Pass | `/rules` and `/id/rules` redirect to their language homepages. `/setup` and `/match/*` return `X-Robots-Tag: noindex, nofollow`. |
-| DNS ownership record | Pending | The supplied TXT value was not returned by a public DNS query. The HTML verification file and meta tag are available for URL-prefix verification. |
+| Check                                  | Result  | Evidence                                                                                                                                          |
+| -------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Release tests                          | Pass    | Scoring core: 18 tests. Web: 34 tests. Total: 52 passed.                                                                                          |
+| Production build and typecheck         | Pass    | Local build and forced TypeScript build passed. Vercel also built the production deployment.                                                      |
+| English and Indonesian landing pages   | Pass    | `/` and `/id/` returned 200 with distinct language, title, description, canonical, and hreflang metadata.                                         |
+| Google Tag Manager snippet             | Pass    | Container `GTM-WXQ5CHST` is present in both landing page documents. Tag firing and GA4 event receipt were not checked in Tag Assistant.           |
+| Crawl files and ownership verification | Pass    | `robots.txt`, `sitemap.xml`, and `google1e47e11c0010212d.html` returned 200. The sitemap lists `/` and `/id/`.                                    |
+| Deferred routes                        | Pass    | `/rules` and `/id/rules` redirect to their language homepages. `/setup` and `/match/*` return `X-Robots-Tag: noindex, nofollow`.                  |
+| DNS ownership record                   | Pending | The supplied TXT value was not returned by a public DNS query. The HTML verification file and meta tag are available for URL-prefix verification. |
 
 The production JavaScript bundle is 569.16 kB (169.20 kB gzip). Vite reports that it exceeds the 500 kB warning threshold; the deployment still built successfully.
+
+## Current working tree verification — 2026-10-13
+
+The web entry route now lazy-loads Home, Setup, Match, and Viewer. Authentication, QR generation, and hCaptcha are deferred until their routes or states need them. The current production build has a 294.47 kB entry JavaScript chunk (93.92 kB gzip) and emits no Vite chunk-size warning. Route and deferred chunks remain separately cacheable; Supabase client code is isolated from the initial entry.
+
+Current local checks passed with `CI=true`: 53 scoring-core tests, 54 web tests, typecheck, production build, repository-wide Prettier check, and `git diff --check`. A Chrome smoke check also reached Home → Setup → Match, awarded a point, and opened and dismissed the end-match dialog on the local development route.
 
 ## Still required before public launch
 

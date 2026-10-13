@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocale } from "../lib/i18n";
-import styles from "../styles/App.module.css";
+import { Button } from "@/components/ui/button";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -65,14 +65,14 @@ export function PwaInstallControl() {
 
   if (installPrompt) {
     return (
-      <div className={styles.installControl}>
-        <button
-          className={styles.installButton}
+      <div className="mt-[14px]">
+        <Button
+          className="h-12 w-full border border-line-strong bg-surface px-[14px] font-extrabold text-ink hover:bg-[#eef0f2]"
           type="button"
           onClick={() => void install()}
         >
           {t("installApp")}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -80,9 +80,11 @@ export function PwaInstallControl() {
   if (!ios) return null;
 
   return (
-    <details className={styles.installInstructions}>
+    <details className="mt-3 border-t border-line text-left [&>summary]:flex [&>summary]:min-h-11 [&>summary]:items-center [&>summary]:text-sm [&>summary]:font-extrabold [&>summary]:text-cobalt-dark">
       <summary>{t("installToHomeScreen")}</summary>
-      <p>{t("installOnIosInstructions")}</p>
+      <p className="m-0 px-0 pt-0 pb-3 text-[13px] leading-[1.5] text-text-muted">
+        {t("installOnIosInstructions")}
+      </p>
     </details>
   );
 }

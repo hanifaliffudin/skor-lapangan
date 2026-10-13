@@ -12,6 +12,8 @@ export type Locale = "id" | "en";
 const messages = {
   id: {
     appName: "Skor Lapangan",
+    language: "Bahasa",
+    loading: "Memuat…",
     seoTitle:
       "Papan Skor Badminton, Pickleball, Tennis & Padel | Skor Lapangan",
     seoDescription:
@@ -21,6 +23,8 @@ const messages = {
       "Catat skor tunggal atau ganda dari ponsel. Pantau servis dan posisi pemain, lalu bagikan skor langsung lewat tautan viewer.",
     chooseSport: "Pilih olahraga",
     chooseFormat: "Pilih format permainan",
+    quickStart: "Mulai cepat",
+    matchControls: "Kontrol pertandingan",
     badminton: "Badminton",
     pickleball: "Pickleball",
     tennis: "Tenis",
@@ -104,7 +108,7 @@ const messages = {
     pwaUpdateButton: "Perbarui aplikasi",
     resumeTitle: "Pertandingan aktif di perangkat ini",
     resumeBody: "Lanjutkan pertandingan tamu yang belum selesai.",
-    resumeMatch: "Lanjutkan pertandingan",
+    resumeMatch: "Lanjutkan",
     deleteMatch: "Hapus",
     deleteMatchPromptGroup: "Konfirmasi hapus pertandingan",
     deleteMatchConfirm:
@@ -149,12 +153,19 @@ const messages = {
     correctionHint:
       "Perubahan ini disimpan sebagai satu event. Posisi server disesuaikan otomatis.",
     save: "Simpan koreksi",
-    endSession: "Akhiri sesi",
+    endSession: "Akhiri pertandingan",
     endTitle: "Akhiri pertandingan ini?",
     endBody:
-      "Salinan di perangkat ini akan dihapus. Data server pertandingan guest tidak dapat diakses setelah kedaluwarsa, dan tautan viewer dicabut.",
+      "Salinan di perangkat ini akan dihapus. Tautan viewer yang ada ikut dicabut. Data guest yang tersinkron tetap tersedia sampai kedaluwarsa.",
+    newMatchPrompt: "Mulai pertandingan baru?",
+    newMatchBody:
+      "Pertandingan selesai ini akan dihapus dari perangkat, lalu tautan viewer yang ada dicabut sebelum kembali ke beranda.",
+    keepPlaying: "Lanjut bermain",
+    backToScore: "Kembali ke skor",
+    goHome: "Ke beranda",
     cancel: "Batal",
-    confirmEnd: "Ya, akhiri",
+    confirmEnd: "Ya, akhiri pertandingan",
+    endFailure: "Pertandingan belum diakhiri. Coba lagi.",
     missingTitle: "Pertandingan tidak ditemukan",
     missingBody: "Sesi mungkin sudah ditutup atau data tab telah dibersihkan.",
     newMatch: "Mulai pertandingan baru",
@@ -169,7 +180,7 @@ const messages = {
     padelAwaitingOrders: "Konfirmasi urutan set ini",
     padelStarStage: "Tahap Star Point",
     padelDeuceStage: "Deuce",
-    officialRules: "Official Rules",
+    officialRules: "Aturan resmi",
     officialHint: "Aturan standar federasi, dikunci",
     rulesTitle: "Aturan pertandingan",
     customRules: "Aturan khusus untuk pertandingan ini",
@@ -195,6 +206,8 @@ const messages = {
     rulesUnofficial: "Tidak resmi",
     capMustBeAtLeastTarget:
       "Batas poin harus sama atau lebih besar dari target.",
+    customRulesInvalid:
+      "Masukkan angka bulat yang valid: target 1–101, selisih 1–10, dan batas poin minimal sama dengan target.",
     saveHistory: "Simpan riwayat dengan Google",
     signOut: "Keluar",
     historySaved: "Riwayat tersimpan",
@@ -253,7 +266,6 @@ const messages = {
     createCommunityRule: "Buat Community Rules",
     backendNotConfigured:
       "Supabase belum dikonfigurasi untuk aturan komunitas.",
-    loading: "Memuat…",
     noCommunityRulesYet: "Belum ada aturan publik",
     noCommunityRulesBody:
       "Aturan komunitas yang dipublikasikan akan muncul di sini.",
@@ -320,6 +332,8 @@ const messages = {
   },
   en: {
     appName: "Skor Lapangan",
+    language: "Language",
+    loading: "Loading…",
     seoTitle:
       "Badminton, Pickleball, Tennis & Padel Scoreboard | Skor Lapangan",
     seoDescription:
@@ -329,6 +343,8 @@ const messages = {
       "Keep score for singles or doubles on your phone. Track service and court positions, then share the live score with a viewer link.",
     chooseSport: "Choose a sport",
     chooseFormat: "Choose match format",
+    quickStart: "Quick start",
+    matchControls: "Match controls",
     badminton: "Badminton",
     pickleball: "Pickleball",
     tennis: "Tennis",
@@ -412,7 +428,7 @@ const messages = {
     pwaUpdateButton: "Update app",
     resumeTitle: "Active matches on this device",
     resumeBody: "Continue an unfinished guest match.",
-    resumeMatch: "Resume match",
+    resumeMatch: "Resume",
     deleteMatch: "Delete",
     deleteMatchPromptGroup: "Confirm match deletion",
     deleteMatchConfirm:
@@ -457,12 +473,19 @@ const messages = {
     correctionHint:
       "This change is stored as one event. Server position adjusts automatically.",
     save: "Save correction",
-    endSession: "End session",
+    endSession: "End match",
     endTitle: "End this match?",
     endBody:
-      "This device copy will be removed. Guest match data becomes inaccessible after expiry, and the viewer link is revoked.",
+      "This device copy will be removed. Any existing viewer link will be revoked. Synced guest data remains available until it expires.",
+    newMatchPrompt: "Start a new match?",
+    newMatchBody:
+      "This finished match will be removed from this device, and any viewer link will be revoked before you return home.",
+    keepPlaying: "Keep playing",
+    backToScore: "Back to score",
+    goHome: "Go to home",
     cancel: "Cancel",
-    confirmEnd: "Yes, end it",
+    confirmEnd: "End this match",
+    endFailure: "The match was not ended. Try again.",
     missingTitle: "Match not found",
     missingBody:
       "The session may have ended or this tab's data may have been cleared.",
@@ -503,6 +526,8 @@ const messages = {
     communityRules: "Community Rules",
     rulesUnofficial: "Unofficial",
     capMustBeAtLeastTarget: "The point cap must be at least the target score.",
+    customRulesInvalid:
+      "Enter whole numbers: target 1–101, win-by 1–10, and a point cap at least as high as the target.",
     saveHistory: "Save history with Google",
     signOut: "Sign out",
     historySaved: "History saved",
@@ -557,7 +582,6 @@ const messages = {
       "Community Rules are unofficial and maintained by their creators. Check them with your group before play; use at your own risk.",
     createCommunityRule: "Create Community Rules",
     backendNotConfigured: "Supabase is not configured for Community Rules.",
-    loading: "Loading…",
     noCommunityRulesYet: "No public rules yet",
     noCommunityRulesBody: "Published Community Rules will appear here.",
     unofficial: "Unofficial",

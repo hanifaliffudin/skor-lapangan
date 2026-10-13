@@ -1,11 +1,26 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { overrideState, type MatchJournal } from "@skor-lapangan/scoring-core";
 import { App } from "./App";
 import { LocaleProvider } from "./lib/i18n";
-import { listGuestMatches, saveMatch } from "./lib/session";
+import { listGuestMatches, loadMatch, saveMatch } from "./lib/session";
+
+async function selectOption(
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  optionName: string,
+) {
+  await user.click(screen.getByLabelText(label));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
 
 function completedMatch(): MatchJournal {
   const createdAt = "2026-10-08T00:00:00.000Z";
@@ -56,6 +71,14 @@ function completedMatch(): MatchJournal {
   );
 }
 
+function activeMatch(id: string): MatchJournal {
+  const match = completedMatch();
+  return {
+    definition: { ...match.definition, id },
+    events: [],
+  };
+}
+
 const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks");
 
 function restoreLocks() {
@@ -64,6 +87,11 @@ function restoreLocks() {
   } else {
     Reflect.deleteProperty(navigator, "locks");
   }
+}
+
+async function renderApp(ui: Parameters<typeof render>[0]) {
+  render(ui);
+  await screen.findByRole("banner");
 }
 
 describe("quick start", () => {
@@ -75,11 +103,12 @@ describe("quick start", () => {
   afterEach(() => {
     cleanup();
     restoreLocks();
+    vi.restoreAllMocks();
   });
 
   it("defaults to English and can switch to Indonesian", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -100,9 +129,9 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
-  it("uses the Indonesian locale for its dedicated URL", () => {
+  it("uses the Indonesian locale for its dedicated URL", async () => {
     window.localStorage.setItem("skor-lapangan:locale", "en");
-    render(
+    await renderApp(
       <MemoryRouter initialEntries={["/id/"]}>
         <LocaleProvider>
           <App />
@@ -119,7 +148,7 @@ describe("quick start", () => {
 
   it("offers mixed doubles and ITF format settings when Tennis is selected", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -136,8 +165,15 @@ describe("quick start", () => {
       await screen.findByText("Tennis format · 2026 ITF rules"),
     ).toBeVisible();
     expect(screen.getAllByText(/Mixed-doubles roles/)).toHaveLength(2);
-    expect(screen.getByText("Match tie-break replaces the set")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Start match" }));
+    await user.click(screen.getByLabelText("Deciding set"));
+    expect(
+      await screen.findByRole("option", {
+        name: "Match tie-break replaces the set",
+      }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+    const startButton = screen.getByRole("button", { name: "Start match" });
+    fireEvent.submit(startButton.closest("form")!);
 
     const saved = listGuestMatches()[0]!;
     expect(saved.definition).toMatchObject({
@@ -155,7 +191,7 @@ describe("quick start", () => {
       tennisLocalRoles: { A: ["woman", "man"], B: ["woman", "man"] },
     });
     await user.click(
-      screen.getByRole("button", { name: /Tennis point won by Team A/ }),
+      await screen.findByRole("button", { name: /Tennis point won by Team A/ }),
     );
     expect(
       screen.getByRole("button", { name: "Correct score: Team A" }),
@@ -165,7 +201,7 @@ describe("quick start", () => {
 
   it("scores a Tennis doubles point with the selected service and receiver order", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -207,7 +243,7 @@ describe("quick start", () => {
 
   it("sets up mixed Padel with FIP options and enforces the deciding receiver", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -226,22 +262,18 @@ describe("quick start", () => {
     expect(
       await screen.findByText("Padel format · 2026 FIP rules"),
     ).toBeVisible();
-    await user.selectOptions(
-      screen.getByLabelText("Game scoring"),
-      "golden_point",
+    await selectOption(user, "Game scoring", "Golden Point");
+    await selectOption(
+      user,
+      "First two set format",
+      "Four-game mini-set · tie-break at 4–4",
     );
-    await user.selectOptions(
-      screen.getByLabelText("First two set format"),
-      "mini",
+    await selectOption(
+      user,
+      "Deciding set",
+      "Match tie-break replaces the set",
     );
-    await user.selectOptions(
-      screen.getByLabelText("Deciding set"),
-      "match_tiebreak",
-    );
-    await user.selectOptions(
-      screen.getByLabelText("Match tie-break target"),
-      "10",
-    );
+    await selectOption(user, "Match tie-break target", "10 points, win by two");
     expect(
       screen.getAllByText(/Mixed receiver-role labels stay on the device/i),
     ).toHaveLength(2);
@@ -286,7 +318,7 @@ describe("quick start", () => {
 
   it("labels club Padel singles as a local variant", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -334,7 +366,7 @@ describe("quick start", () => {
 
   it("starts a keyboard-selected pickleball singles match with the chosen scoring mode", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -372,16 +404,15 @@ describe("quick start", () => {
     );
     expect(screen.getAllByLabelText("Player 1")).toHaveLength(2);
     expect(screen.queryByLabelText("Player 2")).not.toBeInTheDocument();
-    expect(
-      screen.getByLabelText("First server").querySelectorAll("option"),
-    ).toHaveLength(2);
-    expect(screen.getByLabelText("Scoring system")).toHaveValue("side_out");
+    expect(screen.getByLabelText("Scoring system")).toHaveTextContent(
+      "Standard side-out",
+    );
 
     const [playerA, playerB] = screen.getAllByLabelText("Player 1");
     await user.type(playerA!, "Rina");
     await user.type(playerB!, "Bima");
-    await user.selectOptions(screen.getByLabelText("Scoring system"), "rally");
-    await user.selectOptions(screen.getByLabelText("First server"), "B-0");
+    await selectOption(user, "Scoring system", "A point on every rally");
+    await selectOption(user, "First server", "Bima");
     await user.click(screen.getByRole("button", { name: "Start match" }));
 
     const match = listGuestMatches()[0]!.definition;
@@ -395,8 +426,8 @@ describe("quick start", () => {
     expect(match.ruleset?.id).toBe("usap-singles-rally-2026");
   });
 
-  it("starts without requiring an account", () => {
-    render(
+  it("starts without requiring an account", async () => {
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -413,8 +444,8 @@ describe("quick start", () => {
 
   it.each(["/rules", "/rules/new", "/rules/example", "/history"])(
     "redirects deferred feature route %s to the home page",
-    (path) => {
-      render(
+    async (path) => {
+      await renderApp(
         <MemoryRouter initialEntries={[path]}>
           <LocaleProvider>
             <App />
@@ -439,7 +470,7 @@ describe("quick start", () => {
     const match = completedMatch();
     saveMatch({ definition: match.definition, events: [] });
 
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -447,13 +478,135 @@ describe("quick start", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: /Resume match/ }));
+    await user.click(screen.getByRole("button", { name: "Resume" }));
     expect(screen.getByRole("heading", { name: "Game 1" })).toBeVisible();
+  });
+
+  it("shows match context and keeps the match when the end dialog is canceled", async () => {
+    const user = userEvent.setup();
+    const id = "active-end-dialog-match";
+    saveMatch(activeMatch(id));
+
+    await renderApp(
+      <MemoryRouter initialEntries={[`/match/${id}`]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "End match" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Badminton · Doubles");
+    expect(dialog).toHaveTextContent("0:0");
+    expect(
+      screen.getByRole("heading", { name: "End this match?" }),
+    ).toBeVisible();
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(loadMatch(id)).not.toBeNull();
+  });
+
+  it("removes the local match only after the end action is confirmed", async () => {
+    const user = userEvent.setup();
+    const id = "active-confirm-end-match";
+    saveMatch(activeMatch(id));
+
+    await renderApp(
+      <MemoryRouter initialEntries={[`/match/${id}`]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "End match" }));
+    await user.click(screen.getByRole("button", { name: "End this match" }));
+
+    expect(loadMatch(id)).toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Scoreboards for badminton, pickleball, tennis, and padel",
+      }),
+    ).toBeVisible();
+  });
+
+  it("keeps the end dialog open and offers a retry when removal fails", async () => {
+    const user = userEvent.setup();
+    const id = "active-failed-end-match";
+    saveMatch(activeMatch(id));
+    const removeSpy = vi
+      .spyOn(window.localStorage, "removeItem")
+      .mockImplementation(() => {
+        throw new Error("Storage is unavailable.");
+      });
+
+    await renderApp(
+      <MemoryRouter initialEntries={[`/match/${id}`]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "End match" }));
+    await user.click(screen.getByRole("button", { name: "End this match" }));
+
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The match was not ended. Try again.",
+    );
+    expect(loadMatch(id)).not.toBeNull();
+
+    removeSpy.mockRestore();
+    await user.click(screen.getByRole("button", { name: "End this match" }));
+
+    expect(loadMatch(id)).toBeNull();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Scoreboards for badminton, pickleball, tennis, and padel",
+      }),
+    ).toBeVisible();
+  });
+
+  it("shows a temporary status after removing a match from this device", async () => {
+    const user = userEvent.setup();
+    const timeoutSpy = vi.spyOn(window, "setTimeout");
+    const match = completedMatch();
+    saveMatch({
+      definition: { ...match.definition, id: "active-delete-match" },
+      events: [],
+    });
+
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Delete Badminton/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove from device" }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Match removed from this device.",
+    );
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 4000);
+    const dismissToast = timeoutSpy.mock.calls.find(
+      ([, delay]) => delay === 4000,
+    )?.[0];
+    if (typeof dismissToast === "function") act(() => dismissToast());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   it("creates a match with a local-only custom rules snapshot", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -482,7 +635,7 @@ describe("quick start", () => {
 
   it("removes guest rule settings when a custom-rules match completes", async () => {
     const user = userEvent.setup();
-    render(
+    await renderApp(
       <MemoryRouter>
         <LocaleProvider>
           <App />
@@ -500,7 +653,7 @@ describe("quick start", () => {
     await user.type(screen.getByLabelText("Points to win"), "1");
     await user.clear(screen.getByLabelText("Win by"));
     await user.type(screen.getByLabelText("Win by"), "1");
-    await user.selectOptions(screen.getByLabelText("Games per match"), "1");
+    await selectOption(user, "Games per match", "One game");
     await user.click(screen.getByRole("button", { name: "Start match" }));
     await user.click(
       screen.getByRole("button", { name: "+ Point for Team A" }),
@@ -513,14 +666,45 @@ describe("quick start", () => {
     expect(saved.finalState?.status).toBe("complete");
   });
 
-  it("disables score correction after the match is complete", () => {
+  it("rejects invalid custom scoring values before starting a match", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Continue to player setup" }),
+    );
+    await user.click(
+      screen.getByRole("radio", { name: /Custom rules for this match/ }),
+    );
+    await user.clear(screen.getByLabelText("Points to win"));
+    await user.type(screen.getByLabelText("Points to win"), "21");
+    await user.clear(screen.getByLabelText("Point cap (optional)"));
+    await user.type(screen.getByLabelText("Point cap (optional)"), "10");
+    const startButton = screen.getByRole("button", { name: "Start match" });
+    fireEvent.submit(startButton.closest("form")!);
+
+    expect(
+      screen.getByText("The point cap must be at least the target score."),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Who is playing?" }),
+    ).toBeVisible();
+  });
+
+  it("disables score correction after the match is complete", async () => {
     const match = completedMatch();
     window.sessionStorage.setItem(
       `skor-lapangan:match:${match.definition.id}`,
       JSON.stringify(match),
     );
 
-    render(
+    await renderApp(
       <MemoryRouter initialEntries={[`/match/${match.definition.id}`]}>
         <LocaleProvider>
           <App />
@@ -564,7 +748,7 @@ describe("quick start", () => {
       value: { request } as unknown as LockManager,
     });
 
-    render(
+    await renderApp(
       <MemoryRouter initialEntries={[`/match/${match.definition.id}`]}>
         <LocaleProvider>
           <App />

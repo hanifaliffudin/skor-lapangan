@@ -46,19 +46,23 @@ function isViewerState(value: unknown): value is MatchState {
       [0, 1].includes(sides.right as number)
     );
   };
+  const nonNegativeInteger = (number: unknown): number is number =>
+    Number.isInteger(number) && (number as number) >= 0;
   const scoreIsValid = (score: unknown) => {
     if (!score || typeof score !== "object") return false;
     const value = score as { A?: unknown; B?: unknown };
-    return Number.isInteger(value.A) && Number.isInteger(value.B);
+    return nonNegativeInteger(value.A) && nonNegativeInteger(value.B);
   };
   const tennisIsValid =
     state.sport !== "tennis" ||
     Boolean(
       tennisState &&
-      Number.isInteger(tennisState.setNumber) &&
+      nonNegativeInteger(tennisState.setNumber) &&
+      tennisState.setNumber >= 1 &&
       scoreIsValid(tennisState.setsWon) &&
       scoreIsValid(tennisState.gamesInSet) &&
       scoreIsValid(tennisState.pointScore) &&
+      nonNegativeInteger(tennisState.gamePointCount) &&
       (tennisState.tieBreakScore === null ||
         scoreIsValid(tennisState.tieBreakScore)) &&
       (tennisState.phase === "game" ||
@@ -73,10 +77,12 @@ function isViewerState(value: unknown): value is MatchState {
     state.sport !== "padel" ||
     Boolean(
       padelState &&
-      Number.isInteger(padelState.setNumber) &&
+      nonNegativeInteger(padelState.setNumber) &&
+      padelState.setNumber >= 1 &&
       scoreIsValid(padelState.setsWon) &&
       scoreIsValid(padelState.gamesInSet) &&
       scoreIsValid(padelState.pointScore) &&
+      nonNegativeInteger(padelState.gamePointCount) &&
       (padelState.tieBreakScore === null ||
         scoreIsValid(padelState.tieBreakScore)) &&
       ["advantage", "star_point", "golden_point"].includes(
@@ -105,13 +111,10 @@ function isViewerState(value: unknown): value is MatchState {
       state.format === "doubles" ||
       ((state.sport === "tennis" || state.sport === "padel") &&
         state.format === "mixed_doubles")) &&
-    typeof state.gameNumber === "number" &&
-    Boolean(
-      points && Number.isInteger(points.A) && Number.isInteger(points.B),
-    ) &&
-    Boolean(
-      gamesWon && Number.isInteger(gamesWon.A) && Number.isInteger(gamesWon.B),
-    ) &&
+    nonNegativeInteger(state.gameNumber) &&
+    state.gameNumber >= 1 &&
+    scoreIsValid(points) &&
+    scoreIsValid(gamesWon) &&
     isTeamId(state.servingTeam) &&
     (state.currentServer === 0 || state.currentServer === 1) &&
     (state.serverNumber === null ||
@@ -123,6 +126,13 @@ function isViewerState(value: unknown): value is MatchState {
     (state.status === "active" || state.status === "complete") &&
     (state.winner === null || isTeamId(state.winner)) &&
     Array.isArray(state.completedGames) &&
+    state.completedGames.every(
+      (game) =>
+        Boolean(game) &&
+        typeof game === "object" &&
+        isTeamId((game as { winner?: unknown }).winner) &&
+        scoreIsValid((game as { score?: unknown }).score),
+    ) &&
     tennisIsValid &&
     padelIsValid
   );
@@ -222,30 +232,42 @@ export function ViewerPage() {
 
   const state = snapshot?.currentState;
   const definition = state ? viewerDefinition(state) : null;
+  const updatedTime = snapshot
+    ? new Date(snapshot.updatedAt).toLocaleTimeString(
+        locale === "id" ? "id-ID" : "en-US",
+        { hour: "2-digit", minute: "2-digit" },
+      )
+    : "";
 
   return (
-    <div className={styles.matchShell}>
+    <div className="min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <AppHeader compact />
-      <main className={styles.viewerMain}>
-        <p className={styles.eyebrow}>{t("liveViewer")}</p>
-        <h1>{t("viewerTitle")}</h1>
+      <main className="mx-auto w-full max-w-[720px] px-[clamp(18px,5vw,40px)] pt-8 pb-16">
+        <p className="mb-3 text-xs font-black tracking-[0.12em] text-cobalt-dark uppercase">
+          {t("liveViewer")}
+        </p>
+        <h1 className="mb-3 text-[clamp(28px,6vw,42px)] tracking-[-0.04em]">
+          {t("viewerTitle")}
+        </h1>
         {loading ? <p role="status">{t("viewerLoading")}</p> : null}
         {error && !snapshot ? (
-          <section className={styles.emptyState}>
+          <section className="mx-auto w-full max-w-[580px] px-[22px] py-20 text-center [&>p]:mx-auto [&>p]:max-w-[600px] [&>p]:text-[clamp(17px,3vw,21px)] [&>p]:leading-[1.55] [&>p]:text-text-muted">
             <h2>{t("viewerUnavailable")}</h2>
             <p>{t("viewerUnavailableBody")}</p>
           </section>
         ) : null}
         {snapshot && state && definition ? (
           <>
-            <p className={styles.viewerMeta} role="status">
+            <p
+              className="mb-4 text-[13px] leading-[1.45] text-text-muted"
+              role="status"
+            >
               {stale ? t("viewerStale") : t("viewerLive")} · {t(snapshot.sport)}{" "}
               ·{" "}
               {state.sport === "padel" && getMatchFormat(state) === "singles"
                 ? t("padelLocalVariant")
                 : t(getMatchFormat(state))}{" "}
-              · {t("updatedAt")}{" "}
-              {new Date(snapshot.updatedAt).toLocaleTimeString()}
+              · {t("updatedAt")} {updatedTime}
             </p>
             <section className={styles.scoreboard} aria-label={t("score")}>
               {(["A", "B"] as const).map((team) => (
@@ -270,7 +292,7 @@ export function ViewerPage() {
                       </small>
                     ) : null}
                   </div>
-                  <strong className={styles.viewerScore}>
+                  <strong className="block py-3 text-center text-[clamp(48px,12vw,76px)] leading-none font-black tabular-nums text-ink">
                     {state.tennis
                       ? tennisScoreLabel(state, team, locale)
                       : state.padel
@@ -282,7 +304,9 @@ export function ViewerPage() {
             </section>
             <Court definition={definition} state={state} />
             {state.status === "complete" ? (
-              <p className={styles.viewerMeta}>{t("matchComplete")}</p>
+              <p className="mb-4 text-[13px] leading-[1.45] text-text-muted">
+                {t("matchComplete")}
+              </p>
             ) : null}
           </>
         ) : null}

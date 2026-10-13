@@ -6,6 +6,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src"],

@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,7 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: "prompt",
       injectRegister: false,
@@ -21,6 +23,11 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: {
+    alias: {
+      "@": resolve(projectRoot, "src"),
+    },
+  },
   build: {
     rollupOptions: {
       input: {

@@ -1,9 +1,14 @@
+# Keep dependency output and generated reports out of the repository-wide check.
 node_modules
 dist
 coverage
-pnpm-lock.yaml
 
-# Preserve repository and coding-agent instructions verbatim.
+# Generated ownership and local Supabase metadata are not source documents.
+apps/web/public/google1e47e11c0010212d.html
+supabase/.temp/
+
+# Repository and skill instructions use their own formatting conventions.
 AGENTS.md
 antislop.md
 skills/
+pnpm-lock.yaml

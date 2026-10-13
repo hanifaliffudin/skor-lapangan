@@ -2,16 +2,29 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   deriveJournal,
+  padelScoreLabel,
+  tennisScoreLabel,
   type MatchFormat,
   type MatchJournal,
+  type MatchState,
   type Sport,
+  type TeamId,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
 import { PwaInstallControl } from "../../components/PwaInstallControl";
 import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { listGuestMatches, removeMatch, saveDraft } from "../../lib/session";
+import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Check, Trash2 } from "lucide-react";
 import styles from "../../styles/App.module.css";
+
+function pointLabel(state: MatchState, team: TeamId, locale: "en" | "id") {
+  if (state.tennis) return tennisScoreLabel(state, team, locale);
+  if (state.padel) return padelScoreLabel(state, team, locale);
+  return String(state.points[team]);
+}
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -22,10 +35,17 @@ export function HomePage() {
     listGuestMatches(),
   );
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [hasDeletedMatch, setHasDeletedMatch] = useState(false);
+  const [showDeleteToast, setShowDeleteToast] = useState(false);
   const activeMatches = savedMatches.filter(
     (journal) => deriveJournal(journal).state.status === "active",
   );
+
+  useEffect(() => {
+    if (!showDeleteToast) return;
+
+    const timeoutId = window.setTimeout(() => setShowDeleteToast(false), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [showDeleteToast]);
 
   useEffect(() => {
     const canonicalUrl =
@@ -67,13 +87,13 @@ export function HomePage() {
       matches.filter((match) => match.definition.id !== matchId),
     );
     setPendingDeleteId(null);
-    setHasDeletedMatch(true);
+    setShowDeleteToast(true);
   }
 
   return (
-    <div className={styles.pageShell}>
+    <div className="min-h-screen min-h-dvh bg-paper pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <AppHeader />
-      <main className={styles.homeMain}>
+      <main className="mx-auto w-full max-w-[760px] px-[clamp(18px,5vw,40px)] pt-[clamp(44px,8vw,84px)] pb-14 max-[560px]:pt-[38px]">
         <PwaUpdateNotice />
         <section className={styles.hero} aria-labelledby="hero-title">
           <p className={styles.eyebrow}>
@@ -93,156 +113,197 @@ export function HomePage() {
               <p>{t("resumeBody")}</p>
             </div>
             <div className={styles.resumeList}>
-              {activeMatches.map((journal) => (
-                <article
-                  className={styles.resumeMatch}
-                  key={journal.definition.id}
-                  aria-label={`${t(journal.definition.sport)} ${t(journal.definition.format ?? "doubles")}`}
-                >
-                  <span>
-                    {t(journal.definition.sport)} ·{" "}
-                    {t(journal.definition.format ?? "doubles")}
-                  </span>
-                  <div className={styles.resumeMatchActions}>
-                    <button
-                      className={styles.resumeButton}
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          localizedPath(
-                            `/match/${journal.definition.id}`,
-                            locale,
-                          ),
-                        )
-                      }
-                    >
-                      {t("resumeMatch")}
-                    </button>
-                    <button
-                      className={styles.deleteMatchButton}
-                      type="button"
-                      aria-label={`${t("deleteMatch")} ${t(journal.definition.sport)}`}
-                      onClick={() => {
-                        setHasDeletedMatch(false);
-                        setPendingDeleteId(journal.definition.id);
-                      }}
-                    >
-                      {t("deleteMatch")}
-                    </button>
-                  </div>
-                  {pendingDeleteId === journal.definition.id ? (
+              {activeMatches.map((journal) => {
+                const state = deriveJournal(journal).state;
+                const serverName =
+                  journal.definition.teams[state.servingTeam].players[
+                    state.currentServer
+                  ]?.name || t(state.servingTeam === "A" ? "teamA" : "teamB");
+
+                return (
+                  <article
+                    className={styles.resumeMatch}
+                    key={journal.definition.id}
+                    aria-label={`${t(journal.definition.sport)} ${t(journal.definition.format ?? "doubles")}`}
+                  >
+                    <span className={styles.resumeMatchTitle}>
+                      {t(journal.definition.sport)} ·{" "}
+                      {t(journal.definition.format ?? "doubles")}
+                    </span>
                     <div
-                      className={styles.deleteMatchConfirm}
+                      className={styles.resumeMatchScore}
                       role="group"
-                      aria-label={t("deleteMatchPromptGroup")}
+                      aria-label={t("score")}
                     >
-                      <p>{t("deleteMatchConfirm")}</p>
-                      <div className={styles.deleteMatchConfirmActions}>
-                        <button
-                          className={styles.deleteMatchConfirmButton}
-                          type="button"
-                          onClick={() =>
-                            confirmDeleteMatch(journal.definition.id)
-                          }
-                        >
-                          {t("confirmDeleteMatch")}
-                        </button>
-                        <button
-                          className={styles.deleteMatchCancelButton}
-                          type="button"
-                          onClick={() => setPendingDeleteId(null)}
-                        >
-                          {t("cancel")}
-                        </button>
-                      </div>
+                      <span>{t("teamA")}</span>
+                      <strong>
+                        {pointLabel(state, "A", locale)}
+                        <span aria-hidden="true">:</span>
+                        {pointLabel(state, "B", locale)}
+                      </strong>
+                      <span>{t("teamB")}</span>
                     </div>
-                  ) : null}
-                </article>
-              ))}
+                    <span className={styles.resumeMatchServer}>
+                      <span
+                        className={styles.resumeServerIndicator}
+                        aria-hidden="true"
+                      />
+                      <span className={styles.resumeMatchServerName}>
+                        {t("server")}: {serverName}
+                      </span>
+                    </span>
+                    <div className={styles.resumeMatchActions}>
+                      <Button
+                        variant="default"
+                        className={styles.resumeButton}
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            localizedPath(
+                              `/match/${journal.definition.id}`,
+                              locale,
+                            ),
+                          )
+                        }
+                      >
+                        {t("resumeMatch")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={styles.deleteMatchButton}
+                        type="button"
+                        aria-label={`${t("deleteMatch")} ${t(journal.definition.sport)}`}
+                        title={`${t("deleteMatch")} ${t(journal.definition.sport)}`}
+                        onClick={() => {
+                          setShowDeleteToast(false);
+                          setPendingDeleteId(journal.definition.id);
+                        }}
+                      >
+                        <Trash2 aria-hidden="true" size={18} />
+                      </Button>
+                    </div>
+                    {pendingDeleteId === journal.definition.id ? (
+                      <div
+                        className={styles.deleteMatchConfirm}
+                        role="group"
+                        aria-label={t("deleteMatchPromptGroup")}
+                      >
+                        <p>{t("deleteMatchConfirm")}</p>
+                        <div className={styles.deleteMatchConfirmActions}>
+                          <Button
+                            variant="default"
+                            className={styles.deleteMatchConfirmButton}
+                            type="button"
+                            onClick={() =>
+                              confirmDeleteMatch(journal.definition.id)
+                            }
+                          >
+                            {t("confirmDeleteMatch")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className={styles.deleteMatchCancelButton}
+                            type="button"
+                            onClick={() => setPendingDeleteId(null)}
+                          >
+                            {t("cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
           </section>
         ) : null}
-        <p className={styles.deleteAnnouncement} role="status" aria-live="polite">
-          {hasDeletedMatch ? t("matchDeleted") : ""}
-        </p>
+        {showDeleteToast ? (
+          <div className={styles.deleteToast} role="status" aria-atomic="true">
+            <Check aria-hidden="true" size={18} />
+            <span>{t("matchDeleted")}</span>
+          </div>
+        ) : null}
 
-        <section className={styles.quickStart} aria-label="Quick start">
+        <section className={styles.quickStart} aria-label={t("quickStart")}>
           <fieldset className={styles.optionGroup}>
             <legend>{t("chooseSport")}</legend>
-            <div className={styles.optionGrid}>
+            <RadioGroup
+              className={styles.optionGrid}
+              name="sport"
+              value={sport}
+              onValueChange={(value) => {
+                const nextSport = value as Sport;
+                setSport(nextSport);
+                if (format === "mixed_doubles") setFormat("doubles");
+              }}
+            >
               <ChoiceCard
                 checked={sport === "badminton"}
+                value="badminton"
                 label={t("badminton")}
                 hint={t("badmintonHint")}
-                name="sport"
-                onChange={() => {
-                  setSport("badminton");
-                  if (format === "mixed_doubles") setFormat("doubles");
-                }}
               />
               <ChoiceCard
                 checked={sport === "pickleball"}
+                value="pickleball"
                 label={t("pickleball")}
                 hint={t("pickleballHint")}
-                name="sport"
-                onChange={() => {
-                  setSport("pickleball");
-                  if (format === "mixed_doubles") setFormat("doubles");
-                }}
               />
               <ChoiceCard
                 checked={sport === "tennis"}
+                value="tennis"
                 label={t("tennis")}
                 hint={t("tennisHint")}
-                name="sport"
-                onChange={() => setSport("tennis")}
               />
               <ChoiceCard
                 checked={sport === "padel"}
+                value="padel"
                 label={t("padel")}
                 hint={t("padelHint")}
-                name="sport"
-                onChange={() => setSport("padel")}
               />
-            </div>
+            </RadioGroup>
           </fieldset>
 
           <fieldset className={styles.optionGroup}>
             <legend>{t("chooseFormat")}</legend>
-            <div className={styles.optionGrid}>
+            <RadioGroup
+              className={styles.optionGrid}
+              name="format"
+              value={format}
+              onValueChange={(value) => setFormat(value as MatchFormat)}
+            >
               <ChoiceCard
                 checked={format === "singles"}
+                value="singles"
                 label={t(sport === "padel" ? "padelSingles" : "singles")}
                 hint={t(sport === "padel" ? "padelSinglesHint" : "singlesHint")}
-                name="format"
-                onChange={() => setFormat("singles")}
               />
               <ChoiceCard
                 checked={format === "doubles"}
+                value="doubles"
                 label={t("doubles")}
                 hint={t("doublesHint")}
-                name="format"
-                onChange={() => setFormat("doubles")}
               />
               {sport === "tennis" || sport === "padel" ? (
                 <ChoiceCard
                   checked={format === "mixed_doubles"}
+                  value="mixed_doubles"
                   label={t("mixedDoubles")}
                   hint={t("mixedDoublesHint")}
-                  name="format"
-                  onChange={() => setFormat("mixed_doubles")}
                 />
               ) : null}
-            </div>
+            </RadioGroup>
           </fieldset>
 
-          <button
+          <Button
+            variant="default"
             className={styles.primaryButton}
             type="button"
             onClick={continueToSetup}
           >
             {t("continue")} <span aria-hidden="true">→</span>
-          </button>
+          </Button>
           <p className={styles.guestNote}>{t("guestNote")}</p>
           <PwaInstallControl />
         </section>
@@ -260,19 +321,21 @@ interface ChoiceCardProps {
   checked: boolean;
   hint: string;
   label: string;
-  name: string;
-  onChange: () => void;
+  value: string;
 }
 
-function ChoiceCard({ checked, hint, label, name, onChange }: ChoiceCardProps) {
+function ChoiceCard({ checked, hint, label, value }: ChoiceCardProps) {
   return (
-    <label className={styles.choiceCard} data-selected={checked}>
-      <input type="radio" checked={checked} name={name} onChange={onChange} />
-      <span className={styles.choiceCopy}>
+    <RadioGroupItem
+      className={styles.choiceCard}
+      value={value}
+      aria-label={`${label} ${hint}`}
+      data-selected={checked}
+    >
+      <span className={`${styles.choiceCopy} flex min-w-0 flex-col gap-1`}>
         <strong>{label}</strong>
         <small>{hint}</small>
       </span>
-      <span className={styles.radioVisual} aria-hidden="true" />
-    </label>
+    </RadioGroupItem>
   );
 }

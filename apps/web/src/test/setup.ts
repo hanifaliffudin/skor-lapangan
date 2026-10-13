@@ -2,6 +2,13 @@ import "@testing-library/jest-dom/vitest";
 
 window.scrollTo = () => undefined;
 
+if (typeof window.PointerEvent !== "function") {
+  Object.defineProperty(window, "PointerEvent", {
+    configurable: true,
+    value: class extends MouseEvent {},
+  });
+}
+
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
 

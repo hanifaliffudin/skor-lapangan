@@ -1,31 +1,31 @@
 import { useEffect, useState } from "react";
 import { useLocale } from "../lib/i18n";
+import { Button } from "@/components/ui/button";
 import {
   applyPwaUpdate,
   isPwaUpdateAvailable,
   subscribeToPwaUpdate,
 } from "../lib/pwa";
-import styles from "../styles/App.module.css";
 
 export function PwaUpdateNotice() {
   const { t } = useLocale();
-  const [updateAvailable, setUpdateAvailable] = useState(
-    isPwaUpdateAvailable,
-  );
+  const [updateAvailable, setUpdateAvailable] = useState(isPwaUpdateAvailable);
   const [updating, setUpdating] = useState(false);
 
-  useEffect(
-    () => subscribeToPwaUpdate(() => setUpdateAvailable(true)),
-    [],
-  );
+  useEffect(() => subscribeToPwaUpdate(() => setUpdateAvailable(true)), []);
 
   if (!updateAvailable) return null;
 
   return (
-    <aside className={styles.pwaUpdateNotice} aria-live="polite">
-      <p>{t("pwaUpdateReady")}</p>
-      <button
-        className={styles.pwaUpdateButton}
+    <aside
+      className="mb-[26px] flex items-center justify-between gap-3 border border-line-strong bg-surface p-3 max-[560px]:flex-col max-[560px]:items-stretch"
+      aria-live="polite"
+    >
+      <p className="m-0 text-sm leading-[1.45] text-ink">
+        {t("pwaUpdateReady")}
+      </p>
+      <Button
+        className="h-11 shrink-0 border border-line-strong bg-lime px-[14px] font-extrabold text-ink hover:bg-[#84d84c] max-[560px]:w-full"
         type="button"
         disabled={updating}
         onClick={() => {
@@ -34,7 +34,7 @@ export function PwaUpdateNotice() {
         }}
       >
         {updating ? t("working") : t("pwaUpdateButton")}
-      </button>
+      </Button>
     </aside>
   );
 }

@@ -250,4 +250,34 @@ describe("live viewer", () => {
 
     expect(await screen.findByText("Viewer link unavailable")).toBeVisible();
   });
+
+  it("rejects a public snapshot with negative scores", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "badminton",
+          status: "active",
+          current_state: {
+            ...viewerState,
+            points: { A: -1, B: 4 },
+          },
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/view/invalid-score"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Viewer link unavailable")).toBeVisible();
+  });
 });

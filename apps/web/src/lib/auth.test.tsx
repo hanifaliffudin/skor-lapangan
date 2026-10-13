@@ -65,6 +65,12 @@ vi.mock("./supabase", () => ({
   },
 }));
 
+vi.mock("./runtime-config", () => ({
+  get hcaptchaSiteKey() {
+    return auth.hcaptchaSiteKey;
+  },
+}));
+
 function AuthState() {
   const { user, isAnonymous } = useAuth();
   return <output>{user ? `${user.id}:${isAnonymous}` : "no-session"}</output>;

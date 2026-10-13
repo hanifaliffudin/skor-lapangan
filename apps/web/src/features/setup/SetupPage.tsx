@@ -21,6 +21,11 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { loadDraft, saveDraft, saveMatch } from "../../lib/session";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SelectControl } from "@/components/ui/select-control";
 import styles from "../../styles/App.module.css";
 
 const defaultTennisRules: TennisRules = {
@@ -37,6 +42,19 @@ const defaultPadelRules: PadelRules = {
   finalSetScoring: "standard",
   matchTieBreakPoints: 7,
 };
+
+function hasValidCustomRules(rules: ScoringRules): boolean {
+  const validInteger = (value: number, min: number, max: number) =>
+    Number.isInteger(value) && value >= min && value <= max;
+
+  return (
+    validInteger(rules.pointsToWin, 1, 101) &&
+    validInteger(rules.winBy, 1, 10) &&
+    (rules.maxPoints === null ||
+      (validInteger(rules.maxPoints, 1, 101) &&
+        rules.maxPoints >= rules.pointsToWin))
+  );
+}
 
 export function SetupPage() {
   const draft = loadDraft();
@@ -126,12 +144,13 @@ export function SetupPage() {
     event.preventDefault();
     if (!draft) return;
 
-    if (
-      ruleSource !== "official" &&
-      customRules.maxPoints !== null &&
-      customRules.maxPoints < customRules.pointsToWin
-    ) {
-      setRuleError(t("capMustBeAtLeastTarget"));
+    if (ruleSource !== "official" && !hasValidCustomRules(customRules)) {
+      setRuleError(
+        customRules.maxPoints !== null &&
+          customRules.maxPoints < customRules.pointsToWin
+          ? t("capMustBeAtLeastTarget")
+          : t("customRulesInvalid"),
+      );
       return;
     }
     if (
@@ -293,16 +312,17 @@ export function SetupPage() {
   }
 
   return (
-    <div className={styles.pageShell}>
+    <div className="min-h-screen min-h-dvh bg-paper pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <AppHeader compact />
-      <main className={styles.setupMain}>
-        <button
+      <main className="mx-auto w-full max-w-[720px] px-[clamp(18px,5vw,40px)] pt-8 pb-16">
+        <Button
+          variant="outline"
           className={styles.textButton}
           type="button"
           onClick={() => navigate(localizedPath("/", locale))}
         >
           <span aria-hidden="true">←</span> {t("back")}
-        </button>
+        </Button>
 
         <div className={styles.sectionHeading}>
           <p className={styles.eyebrow}>
@@ -440,9 +460,9 @@ export function SetupPage() {
               />
             )
           ) : (
-            <label className={styles.selectField}>
+            <Label className={styles.selectField}>
               <span>{t("firstServer")}</span>
-              <select
+              <SelectControl
                 name="first-server"
                 value={firstServer}
                 onChange={(event) => setFirstServer(event.target.value)}
@@ -461,13 +481,13 @@ export function SetupPage() {
                     </option>
                   );
                 })}
-              </select>
-            </label>
+              </SelectControl>
+            </Label>
           )}
 
-          <button className={styles.primaryButton} type="submit">
+          <Button className={styles.primaryButton} type="submit">
             {t("startMatch")} <span aria-hidden="true">→</span>
-          </button>
+          </Button>
           {ruleError ? (
             <p className={styles.formError} role="alert">
               {ruleError}
@@ -535,45 +555,42 @@ function RulesSelector({
   return (
     <fieldset className={styles.rulesGroup}>
       <legend>{t("rulesTitle")}</legend>
-      <div className={styles.rulesChoices}>
-        <label
+      <RadioGroup
+        className={styles.rulesChoices}
+        name="rules-source"
+        value={ruleSource}
+        onValueChange={(value) =>
+          onRuleSourceChange(value as "official" | "guest_custom")
+        }
+      >
+        <RadioGroupItem
           className={styles.ruleChoice}
           data-selected={ruleSource === "official"}
+          value="official"
         >
-          <input
-            type="radio"
-            name="rules-source"
-            checked={ruleSource === "official"}
-            onChange={() => onRuleSourceChange("official")}
-          />
           <span>
             <strong>{t("officialRules")}</strong>
             <small>{t("officialLocked")}</small>
           </span>
-        </label>
-        <label
+        </RadioGroupItem>
+        <RadioGroupItem
           className={styles.ruleChoice}
           data-selected={ruleSource === "guest_custom"}
+          value="guest_custom"
         >
-          <input
-            type="radio"
-            name="rules-source"
-            checked={ruleSource === "guest_custom"}
-            onChange={() => onRuleSourceChange("guest_custom")}
-          />
           <span>
             <strong>{t("customRules")}</strong>
             <small>{t("rulesUnofficial")}</small>
           </span>
-        </label>
-      </div>
+        </RadioGroupItem>
+      </RadioGroup>
 
       {ruleSource === "official" &&
       sport === "pickleball" &&
       format === "singles" ? (
-        <label className={styles.selectField}>
+        <Label className={styles.selectField}>
           <span>{t("scoringMode")}</span>
-          <select
+          <SelectControl
             name="pickleball-singles-scoring-mode"
             value={officialScoringMode}
             onChange={(event) =>
@@ -582,49 +599,55 @@ function RulesSelector({
           >
             <option value="side_out">{t("sideOutStandard")}</option>
             <option value="rally">{t("rallyScoring")}</option>
-          </select>
-        </label>
+          </SelectControl>
+        </Label>
       ) : null}
 
       {ruleSource === "guest_custom" ? (
         <div className={styles.ruleEditor}>
           <p>{t("customRulesNotice")}</p>
           <div className={styles.ruleFields}>
-            <label>
+            <Label>
               <span>{t("pointsToWin")}</span>
-              <input
+              <Input
                 name="custom-points-to-win"
                 type="number"
                 min="1"
                 max="101"
+                step="1"
+                inputMode="numeric"
                 value={customRules.pointsToWin}
                 onChange={(event) =>
                   onRulesChange("pointsToWin", Number(event.target.value))
                 }
                 required
               />
-            </label>
-            <label>
+            </Label>
+            <Label>
               <span>{t("winBy")}</span>
-              <input
+              <Input
                 name="custom-win-by"
                 type="number"
                 min="1"
                 max="10"
+                step="1"
+                inputMode="numeric"
                 value={customRules.winBy}
                 onChange={(event) =>
                   onRulesChange("winBy", Number(event.target.value))
                 }
                 required
               />
-            </label>
-            <label>
+            </Label>
+            <Label>
               <span>{t("maxPoints")}</span>
-              <input
+              <Input
                 name="custom-max-points"
                 type="number"
                 min={customRules.pointsToWin}
                 max="101"
+                step="1"
+                inputMode="numeric"
                 value={customRules.maxPoints ?? ""}
                 onChange={(event) =>
                   onRulesChange(
@@ -635,10 +658,10 @@ function RulesSelector({
                   )
                 }
               />
-            </label>
-            <label>
+            </Label>
+            <Label>
               <span>{t("bestOf")}</span>
-              <select
+              <SelectControl
                 name="custom-best-of"
                 value={customRules.bestOf}
                 onChange={(event) =>
@@ -651,11 +674,11 @@ function RulesSelector({
                 <option value="1">{t("bestOfOne")}</option>
                 <option value="3">{t("bestOfThree")}</option>
                 <option value="5">{t("bestOfFive")}</option>
-              </select>
-            </label>
-            <label>
+              </SelectControl>
+            </Label>
+            <Label>
               <span>{t("scoringMode")}</span>
-              <select
+              <SelectControl
                 name="custom-scoring-mode"
                 value={customRules.scoringMode}
                 onChange={(event) =>
@@ -667,13 +690,13 @@ function RulesSelector({
               >
                 <option value="rally">{t("rallyScoring")}</option>
                 <option value="side_out">{t("sideOutScoring")}</option>
-              </select>
-            </label>
+              </SelectControl>
+            </Label>
             {customRules.scoringMode === "side_out" && format === "doubles" ? (
               <>
-                <label>
+                <Label>
                   <span>{t("serversPerTurn")}</span>
-                  <select
+                  <SelectControl
                     name="custom-servers-per-turn"
                     value={customRules.serversPerTurn}
                     onChange={(event) =>
@@ -685,11 +708,11 @@ function RulesSelector({
                   >
                     <option value="1">1</option>
                     <option value="2">2</option>
-                  </select>
-                </label>
-                <label>
+                  </SelectControl>
+                </Label>
+                <Label>
                   <span>{t("openingServerNumber")}</span>
-                  <select
+                  <SelectControl
                     name="custom-opening-server-number"
                     value={customRules.openingServerNumber}
                     onChange={(event) =>
@@ -701,8 +724,8 @@ function RulesSelector({
                   >
                     <option value="1">{t("serverOne")}</option>
                     <option value="2">{t("serverTwo")}</option>
-                  </select>
-                </label>
+                  </SelectControl>
+                </Label>
               </>
             ) : null}
           </div>
@@ -728,9 +751,9 @@ function TennisRulesFields({
       <legend>{t("tennisFormatTitle")}</legend>
       <p className={styles.fieldHint}>{t("tennisRulesSource")}</p>
       <div className={styles.ruleFields}>
-        <label>
+        <Label>
           <span>{t("bestOf")}</span>
-          <select
+          <SelectControl
             name="tennis-best-of"
             value={rules.bestOf}
             onChange={(event) =>
@@ -739,11 +762,11 @@ function TennisRulesFields({
           >
             <option value="3">{t("bestOfThree")}</option>
             <option value="5">{t("bestOfFive")}</option>
-          </select>
-        </label>
-        <label>
+          </SelectControl>
+        </Label>
+        <Label>
           <span>{t("tennisGameScoring")}</span>
-          <select
+          <SelectControl
             name="tennis-game-scoring"
             value={rules.gameScoring}
             onChange={(event) =>
@@ -755,11 +778,11 @@ function TennisRulesFields({
           >
             <option value="advantage">{t("tennisAdvantage")}</option>
             <option value="no_ad">{t("tennisNoAd")}</option>
-          </select>
-        </label>
-        <label>
+          </SelectControl>
+        </Label>
+        <Label>
           <span>{t("tennisSetScoring")}</span>
-          <select
+          <SelectControl
             name="tennis-set-scoring"
             value={rules.setScoring}
             onChange={(event) =>
@@ -771,11 +794,11 @@ function TennisRulesFields({
           >
             <option value="tiebreak">{t("tennisTiebreakSet")}</option>
             <option value="advantage">{t("tennisAdvantageSet")}</option>
-          </select>
-        </label>
-        <label>
+          </SelectControl>
+        </Label>
+        <Label>
           <span>{t("tennisFinalSet")}</span>
-          <select
+          <SelectControl
             name="tennis-final-set-scoring"
             value={rules.finalSetScoring}
             onChange={(event) =>
@@ -788,12 +811,12 @@ function TennisRulesFields({
             <option value="tiebreak">{t("tennisTiebreakSet")}</option>
             <option value="advantage">{t("tennisAdvantageSet")}</option>
             <option value="match_tiebreak">{t("tennisMatchTiebreak")}</option>
-          </select>
-        </label>
+          </SelectControl>
+        </Label>
         {rules.finalSetScoring === "match_tiebreak" ? (
-          <label>
+          <Label>
             <span>{t("tennisMatchTiebreakTarget")}</span>
-            <select
+            <SelectControl
               name="tennis-match-tiebreak-target"
               value={rules.matchTieBreakPoints}
               onChange={(event) =>
@@ -805,8 +828,8 @@ function TennisRulesFields({
             >
               <option value="7">7 {t("pointsByTwo")}</option>
               <option value="10">10 {t("pointsByTwo")}</option>
-            </select>
-          </label>
+            </SelectControl>
+          </Label>
         ) : null}
       </div>
     </fieldset>
@@ -835,9 +858,9 @@ function PadelRulesFields({
         {t(format === "singles" ? "padelLocalRulesSource" : "padelRulesSource")}
       </p>
       <div className={styles.ruleFields}>
-        <label>
+        <Label>
           <span>{t("padelGameScoring")}</span>
-          <select
+          <SelectControl
             name="padel-game-scoring"
             value={rules.gameScoring}
             onChange={(event) =>
@@ -850,11 +873,11 @@ function PadelRulesFields({
             <option value="advantage">{t("padelAdvantage")}</option>
             <option value="star_point">{t("padelStarPoint")}</option>
             <option value="golden_point">{t("padelGoldenPoint")}</option>
-          </select>
-        </label>
-        <label>
+          </SelectControl>
+        </Label>
+        <Label>
           <span>{t("padelSetScoring")}</span>
-          <select
+          <SelectControl
             name="padel-set-scoring"
             value={rules.setScoring}
             onChange={(event) =>
@@ -866,11 +889,11 @@ function PadelRulesFields({
           >
             <option value="standard">{t("padelStandardSet")}</option>
             <option value="mini">{t("padelMiniSet")}</option>
-          </select>
-        </label>
-        <label>
+          </SelectControl>
+        </Label>
+        <Label>
           <span>{t("padelFinalSet")}</span>
-          <select
+          <SelectControl
             name="padel-final-set-scoring"
             value={rules.finalSetScoring}
             onChange={(event) =>
@@ -883,12 +906,12 @@ function PadelRulesFields({
             <option value="standard">{t("padelStandardSet")}</option>
             <option value="advantage">{t("padelAdvantageSet")}</option>
             <option value="match_tiebreak">{t("padelMatchTiebreak")}</option>
-          </select>
-        </label>
+          </SelectControl>
+        </Label>
         {rules.finalSetScoring === "match_tiebreak" ? (
-          <label>
+          <Label>
             <span>{t("padelMatchTiebreakTarget")}</span>
-            <select
+            <SelectControl
               name="padel-match-tiebreak-target"
               value={rules.matchTieBreakPoints}
               onChange={(event) =>
@@ -900,8 +923,8 @@ function PadelRulesFields({
             >
               <option value="7">7 {t("pointsByTwo")}</option>
               <option value="10">10 {t("pointsByTwo")}</option>
-            </select>
-          </label>
+            </SelectControl>
+          </Label>
         ) : null}
       </div>
     </fieldset>
@@ -930,9 +953,9 @@ function TennisOrderFields({
     <fieldset className={styles.rulesGroup}>
       <legend>{t("tennisOrdersTitle")}</legend>
       <p className={styles.fieldHint}>{t("tennisOrdersIntro")}</p>
-      <label className={styles.selectField}>
+      <Label className={styles.selectField}>
         <span>{t("tennisFirstServingTeam")}</span>
-        <select
+        <SelectControl
           name="tennis-first-serving-team"
           value={firstServingTeam}
           onChange={(event) =>
@@ -941,15 +964,15 @@ function TennisOrderFields({
         >
           <option value="A">{t("teamA")}</option>
           <option value="B">{t("teamB")}</option>
-        </select>
-      </label>
+        </SelectControl>
+      </Label>
       {format !== "singles"
         ? (["A", "B"] as const).map((team) => (
             <div className={styles.tennisPairOrders} key={team}>
               <h3>{team === "A" ? t("teamA") : t("teamB")}</h3>
-              <label className={styles.selectField}>
+              <Label className={styles.selectField}>
                 <span>{t("tennisPairFirstServer")}</span>
-                <select
+                <SelectControl
                   name={`tennis-first-server-team-${team.toLowerCase()}`}
                   value={firstServerByTeam[team]}
                   onChange={(event) =>
@@ -961,11 +984,11 @@ function TennisOrderFields({
                 >
                   <option value="0">{t("player1")}</option>
                   <option value="1">{t("player2")}</option>
-                </select>
-              </label>
-              <label className={styles.selectField}>
+                </SelectControl>
+              </Label>
+              <Label className={styles.selectField}>
                 <span>{t("tennisDeuceReceiver")}</span>
-                <select
+                <SelectControl
                   name={`tennis-deuce-receiver-team-${team.toLowerCase()}`}
                   value={deuceReceiverByTeam[team]}
                   onChange={(event) =>
@@ -977,8 +1000,8 @@ function TennisOrderFields({
                 >
                   <option value="0">{t("player1")}</option>
                   <option value="1">{t("player2")}</option>
-                </select>
-              </label>
+                </SelectControl>
+              </Label>
             </div>
           ))
         : null}
@@ -1008,9 +1031,9 @@ function PadelOrderFields({
     <fieldset className={styles.rulesGroup}>
       <legend>{t("padelOrdersTitle")}</legend>
       <p className={styles.fieldHint}>{t("padelOrdersIntro")}</p>
-      <label className={styles.selectField}>
+      <Label className={styles.selectField}>
         <span>{t("padelFirstServingTeam")}</span>
-        <select
+        <SelectControl
           name="padel-first-serving-team"
           value={firstServingTeam}
           onChange={(event) =>
@@ -1019,15 +1042,15 @@ function PadelOrderFields({
         >
           <option value="A">{t("teamA")}</option>
           <option value="B">{t("teamB")}</option>
-        </select>
-      </label>
+        </SelectControl>
+      </Label>
       {format !== "singles"
         ? (["A", "B"] as const).map((team) => (
             <div className={styles.tennisPairOrders} key={team}>
               <h3>{team === "A" ? t("teamA") : t("teamB")}</h3>
-              <label className={styles.selectField}>
+              <Label className={styles.selectField}>
                 <span>{t("padelFirstServer")}</span>
-                <select
+                <SelectControl
                   name={`padel-first-server-team-${team.toLowerCase()}`}
                   value={firstServerByTeam[team]}
                   onChange={(event) =>
@@ -1039,11 +1062,11 @@ function PadelOrderFields({
                 >
                   <option value="0">{t("player1")}</option>
                   <option value="1">{t("player2")}</option>
-                </select>
-              </label>
-              <label className={styles.selectField}>
+                </SelectControl>
+              </Label>
+              <Label className={styles.selectField}>
                 <span>{t("padelFirstReceiver")}</span>
-                <select
+                <SelectControl
                   name={`padel-first-receiver-team-${team.toLowerCase()}`}
                   value={deuceReceiverByTeam[team]}
                   onChange={(event) =>
@@ -1055,8 +1078,8 @@ function PadelOrderFields({
                 >
                   <option value="0">{t("player1")}</option>
                   <option value="1">{t("player2")}</option>
-                </select>
-              </label>
+                </SelectControl>
+              </Label>
             </div>
           ))
         : null}
@@ -1084,9 +1107,9 @@ function TeamRoleFields({
         {label} · {t("mixedRolesTitle")}
       </legend>
       {roles.map((role, index) => (
-        <label key={index}>
+        <Label key={index}>
           <span>{index === 0 ? t("player1") : t("player2")}</span>
-          <select
+          <SelectControl
             name={`${localOnlyKey}-${teamKey}-player-${index + 1}`}
             value={role}
             onChange={(event) =>
@@ -1095,8 +1118,8 @@ function TeamRoleFields({
           >
             <option value="woman">{t("woman")}</option>
             <option value="man">{t("man")}</option>
-          </select>
-        </label>
+          </SelectControl>
+        </Label>
       ))}
       <small className={styles.fieldHint}>{t(localOnlyKey)}</small>
     </fieldset>
@@ -1122,9 +1145,9 @@ function TeamFields({
     <fieldset className={styles.teamFields}>
       <legend>{label}</legend>
       {names.map((name, index) => (
-        <label key={playerLabels[index]}>
+        <Label key={playerLabels[index]}>
           <span>{playerLabels[index]}</span>
-          <input
+          <Input
             name={`team-${teamKey}-player-${index + 1}`}
             autoComplete="off"
             maxLength={30}
@@ -1132,7 +1155,7 @@ function TeamFields({
             value={name}
             onChange={(event) => onChange(index, event.target.value)}
           />
-        </label>
+        </Label>
       ))}
     </fieldset>
   );

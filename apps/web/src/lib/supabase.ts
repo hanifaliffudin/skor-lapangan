@@ -1,12 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import {
+  hasSupabaseConfig,
+  hcaptchaSiteKey,
+  publishableKey,
+  supabaseUrl,
+} from "./runtime-config";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-export const hcaptchaSiteKey =
-  import.meta.env.VITE_HCAPTCHA_SITE_KEY?.trim() || null;
-
-export const hasSupabaseConfig = Boolean(supabaseUrl && publishableKey);
+export { hasSupabaseConfig, hcaptchaSiteKey } from "./runtime-config";
 
 export const supabase = hasSupabaseConfig
   ? createClient<Database>(supabaseUrl!, publishableKey!, {

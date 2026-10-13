@@ -1,13 +1,13 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
   useState,
   type FormEvent,
-  type RefObject,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
 import {
   awardRally,
   canSelectPadelDecidingSide,
@@ -51,12 +51,36 @@ import {
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
 import { useMatchControl } from "./useMatchControl";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SelectControl } from "@/components/ui/select-control";
 import styles from "../../styles/App.module.css";
+
+const QRCodeSVG = lazy(() =>
+  import("qrcode.react").then(({ QRCodeSVG: component }) => ({
+    default: component,
+  })),
+);
 
 const eventMetadata = (): EventMetadata => ({
   id: crypto.randomUUID(),
   createdAt: new Date().toISOString(),
 });
+
+function pointLabel(state: MatchState, team: TeamId, locale: "en" | "id") {
+  if (state.tennis) return tennisScoreLabel(state, team, locale);
+  if (state.padel) return padelScoreLabel(state, team, locale);
+  return String(state.points[team]);
+}
 
 export function MatchPage() {
   const { matchId } = useParams();
@@ -79,11 +103,13 @@ export function MatchPage() {
   const [viewerUrl, setViewerUrl] = useState("");
   const [viewerBusy, setViewerBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [endingSession, setEndingSession] = useState(false);
+  const [endError, setEndError] = useState("");
   const schemaBlockedMatches = useRef(new Set<string>());
   const previousSyncAttempt = useRef(0);
-  const overrideDialog = useRef<HTMLDialogElement>(null);
-  const setOrdersDialog = useRef<HTMLDialogElement>(null);
-  const endDialog = useRef<HTMLDialogElement>(null);
+  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [setOrdersOpen, setSetOrdersOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
   const [nextSetOrders, setNextSetOrders] = useState<TennisSetOrders | null>(
     null,
   );
@@ -97,9 +123,7 @@ export function MatchPage() {
 
   useEffect(() => {
     const currentTennis = view?.state.tennis;
-    const dialog = setOrdersDialog.current;
     if (!currentTennis?.awaitingSetOrders) {
-      if (dialog?.open) dialog.close();
       setNextSetOrders(null);
       return;
     }
@@ -108,10 +132,7 @@ export function MatchPage() {
 
   useEffect(() => {
     const current = view?.state.padel;
-    const dialog = setOrdersDialog.current;
     if (!current?.awaitingSetOrders) {
-      if (!view?.state.tennis?.awaitingSetOrders && dialog?.open)
-        dialog.close();
       setNextPadelOrders(null);
       return;
     }
@@ -119,27 +140,19 @@ export function MatchPage() {
   }, [view?.state.padel?.awaitingSetOrders, view?.state.padel?.setNumber]);
 
   useEffect(() => {
-    const dialog = setOrdersDialog.current;
-    if (
-      dialog &&
-      view?.state.tennis?.awaitingSetOrders &&
-      nextSetOrders &&
-      !dialog.open
-    ) {
-      dialog.showModal();
-    }
-  }, [nextSetOrders, view?.state.tennis?.awaitingSetOrders]);
-
-  useEffect(() => {
-    const dialog = setOrdersDialog.current;
-    if (
-      dialog &&
-      view?.state.padel?.awaitingSetOrders &&
-      nextPadelOrders &&
-      !dialog.open
-    )
-      dialog.showModal();
-  }, [nextPadelOrders, view?.state.padel?.awaitingSetOrders]);
+    const tennisReady = Boolean(
+      view?.state.tennis?.awaitingSetOrders && nextSetOrders,
+    );
+    const padelReady = Boolean(
+      view?.state.padel?.awaitingSetOrders && nextPadelOrders,
+    );
+    setSetOrdersOpen(tennisReady || padelReady);
+  }, [
+    nextPadelOrders,
+    nextSetOrders,
+    view?.state.padel?.awaitingSetOrders,
+    view?.state.tennis?.awaitingSetOrders,
+  ]);
 
   useEffect(() => {
     if (!matchId) return;
@@ -240,24 +253,29 @@ export function MatchPage() {
     if (!matchId || !supabase || !user) return;
     setViewerBusy(true);
     setShareMessage("");
-    const { data, error } = await supabase.rpc("create_live_viewer_link", {
-      p_match_id: matchId,
-    });
-    setViewerBusy(false);
-    if (error || !data) {
-      setShareMessage(
-        error
-          ? isRateLimitError(error.message)
-            ? t("rateLimited")
-            : error.message
-          : t("shareFailed"),
+    try {
+      const { data, error } = await supabase.rpc("create_live_viewer_link", {
+        p_match_id: matchId,
+      });
+      if (error || !data) {
+        setShareMessage(
+          error
+            ? isRateLimitError(error.message)
+              ? t("rateLimited")
+              : error.message
+            : t("shareFailed"),
+        );
+        return;
+      }
+      setViewerUrl(
+        `${window.location.origin}${localizedPath(`/view/${data}`, locale)}`,
       );
-      return;
+      setShareMessage(t("shareReady"));
+    } catch {
+      setShareMessage(t("shareFailed"));
+    } finally {
+      setViewerBusy(false);
     }
-    setViewerUrl(
-      `${window.location.origin}${localizedPath(`/view/${data}`, locale)}`,
-    );
-    setShareMessage(t("shareReady"));
   }
 
   async function copyViewerLink() {
@@ -285,20 +303,7 @@ export function MatchPage() {
   async function revokeViewerLink() {
     if (!matchId || !supabase) return;
     setViewerBusy(true);
-    const { error } = await supabase.rpc("revoke_live_viewer_link", {
-      p_match_id: matchId,
-    });
-    setViewerBusy(false);
-    if (error) {
-      setShareMessage(error.message);
-      return;
-    }
-    setViewerUrl("");
-    setShareMessage(t("shareRevoked"));
-  }
-
-  async function endSession() {
-    if (matchId && supabase && user) {
+    try {
       const { error } = await supabase.rpc("revoke_live_viewer_link", {
         p_match_id: matchId,
       });
@@ -306,14 +311,52 @@ export function MatchPage() {
         setShareMessage(error.message);
         return;
       }
+      setViewerUrl("");
+      setShareMessage(t("shareRevoked"));
+    } catch {
+      setShareMessage(t("shareFailed"));
+    } finally {
+      setViewerBusy(false);
     }
-    if (matchId) removeMatch(matchId);
-    navigate(localizedPath("/", locale));
+  }
+
+  async function endSession() {
+    if (endingSession) return;
+    if (!canControl) {
+      setEndError(
+        t(
+          controlStatus === "waiting"
+            ? "matchControlWaiting"
+            : "matchControlError",
+        ),
+      );
+      return;
+    }
+
+    setEndingSession(true);
+    setEndError("");
+    try {
+      if (matchId && supabase && user) {
+        const { error } = await supabase.rpc("revoke_live_viewer_link", {
+          p_match_id: matchId,
+        });
+        if (error) {
+          setEndError(t("endFailure"));
+          return;
+        }
+      }
+      if (matchId) removeMatch(matchId);
+      navigate(localizedPath("/", locale));
+    } catch {
+      setEndError(t("endFailure"));
+    } finally {
+      setEndingSession(false);
+    }
   }
 
   if (!journal || !view) {
     return (
-      <div className={styles.pageShell}>
+      <div className="min-h-screen min-h-dvh bg-paper pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <AppHeader />
         <main className={styles.emptyState}>
           <span className={styles.emptyMark} aria-hidden="true">
@@ -321,13 +364,13 @@ export function MatchPage() {
           </span>
           <h1>{t("missingTitle")}</h1>
           <p>{t("missingBody")}</p>
-          <button
+          <Button
             className={styles.primaryButton}
             type="button"
             onClick={() => navigate(localizedPath("/", locale))}
           >
             {t("newMatch")}
-          </button>
+          </Button>
         </main>
       </div>
     );
@@ -352,7 +395,7 @@ export function MatchPage() {
         : t("rallyFor");
 
   return (
-    <div className={styles.matchShell}>
+    <div className="min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <AppHeader compact />
       <main className={styles.matchMain}>
         <div className={styles.matchTopline}>
@@ -412,13 +455,15 @@ export function MatchPage() {
           ) : null}
         </p>
         {syncState === "error" ? (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             className={styles.syncRetryButton}
             type="button"
             onClick={() => setSyncAttempt((current) => current + 1)}
           >
             {t("retrySync")}
-          </button>
+          </Button>
         ) : null}
         {controlStatus !== "active" ? (
           <div className={styles.readOnlyNotice} role="status">
@@ -430,13 +475,15 @@ export function MatchPage() {
               )}
             </span>
             {controlStatus === "error" ? (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 className={styles.controlButton}
                 type="button"
                 onClick={retryControl}
               >
                 {t("retryControl")}
-              </button>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -476,7 +523,8 @@ export function MatchPage() {
                   </small>
                 ) : null}
               </div>
-              <button
+              <Button
+                variant="ghost"
                 className={styles.scoreButton}
                 data-tennis={isTennis}
                 data-padel={isPadel}
@@ -485,14 +533,26 @@ export function MatchPage() {
                 disabled={
                   state.status === "complete" || !canControl || awaitingOrders
                 }
-                onClick={() => overrideDialog.current?.showModal()}
+                onClick={() => setOverrideOpen(true)}
               >
                 {isTennis
                   ? tennisScoreLabel(state, team, locale)
                   : isPadel
                     ? padelScoreLabel(state, team, locale)
                     : state.points[team]}
-              </button>
+              </Button>
+              <Button
+                variant="outline"
+                className={styles.scoreAction}
+                type="button"
+                aria-label={`+ ${actionLabel} ${definition.teams[team].name}`}
+                disabled={
+                  state.status === "complete" || !canControl || awaitingOrders
+                }
+                onClick={() => rally(team)}
+              >
+                +1
+              </Button>
               <div className={styles.playerNames}>
                 {definition.teams[team].players.map((player) => (
                   <span key={player.id}>{player.name}</span>
@@ -534,7 +594,9 @@ export function MatchPage() {
                   {t("decidingPoint")} · {t("receiveFrom")}
                 </span>
                 {(["right", "left"] as const).map((side) => (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     key={side}
                     aria-pressed={tennis.noAdReceivingSide === side}
@@ -553,7 +615,7 @@ export function MatchPage() {
                     }
                   >
                     {t(side)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -592,7 +654,9 @@ export function MatchPage() {
                   {t("padelDecidingPoint")} · {t("receiveFrom")}
                 </span>
                 {(["right", "left"] as const).map((side) => (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     key={side}
                     aria-pressed={padel.decidingReceivingSide === side}
@@ -607,7 +671,7 @@ export function MatchPage() {
                     }
                   >
                     {t(side)}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : null}
@@ -617,61 +681,54 @@ export function MatchPage() {
 
         <Court definition={definition} state={state} />
 
-        <section className={styles.matchActions} aria-label="Match controls">
-          <div className={styles.rallyActions}>
-            {(["A", "B"] as const).map((team) => (
-              <button
-                className={styles.scoreAction}
-                type="button"
-                disabled={
-                  state.status === "complete" || !canControl || awaitingOrders
-                }
-                onClick={() => rally(team)}
-                key={team}
-              >
-                <span>+ {actionLabel}</span>
-                <strong>{definition.teams[team].name}</strong>
-              </button>
-            ))}
-          </div>
-
+        <section
+          className={styles.matchActions}
+          aria-label={t("matchControls")}
+        >
           <div className={styles.historyActions}>
-            <button
+            <Button
+              variant="outline"
               className={styles.controlButton}
               type="button"
               disabled={!view.canUndo || !canControl}
               onClick={() => commit(undo(journal, eventMetadata()))}
             >
               <span aria-hidden="true">↶</span> {t("undo")}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               className={styles.controlButton}
               type="button"
               disabled={!view.canRedo || !canControl}
               onClick={() => commit(redo(journal, eventMetadata()))}
             >
               {t("redo")} <span aria-hidden="true">↷</span>
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               className={styles.controlButton}
               type="button"
               disabled={
                 state.status === "complete" || !canControl || awaitingOrders
               }
-              onClick={() => overrideDialog.current?.showModal()}
+              onClick={() => setOverrideOpen(true)}
             >
               <span aria-hidden="true">✎</span> {t("correction")}
-            </button>
+            </Button>
           </div>
 
-          <button
+          <Button
+            variant="ghost"
             className={styles.dangerTextButton}
             type="button"
             disabled={!canControl}
-            onClick={() => endDialog.current?.showModal()}
+            onClick={() => {
+              setEndError("");
+              setEndOpen(true);
+            }}
           >
             {state.status === "complete" ? t("newMatch") : t("endSession")}
-          </button>
+          </Button>
 
           {supabase ? (
             <section
@@ -683,15 +740,17 @@ export function MatchPage() {
                 <p>{t("liveViewerDescription")}</p>
               </div>
               <div className={styles.shareActions}>
-                <button
+                <Button
+                  variant="outline"
                   className={styles.secondaryButton}
                   type="button"
                   disabled={viewerBusy || !canControl || !user}
                   onClick={() => void createViewerLink()}
                 >
                   {viewerBusy ? t("working") : t("createViewerLink")}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   className={styles.dangerTextButton}
                   type="button"
                   disabled={
@@ -700,40 +759,44 @@ export function MatchPage() {
                   onClick={() => void revokeViewerLink()}
                 >
                   {t("revokeViewerLink")}
-                </button>
+                </Button>
               </div>
               {viewerUrl ? (
                 <div className={styles.viewerLink}>
-                  <label>
+                  <Label>
                     <span>{t("viewerLink")}</span>
-                    <input
+                    <Input
                       name="viewer-link"
                       readOnly
                       value={viewerUrl}
                       onFocus={(event) => event.currentTarget.select()}
                     />
-                  </label>
-                  <button
+                  </Label>
+                  <Button
+                    variant="outline"
                     className={styles.secondaryButton}
                     type="button"
                     onClick={() => void copyViewerLink()}
                   >
                     {t("copyLink")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
                     className={styles.secondaryButton}
                     type="button"
                     onClick={() => void shareViewerLink()}
                   >
                     {t("shareLink")}
-                  </button>
+                  </Button>
                   <div className={styles.ruleQr} aria-label={t("qrCode")}>
-                    <QRCodeSVG
-                      value={viewerUrl}
-                      size={148}
-                      level="M"
-                      includeMargin
-                    />
+                    <Suspense fallback={null}>
+                      <QRCodeSVG
+                        value={viewerUrl}
+                        size={148}
+                        level="M"
+                        includeMargin
+                      />
+                    </Suspense>
                   </div>
                 </div>
               ) : null}
@@ -745,7 +808,8 @@ export function MatchPage() {
 
       {isTennis ? (
         <TennisCorrectionDialog
-          dialogRef={overrideDialog}
+          open={overrideOpen}
+          onOpenChange={setOverrideOpen}
           state={state}
           gameScoring={tennisRulesFor(definition).gameScoring}
           onSave={(score) =>
@@ -754,7 +818,8 @@ export function MatchPage() {
         />
       ) : isPadel ? (
         <PadelCorrectionDialog
-          dialogRef={overrideDialog}
+          open={overrideOpen}
+          onOpenChange={setOverrideOpen}
           state={state}
           rules={padelRulesFor(definition)}
           onSave={(score) =>
@@ -763,7 +828,8 @@ export function MatchPage() {
         />
       ) : (
         <OverrideDialog
-          dialogRef={overrideDialog}
+          open={overrideOpen}
+          onOpenChange={setOverrideOpen}
           state={state}
           onSave={(points) =>
             commit(overrideState(journal, points, eventMetadata()))
@@ -773,7 +839,10 @@ export function MatchPage() {
 
       {tennis && nextSetOrders ? (
         <TennisSetOrdersDialog
-          dialogRef={setOrdersDialog}
+          open={setOrdersOpen && Boolean(tennis.awaitingSetOrders)}
+          onOpenChange={(open) => {
+            if (open) setSetOrdersOpen(true);
+          }}
           definition={definition}
           orders={nextSetOrders}
           onOrdersChange={setNextSetOrders}
@@ -781,14 +850,17 @@ export function MatchPage() {
             commit(
               confirmTennisSetOrders(journal, nextSetOrders, eventMetadata()),
             );
-            setOrdersDialog.current?.close();
+            setSetOrdersOpen(false);
           }}
         />
       ) : null}
 
       {padel && nextPadelOrders ? (
         <PadelSetOrdersDialog
-          dialogRef={setOrdersDialog}
+          open={setOrdersOpen && Boolean(padel.awaitingSetOrders)}
+          onOpenChange={(open) => {
+            if (open) setSetOrdersOpen(true);
+          }}
           definition={definition}
           orders={nextPadelOrders}
           onOrdersChange={setNextPadelOrders}
@@ -796,44 +868,106 @@ export function MatchPage() {
             commit(
               confirmPadelSetOrders(journal, nextPadelOrders, eventMetadata()),
             );
-            setOrdersDialog.current?.close();
+            setSetOrdersOpen(false);
           }}
         />
       ) : null}
 
-      <dialog className={styles.dialog} ref={endDialog}>
-        <div className={styles.dialogBody}>
-          <h2>{state.status === "complete" ? t("newMatch") : t("endTitle")}</h2>
-          <p>{t("endBody")}</p>
-          <div className={styles.dialogActions}>
-            <button
-              className={styles.secondaryButton}
-              type="button"
-              onClick={() => endDialog.current?.close()}
+      <Dialog
+        open={endOpen}
+        onOpenChange={(open) => {
+          if (endingSession && !open) return;
+          setEndOpen(open);
+          if (!open) setEndError("");
+        }}
+      >
+        <DialogContent className={styles.dialog} showCloseButton={false}>
+          <div className={styles.endDialogBody} aria-busy={endingSession}>
+            <DialogHeader className={styles.endDialogHeader}>
+              <p className={styles.endDialogEyebrow}>
+                {t(definition.sport)} · {t(getMatchFormat(definition))}
+              </p>
+              <DialogTitle className={styles.endDialogTitle}>
+                {state.status === "complete"
+                  ? t("newMatchPrompt")
+                  : t("endTitle")}
+              </DialogTitle>
+              <DialogDescription className={styles.endDialogDescription}>
+                {state.status === "complete" ? t("newMatchBody") : t("endBody")}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div
+              className={styles.endMatchSummary}
+              role="group"
+              aria-label={t("score")}
             >
-              {t("cancel")}
-            </button>
-            <button
-              className={styles.dangerButton}
-              type="button"
-              onClick={() => void endSession()}
-            >
-              {t("confirmEnd")}
-            </button>
+              <span className={styles.endTeamName}>
+                {definition.teams.A.name}
+              </span>
+              <strong className={styles.endMatchScore}>
+                {pointLabel(state, "A", locale)}
+                <span aria-hidden="true">:</span>
+                {pointLabel(state, "B", locale)}
+              </strong>
+              <span className={styles.endTeamName}>
+                {definition.teams.B.name}
+              </span>
+            </div>
+
+            {endError || !canControl ? (
+              <p className={styles.endError} role="alert">
+                {endError ||
+                  t(
+                    controlStatus === "waiting"
+                      ? "matchControlWaiting"
+                      : "matchControlError",
+                  )}
+              </p>
+            ) : null}
+
+            <DialogFooter className={styles.endDialogActions}>
+              <Button
+                variant="outline"
+                className={styles.secondaryButton}
+                type="button"
+                disabled={endingSession}
+                onClick={() => setEndOpen(false)}
+              >
+                {state.status === "complete"
+                  ? t("backToScore")
+                  : t("keepPlaying")}
+              </Button>
+              <Button
+                variant="destructive"
+                className={styles.dangerButton}
+                type="button"
+                disabled={!canControl || endingSession}
+                onClick={() => void endSession()}
+              >
+                {endingSession
+                  ? t("working")
+                  : state.status === "complete"
+                    ? t("goHome")
+                    : t("confirmEnd")}
+              </Button>
+            </DialogFooter>
           </div>
-        </div>
-      </dialog>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function TennisCorrectionDialog({
-  dialogRef,
+  open,
+  onOpenChange,
   state,
   gameScoring,
   onSave,
 }: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   state: MatchState;
   gameScoring: "advantage" | "no_ad";
   onSave: (score: {
@@ -850,25 +984,20 @@ function TennisCorrectionDialog({
   const [scoreB, setScoreB] = useState("0");
   const [advantage, setAdvantage] = useState("");
   const firstInput = useRef<HTMLInputElement>(null);
-  const firstSelect = useRef<HTMLSelectElement>(null);
+  const firstSelect = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const sync = () => {
-      const score =
-        tennis?.phase === "game" ? tennis.pointScore : tennis?.tieBreakScore;
-      setScoreA(String(score?.A ?? 0));
-      setScoreB(String(score?.B ?? 0));
-      setAdvantage(tennis?.advantage ?? "");
-      window.requestAnimationFrame(() => {
-        if (isTieBreak) firstInput.current?.select();
-        else firstSelect.current?.focus();
-      });
-    };
-    dialog.addEventListener("toggle", sync);
-    return () => dialog.removeEventListener("toggle", sync);
-  }, [dialogRef, tennis]);
+    if (!open) return;
+    const score =
+      tennis?.phase === "game" ? tennis.pointScore : tennis?.tieBreakScore;
+    setScoreA(String(score?.A ?? 0));
+    setScoreB(String(score?.B ?? 0));
+    setAdvantage(tennis?.advantage ?? "");
+    window.requestAnimationFrame(() => {
+      if (isTieBreak) firstInput.current?.select();
+      else firstSelect.current?.focus();
+    });
+  }, [open, tennis, isTieBreak]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -886,127 +1015,136 @@ function TennisCorrectionDialog({
       tieBreakScore: isTieBreak ? { A, B } : null,
       gamePointCount: tennis.gamePointCount,
     });
-    dialogRef.current?.close();
+    onOpenChange(false);
   }
 
   if (!tennis) return null;
   return (
-    <dialog className={styles.dialog} ref={dialogRef}>
-      <form className={styles.dialogBody} onSubmit={submit}>
-        <h2>{t("correction")}</h2>
-        <p>
-          {t(isTieBreak ? "correctionTieBreakScore" : "correctionGameScore")}
-        </p>
-        <div className={styles.overrideFields}>
-          <label>
-            <span>{t("teamA")}</span>
-            {isTieBreak ? (
-              <input
-                name="tennis-tiebreak-team-a"
-                ref={firstInput}
-                type="number"
-                min="0"
-                inputMode="numeric"
-                value={scoreA}
-                onChange={(event) => setScoreA(event.target.value)}
-                required
-              />
-            ) : (
-              <select
-                name="tennis-score-team-a"
-                ref={firstSelect}
-                value={scoreA}
-                onChange={(event) => setScoreA(event.target.value)}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <form className={styles.dialogBody} onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("correction")}</DialogTitle>
+            <DialogDescription>
+              {t(
+                isTieBreak ? "correctionTieBreakScore" : "correctionGameScore",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className={styles.overrideFields}>
+            <Label>
+              <span>{t("teamA")}</span>
+              {isTieBreak ? (
+                <Input
+                  name="tennis-tiebreak-team-a"
+                  ref={firstInput}
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={scoreA}
+                  onChange={(event) => setScoreA(event.target.value)}
+                  required
+                />
+              ) : (
+                <SelectControl
+                  name="tennis-score-team-a"
+                  ref={firstSelect}
+                  value={scoreA}
+                  onChange={(event) => setScoreA(event.target.value)}
+                >
+                  {[0, 1, 2, 3].map((value) => (
+                    <option key={value} value={value}>
+                      {value === 0
+                        ? locale === "id"
+                          ? "Nol"
+                          : "Love"
+                        : value === 1
+                          ? "15"
+                          : value === 2
+                            ? "30"
+                            : "40"}
+                    </option>
+                  ))}
+                </SelectControl>
+              )}
+            </Label>
+            <Label>
+              <span>{t("teamB")}</span>
+              {isTieBreak ? (
+                <Input
+                  name="tennis-tiebreak-team-b"
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={scoreB}
+                  onChange={(event) => setScoreB(event.target.value)}
+                  required
+                />
+              ) : (
+                <SelectControl
+                  name="tennis-score-team-b"
+                  value={scoreB}
+                  onChange={(event) => setScoreB(event.target.value)}
+                >
+                  {[0, 1, 2, 3].map((value) => (
+                    <option key={value} value={value}>
+                      {value === 0
+                        ? locale === "id"
+                          ? "Nol"
+                          : "Love"
+                        : value === 1
+                          ? "15"
+                          : value === 2
+                            ? "30"
+                            : "40"}
+                    </option>
+                  ))}
+                </SelectControl>
+              )}
+            </Label>
+          </div>
+          {!isTieBreak && gameScoring === "advantage" ? (
+            <Label className={styles.selectField}>
+              <span>{t("advantageScore")}</span>
+              <SelectControl
+                name="tennis-advantage-score"
+                value={advantage}
+                onChange={(event) => setAdvantage(event.target.value)}
               >
-                {[0, 1, 2, 3].map((value) => (
-                  <option key={value} value={value}>
-                    {value === 0
-                      ? locale === "id"
-                        ? "Nol"
-                        : "Love"
-                      : value === 1
-                        ? "15"
-                        : value === 2
-                          ? "30"
-                          : "40"}
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
-          <label>
-            <span>{t("teamB")}</span>
-            {isTieBreak ? (
-              <input
-                name="tennis-tiebreak-team-b"
-                type="number"
-                min="0"
-                inputMode="numeric"
-                value={scoreB}
-                onChange={(event) => setScoreB(event.target.value)}
-                required
-              />
-            ) : (
-              <select
-                name="tennis-score-team-b"
-                value={scoreB}
-                onChange={(event) => setScoreB(event.target.value)}
-              >
-                {[0, 1, 2, 3].map((value) => (
-                  <option key={value} value={value}>
-                    {value === 0
-                      ? locale === "id"
-                        ? "Nol"
-                        : "Love"
-                      : value === 1
-                        ? "15"
-                        : value === 2
-                          ? "30"
-                          : "40"}
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
-        </div>
-        {!isTieBreak && gameScoring === "advantage" ? (
-          <label className={styles.selectField}>
-            <span>{t("advantageScore")}</span>
-            <select
-              name="tennis-advantage-score"
-              value={advantage}
-              onChange={(event) => setAdvantage(event.target.value)}
+                <option value="">{t("deuce")}</option>
+                <option value="A">{t("teamA")}</option>
+                <option value="B">{t("teamB")}</option>
+              </SelectControl>
+            </Label>
+          ) : null}
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              variant="outline"
+              className={styles.secondaryButton}
+              type="button"
+              onClick={() => onOpenChange(false)}
             >
-              <option value="">{t("deuce")}</option>
-              <option value="A">{t("teamA")}</option>
-              <option value="B">{t("teamB")}</option>
-            </select>
-          </label>
-        ) : null}
-        <div className={styles.dialogActions}>
-          <button
-            className={styles.secondaryButton}
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-          >
-            {t("cancel")}
-          </button>
-          <button className={styles.primaryButton} type="submit">
-            {t("save")}
-          </button>
-        </div>
-      </form>
-    </dialog>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" className={styles.primaryButton}>
+              {t("save")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function PadelCorrectionDialog({
-  dialogRef,
+  open,
+  onOpenChange,
   state,
   rules,
   onSave,
 }: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   state: MatchState;
   rules: PadelRules;
   onSave: (score: {
@@ -1025,26 +1163,21 @@ function PadelCorrectionDialog({
   const [advantage, setAdvantage] = useState("");
   const [starDeuces, setStarDeuces] = useState("0");
   const firstInput = useRef<HTMLInputElement>(null);
-  const firstSelect = useRef<HTMLSelectElement>(null);
+  const firstSelect = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const sync = () => {
-      const score =
-        padel?.phase === "game" ? padel.pointScore : padel?.tieBreakScore;
-      setScoreA(String(score?.A ?? 0));
-      setScoreB(String(score?.B ?? 0));
-      setAdvantage(padel?.advantage ?? "");
-      setStarDeuces(String(padel?.starDeuces ?? 0));
-      window.requestAnimationFrame(() => {
-        if (isTieBreak) firstInput.current?.select();
-        else firstSelect.current?.focus();
-      });
-    };
-    dialog.addEventListener("toggle", sync);
-    return () => dialog.removeEventListener("toggle", sync);
-  }, [dialogRef, padel]);
+    if (!open) return;
+    const score =
+      padel?.phase === "game" ? padel.pointScore : padel?.tieBreakScore;
+    setScoreA(String(score?.A ?? 0));
+    setScoreB(String(score?.B ?? 0));
+    setAdvantage(padel?.advantage ?? "");
+    setStarDeuces(String(padel?.starDeuces ?? 0));
+    window.requestAnimationFrame(() => {
+      if (isTieBreak) firstInput.current?.select();
+      else firstSelect.current?.focus();
+    });
+  }, [open, padel, isTieBreak]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1059,120 +1192,129 @@ function PadelCorrectionDialog({
       tieBreakScore: isTieBreak ? { A, B } : null,
       gamePointCount: padel.gamePointCount,
     });
-    dialogRef.current?.close();
+    onOpenChange(false);
   }
 
   if (!padel) return null;
   return (
-    <dialog className={styles.dialog} ref={dialogRef}>
-      <form className={styles.dialogBody} onSubmit={submit}>
-        <h2>{t("correction")}</h2>
-        <p>
-          {t(isTieBreak ? "correctionTieBreakScore" : "correctionGameScore")}
-        </p>
-        <div className={styles.overrideFields}>
-          {(["A", "B"] as const).map((team, index) => (
-            <label key={team}>
-              <span>{t(team === "A" ? "teamA" : "teamB")}</span>
-              {isTieBreak ? (
-                <input
-                  name={`padel-tiebreak-team-${team.toLowerCase()}`}
-                  ref={index === 0 ? firstInput : undefined}
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
-                  value={team === "A" ? scoreA : scoreB}
-                  onChange={(event) =>
-                    team === "A"
-                      ? setScoreA(event.target.value)
-                      : setScoreB(event.target.value)
-                  }
-                  required
-                />
-              ) : (
-                <select
-                  name={`padel-score-team-${team.toLowerCase()}`}
-                  ref={index === 0 ? firstSelect : undefined}
-                  value={team === "A" ? scoreA : scoreB}
-                  onChange={(event) =>
-                    team === "A"
-                      ? setScoreA(event.target.value)
-                      : setScoreB(event.target.value)
-                  }
-                >
-                  {[0, 1, 2, 3].map((value) => (
-                    <option key={value} value={value}>
-                      {value === 0
-                        ? locale === "id"
-                          ? "Nol"
-                          : "Love"
-                        : value === 1
-                          ? "15"
-                          : value === 2
-                            ? "30"
-                            : "40"}
-                    </option>
-                  ))}
-                </select>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <form className={styles.dialogBody} onSubmit={submit}>
+          <DialogHeader>
+            <DialogTitle>{t("correction")}</DialogTitle>
+            <DialogDescription>
+              {t(
+                isTieBreak ? "correctionTieBreakScore" : "correctionGameScore",
               )}
-            </label>
-          ))}
-        </div>
-        {!isTieBreak && rules.gameScoring !== "golden_point" ? (
-          <label className={styles.selectField}>
-            <span>{t("advantageScore")}</span>
-            <select
-              name="padel-advantage-score"
-              value={advantage}
-              onChange={(event) => setAdvantage(event.target.value)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className={styles.overrideFields}>
+            {(["A", "B"] as const).map((team, index) => (
+              <Label key={team}>
+                <span>{t(team === "A" ? "teamA" : "teamB")}</span>
+                {isTieBreak ? (
+                  <Input
+                    name={`padel-tiebreak-team-${team.toLowerCase()}`}
+                    ref={index === 0 ? firstInput : undefined}
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={team === "A" ? scoreA : scoreB}
+                    onChange={(event) =>
+                      team === "A"
+                        ? setScoreA(event.target.value)
+                        : setScoreB(event.target.value)
+                    }
+                    required
+                  />
+                ) : (
+                  <SelectControl
+                    name={`padel-score-team-${team.toLowerCase()}`}
+                    ref={index === 0 ? firstSelect : undefined}
+                    value={team === "A" ? scoreA : scoreB}
+                    onChange={(event) =>
+                      team === "A"
+                        ? setScoreA(event.target.value)
+                        : setScoreB(event.target.value)
+                    }
+                  >
+                    {[0, 1, 2, 3].map((value) => (
+                      <option key={value} value={value}>
+                        {value === 0
+                          ? locale === "id"
+                            ? "Nol"
+                            : "Love"
+                          : value === 1
+                            ? "15"
+                            : value === 2
+                              ? "30"
+                              : "40"}
+                      </option>
+                    ))}
+                  </SelectControl>
+                )}
+              </Label>
+            ))}
+          </div>
+          {!isTieBreak && rules.gameScoring !== "golden_point" ? (
+            <Label className={styles.selectField}>
+              <span>{t("advantageScore")}</span>
+              <SelectControl
+                name="padel-advantage-score"
+                value={advantage}
+                onChange={(event) => setAdvantage(event.target.value)}
+              >
+                <option value="">{t("deuce")}</option>
+                <option value="A">{t("teamA")}</option>
+                <option value="B">{t("teamB")}</option>
+              </SelectControl>
+            </Label>
+          ) : null}
+          {!isTieBreak && rules.gameScoring === "star_point" ? (
+            <Label className={styles.selectField}>
+              <span>{t("padelStarStage")}</span>
+              <SelectControl
+                name="padel-star-stage"
+                value={starDeuces}
+                onChange={(event) => setStarDeuces(event.target.value)}
+              >
+                {[0, 1, 2].map((value) => (
+                  <option key={value} value={value}>
+                    {t("padelDeuceStage")} {value + 1}
+                  </option>
+                ))}
+              </SelectControl>
+            </Label>
+          ) : null}
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              variant="outline"
+              className={styles.secondaryButton}
+              type="button"
+              onClick={() => onOpenChange(false)}
             >
-              <option value="">{t("deuce")}</option>
-              <option value="A">{t("teamA")}</option>
-              <option value="B">{t("teamB")}</option>
-            </select>
-          </label>
-        ) : null}
-        {!isTieBreak && rules.gameScoring === "star_point" ? (
-          <label className={styles.selectField}>
-            <span>{t("padelStarStage")}</span>
-            <select
-              name="padel-star-stage"
-              value={starDeuces}
-              onChange={(event) => setStarDeuces(event.target.value)}
-            >
-              {[0, 1, 2].map((value) => (
-                <option key={value} value={value}>
-                  {t("padelDeuceStage")} {value + 1}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <div className={styles.dialogActions}>
-          <button
-            className={styles.secondaryButton}
-            type="button"
-            onClick={() => dialogRef.current?.close()}
-          >
-            {t("cancel")}
-          </button>
-          <button className={styles.primaryButton} type="submit">
-            {t("save")}
-          </button>
-        </div>
-      </form>
-    </dialog>
+              {t("cancel")}
+            </Button>
+            <Button type="submit" className={styles.primaryButton}>
+              {t("save")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function PadelSetOrdersDialog({
-  dialogRef,
+  open,
+  onOpenChange,
   definition,
   orders,
   onOrdersChange,
   onConfirm,
 }: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   definition: MatchDefinition;
   orders: PadelSetOrders;
   onOrdersChange: (orders: PadelSetOrders) => void;
@@ -1180,86 +1322,93 @@ function PadelSetOrdersDialog({
 }) {
   const { t } = useLocale();
   return (
-    <dialog
-      className={styles.dialog}
-      ref={dialogRef}
-      onCancel={(event) => event.preventDefault()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) onOpenChange(true);
+      }}
     >
-      <div className={styles.dialogBody}>
-        <h2>{t("padelAwaitingOrders")}</h2>
-        <p>{t("padelOrdersIntro")}</p>
-        {(["A", "B"] as const).map((team) => (
-          <fieldset className={styles.tennisPairOrders} key={team}>
-            <legend>{definition.teams[team].name}</legend>
-            {(["serviceOrder", "deuceReceiver"] as const).map((kind) => (
-              <label className={styles.selectField} key={kind}>
-                <span>
-                  {t(
-                    kind === "serviceOrder"
-                      ? "padelFirstServer"
-                      : "padelFirstReceiver",
-                  )}
-                </span>
-                <select
-                  value={
-                    kind === "serviceOrder"
-                      ? orders.serviceOrder[team][0]
-                      : orders.deuceReceiver[team]
-                  }
-                  onChange={(event) => {
-                    const player = Number(event.target.value) as 0 | 1;
-                    if (kind === "serviceOrder") {
-                      onOrdersChange({
-                        ...orders,
-                        serviceOrder: {
-                          ...orders.serviceOrder,
-                          [team]: [player, (1 - player) as 0 | 1],
-                        },
-                      });
-                    } else {
-                      onOrdersChange({
-                        ...orders,
-                        deuceReceiver: {
-                          ...orders.deuceReceiver,
-                          [team]: player,
-                        },
-                      });
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <div className={styles.dialogBody}>
+          <DialogHeader>
+            <DialogTitle>{t("padelAwaitingOrders")}</DialogTitle>
+            <DialogDescription>{t("padelOrdersIntro")}</DialogDescription>
+          </DialogHeader>
+          {(["A", "B"] as const).map((team) => (
+            <fieldset className={styles.tennisPairOrders} key={team}>
+              <legend>{definition.teams[team].name}</legend>
+              {(["serviceOrder", "deuceReceiver"] as const).map((kind) => (
+                <Label className={styles.selectField} key={kind}>
+                  <span>
+                    {t(
+                      kind === "serviceOrder"
+                        ? "padelFirstServer"
+                        : "padelFirstReceiver",
+                    )}
+                  </span>
+                  <SelectControl
+                    value={
+                      kind === "serviceOrder"
+                        ? orders.serviceOrder[team][0]
+                        : orders.deuceReceiver[team]
                     }
-                  }}
-                >
-                  {[0, 1].map((playerIndex) => (
-                    <option key={playerIndex} value={playerIndex}>
-                      {definition.teams[team].players[playerIndex]?.name ??
-                        `${t("player1")} ${playerIndex + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </fieldset>
-        ))}
-        <div className={styles.dialogActions}>
-          <button
-            className={styles.primaryButton}
-            type="button"
-            onClick={onConfirm}
-          >
-            {t("confirmSetOrders")}
-          </button>
+                    onChange={(event) => {
+                      const player = Number(event.target.value) as 0 | 1;
+                      if (kind === "serviceOrder") {
+                        onOrdersChange({
+                          ...orders,
+                          serviceOrder: {
+                            ...orders.serviceOrder,
+                            [team]: [player, (1 - player) as 0 | 1],
+                          },
+                        });
+                      } else {
+                        onOrdersChange({
+                          ...orders,
+                          deuceReceiver: {
+                            ...orders.deuceReceiver,
+                            [team]: player,
+                          },
+                        });
+                      }
+                    }}
+                  >
+                    {[0, 1].map((playerIndex) => (
+                      <option key={playerIndex} value={playerIndex}>
+                        {definition.teams[team].players[playerIndex]?.name ??
+                          `${t("player1")} ${playerIndex + 1}`}
+                      </option>
+                    ))}
+                  </SelectControl>
+                </Label>
+              ))}
+            </fieldset>
+          ))}
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              className={styles.primaryButton}
+              type="button"
+              onClick={onConfirm}
+            >
+              {t("confirmSetOrders")}
+            </Button>
+          </DialogFooter>
         </div>
-      </div>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function TennisSetOrdersDialog({
-  dialogRef,
+  open,
+  onOpenChange,
   definition,
   orders,
   onOrdersChange,
   onConfirm,
 }: {
-  dialogRef: RefObject<HTMLDialogElement | null>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   definition: MatchDefinition;
   orders: TennisSetOrders;
   onOrdersChange: (orders: TennisSetOrders) => void;
@@ -1267,74 +1416,79 @@ function TennisSetOrdersDialog({
 }) {
   const { t } = useLocale();
   return (
-    <dialog
-      className={styles.dialog}
-      ref={dialogRef}
-      onCancel={(event) => event.preventDefault()}
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) onOpenChange(true);
+      }}
     >
-      <div className={styles.dialogBody}>
-        <h2>{t("awaitingSetOrders")}</h2>
-        <p>{t("setOrdersHint")}</p>
-        {(["A", "B"] as const).map((team) => (
-          <fieldset className={styles.tennisPairOrders} key={team}>
-            <legend>{definition.teams[team].name}</legend>
-            {(["serviceOrder", "deuceReceiver"] as const).map((kind) => (
-              <label className={styles.selectField} key={kind}>
-                <span>
-                  {t(
-                    kind === "serviceOrder"
-                      ? "tennisPairFirstServer"
-                      : "tennisDeuceReceiver",
-                  )}
-                </span>
-                <select
-                  value={
-                    kind === "serviceOrder"
-                      ? orders.serviceOrder[team][0]
-                      : orders.deuceReceiver[team]
-                  }
-                  onChange={(event) => {
-                    const player = Number(event.target.value) as 0 | 1;
-                    if (kind === "serviceOrder") {
-                      onOrdersChange({
-                        ...orders,
-                        serviceOrder: {
-                          ...orders.serviceOrder,
-                          [team]: [player, (1 - player) as 0 | 1],
-                        },
-                      });
-                    } else {
-                      onOrdersChange({
-                        ...orders,
-                        deuceReceiver: {
-                          ...orders.deuceReceiver,
-                          [team]: player,
-                        },
-                      });
+      <DialogContent className={styles.dialog} showCloseButton={false}>
+        <div className={styles.dialogBody}>
+          <DialogHeader>
+            <DialogTitle>{t("awaitingSetOrders")}</DialogTitle>
+            <DialogDescription>{t("setOrdersHint")}</DialogDescription>
+          </DialogHeader>
+          {(["A", "B"] as const).map((team) => (
+            <fieldset className={styles.tennisPairOrders} key={team}>
+              <legend>{definition.teams[team].name}</legend>
+              {(["serviceOrder", "deuceReceiver"] as const).map((kind) => (
+                <Label className={styles.selectField} key={kind}>
+                  <span>
+                    {t(
+                      kind === "serviceOrder"
+                        ? "tennisPairFirstServer"
+                        : "tennisDeuceReceiver",
+                    )}
+                  </span>
+                  <SelectControl
+                    value={
+                      kind === "serviceOrder"
+                        ? orders.serviceOrder[team][0]
+                        : orders.deuceReceiver[team]
                     }
-                  }}
-                >
-                  {[0, 1].map((playerIndex) => (
-                    <option key={playerIndex} value={playerIndex}>
-                      {definition.teams[team].players[playerIndex]?.name ??
-                        `${t("player1")} ${playerIndex + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
-          </fieldset>
-        ))}
-        <div className={styles.dialogActions}>
-          <button
-            className={styles.primaryButton}
-            type="button"
-            onClick={onConfirm}
-          >
-            {t("confirmSetOrders")}
-          </button>
+                    onChange={(event) => {
+                      const player = Number(event.target.value) as 0 | 1;
+                      if (kind === "serviceOrder") {
+                        onOrdersChange({
+                          ...orders,
+                          serviceOrder: {
+                            ...orders.serviceOrder,
+                            [team]: [player, (1 - player) as 0 | 1],
+                          },
+                        });
+                      } else {
+                        onOrdersChange({
+                          ...orders,
+                          deuceReceiver: {
+                            ...orders.deuceReceiver,
+                            [team]: player,
+                          },
+                        });
+                      }
+                    }}
+                  >
+                    {[0, 1].map((playerIndex) => (
+                      <option key={playerIndex} value={playerIndex}>
+                        {definition.teams[team].players[playerIndex]?.name ??
+                          `${t("player1")} ${playerIndex + 1}`}
+                      </option>
+                    ))}
+                  </SelectControl>
+                </Label>
+              ))}
+            </fieldset>
+          ))}
+          <DialogFooter className={styles.dialogActions}>
+            <Button
+              className={styles.primaryButton}
+              type="button"
+              onClick={onConfirm}
+            >
+              {t("confirmSetOrders")}
+            </Button>
+          </DialogFooter>
         </div>
-      </div>
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

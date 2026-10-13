@@ -1,14 +1,13 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthProviderProps,
+} from "./auth-context";
+
+export { useAuth } from "./auth-context";
 
 type GuestSignInResult = { session: Session | null; error: string | null };
 
@@ -53,31 +52,7 @@ function signInAnonymouslyOnce(
   return guestSignIn;
 }
 
-interface AuthContextValue {
-  loading: boolean;
-  session: Session | null;
-  user: User | null;
-  isAnonymous: boolean;
-  authError: string | null;
-  retryGuestSession: (captchaToken?: string) => Promise<void>;
-  signInWithGoogle: () => Promise<string | null>;
-  signOut: () => Promise<void>;
-}
-
-const guestAuth: AuthContextValue = {
-  loading: false,
-  session: null,
-  user: null,
-  isAnonymous: false,
-  authError: null,
-  retryGuestSession: async () => undefined,
-  signInWithGoogle: async () => "Supabase is not configured.",
-  signOut: async () => undefined,
-};
-
-const AuthContext = createContext<AuthContextValue>(guestAuth);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
   const [authError, setAuthError] = useState<string | null>(null);
@@ -192,8 +167,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  return useContext(AuthContext);
 }

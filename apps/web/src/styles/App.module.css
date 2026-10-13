@@ -1,3 +1,5 @@
+@reference "./global.css";
+
 .pageShell,
 .matchShell {
   min-height: 100vh;
@@ -97,7 +99,7 @@
 }
 
 .accountStatus {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 750;
   text-decoration: none;
@@ -160,7 +162,7 @@
 .sectionHeading > p:last-child,
 .emptyState p {
   max-width: 600px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: clamp(17px, 3vw, 21px);
   line-height: 1.55;
 }
@@ -169,7 +171,7 @@
   margin: -10px 0 34px;
   padding: 16px 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   align-items: center;
   gap: 16px;
   border-top: 1px solid var(--line-strong);
@@ -183,7 +185,7 @@
 
 .resumeSection p {
   margin-bottom: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -194,18 +196,78 @@
 }
 
 .resumeMatch {
-  min-height: 64px;
-  padding: 8px 10px;
+  min-height: 88px;
+  padding: 10px 12px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title score"
+    "server actions";
   align-items: center;
-  gap: 4px;
+  gap: 8px 14px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
 }
 
-.resumeMatch > span {
+.resumeMatchTitle {
+  grid-area: title;
   min-width: 0;
+  font-weight: 750;
+}
+
+.resumeMatchScore {
+  grid-area: score;
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: baseline;
+  justify-self: end;
+  gap: 7px;
+}
+
+.resumeMatchScore > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.resumeMatchScore > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--ink);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.resumeMatchScore > strong > span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.resumeMatchServer {
+  grid-area: server;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.resumeMatchServerName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resumeServerIndicator {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--cobalt-dark);
 }
 
 .resumeMatchActions,
@@ -217,6 +279,10 @@
   gap: 8px;
 }
 
+.resumeMatchActions {
+  grid-area: actions;
+}
+
 .resumeButton,
 .deleteMatchButton,
 .deleteMatchConfirmActions button {
@@ -226,12 +292,14 @@
 }
 
 .resumeButton {
-  border: 0;
-  background: transparent;
-  color: var(--cobalt-dark);
+  min-width: 100px;
+  border: 1px solid var(--cobalt-dark);
+  background: var(--cobalt);
+  color: white;
 }
 
 .deleteMatchButton {
+  padding: 0;
   border: 1px solid var(--danger);
   background: var(--surface);
   color: var(--danger);
@@ -251,7 +319,7 @@
 .deleteMatchConfirm p {
   flex: 1 1 220px;
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -269,16 +337,27 @@
   background: var(--surface);
 }
 
-.deleteAnnouncement {
-  min-height: 0;
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+.deleteToast {
+  position: fixed;
+  z-index: 50;
+  right: calc(16px + env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: calc(16px + env(safe-area-inset-left));
+  width: fit-content;
+  max-width: 520px;
+  margin-inline: auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--ink);
+  box-shadow: 0 8px 24px rgb(17 24 39 / 18%);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1.4;
-}
-
-.deleteAnnouncement:empty {
-  display: none;
 }
 
 .eyebrow {
@@ -371,7 +450,7 @@
 }
 
 .choiceCopy small {
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.35;
 }
 
@@ -428,7 +507,7 @@
 .guestNote {
   margin: 14px auto 0;
   max-width: 480px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
@@ -471,7 +550,7 @@
 .installInstructions p {
   margin: 0;
   padding: 0 0 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
   text-align: left;
@@ -519,7 +598,7 @@
   justify-content: center;
   gap: 8px 16px;
   flex-wrap: wrap;
-  color: var(--muted);
+  color: var(--text-muted);
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
@@ -555,7 +634,7 @@
 .syncStatus,
 .readOnlyNotice {
   margin: -8px 0 14px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -604,7 +683,7 @@
 .shareControls > div:first-child p,
 .shareControls > p {
   margin: 5px 0 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -650,7 +729,7 @@
 
 .viewerMeta {
   margin: 0 0 16px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -688,7 +767,7 @@
 .rulesPageHeading p:not(.eyebrow) {
   max-width: 620px;
   margin: 0 0 8px;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -731,7 +810,7 @@
 .communityRuleCard > p {
   min-height: 42px;
   margin: 0 0 14px;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 
@@ -740,7 +819,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -764,7 +843,7 @@
 }
 
 .ruleVersion {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -786,7 +865,7 @@
 }
 
 .ruleSharePanel p {
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 
@@ -813,7 +892,7 @@
 }
 
 .rulesSummary dt {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -882,7 +961,7 @@
 
 .historyIntro {
   max-width: 620px;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -911,7 +990,7 @@
 .historyCardHeading span,
 .historyDate,
 .historyDeviceOnly {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -924,7 +1003,7 @@
 
 .historyScore small {
   margin-left: 10px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 650;
 }
@@ -943,7 +1022,7 @@
 .rulePublishNote,
 .formStatus {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1023,7 +1102,7 @@
 }
 
 .ruleChoice small {
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.35;
 }
 
@@ -1034,7 +1113,7 @@
 
 .ruleEditor > p {
   max-width: 58ch;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -1160,7 +1239,7 @@
 
 .rulesBadge[data-source="guest_custom"],
 .rulesBadge[data-source="community"] {
-  color: var(--muted);
+  color: var(--text-muted);
   background: #eceef0;
 }
 
@@ -1212,7 +1291,7 @@
 
 .teamMeta small {
   flex: 0 0 auto;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .scoreButton {
@@ -1221,6 +1300,7 @@
   padding: 4px;
   border: 0;
   background: transparent;
+  color: var(--cobalt);
   font-size: clamp(76px, 18vw, 150px);
   font-variant-numeric: tabular-nums lining-nums;
   font-weight: 900;
@@ -1249,7 +1329,7 @@
   display: flex;
   gap: 6px 10px;
   flex-wrap: wrap;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1541,7 +1621,7 @@
 
 .tennisSetLine {
   margin: -8px 0 0;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -1598,7 +1678,7 @@
 
 .fieldHint {
   margin: 0 0 14px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1608,39 +1688,20 @@
   margin: 0;
 }
 
-.rallyActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
 .scoreAction {
-  min-height: 76px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
   border: 2px solid var(--ink);
   border-radius: 8px;
   background: var(--lime);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 900;
 }
 
 .scoreAction:hover:not(:disabled) {
   background: #84d84c;
-}
-
-.scoreAction span {
-  font-size: 12px;
-}
-
-.scoreAction strong {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .historyActions {
@@ -1693,7 +1754,7 @@
 
 .dialogBody > p {
   margin-bottom: 24px;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.55;
 }
 
@@ -1701,6 +1762,107 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.endDialogBody {
+  padding: clamp(22px, 5vw, 34px);
+  display: grid;
+  gap: 20px;
+}
+
+.endDialogHeader {
+  gap: 8px;
+}
+
+.endDialogEyebrow {
+  margin: 0;
+  color: var(--cobalt-dark);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.endDialogTitle {
+  font-size: clamp(30px, 6vw, 38px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+}
+
+.endDialogDescription {
+  max-width: 44ch;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.endMatchSummary {
+  padding: 14px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.endTeamName {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.endTeamName:last-child {
+  text-align: right;
+}
+
+.endMatchScore {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--ink);
+  font-size: clamp(24px, 7vw, 32px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.endError {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 4px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, white);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.endDialogActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.endDialogActions > button {
+  width: 100%;
+  min-height: 52px;
+}
+
+@media (max-width: 560px) {
+  .endDialogBody {
+    padding: 22px 18px;
+    gap: 18px;
+  }
+
+  .endDialogActions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
 }
 
 .overrideFields {
@@ -1781,8 +1943,30 @@
     grid-template-columns: 1fr;
   }
 
+  .resumeMatch {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "score"
+      "server"
+      "actions";
+    align-items: start;
+  }
+
+  .resumeMatchScore {
+    justify-self: start;
+  }
+
   .resumeMatchActions {
-    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .resumeButton {
+    flex: 1;
+  }
+
+  .deleteMatchButton {
+    flex: 0 0 44px;
   }
 
   .optionGrid,
@@ -1830,6 +2014,12 @@
   }
 }
 
+@media (max-width: 760px) {
+  .resumeSection {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 370px) {
   .matchMain {
     padding-inline: 10px;
@@ -1849,14 +2039,6 @@
 
   .scoreButton {
     font-size: 64px;
-  }
-
-  .rallyActions {
-    gap: 7px;
-  }
-
-  .scoreAction strong {
-    font-size: 14px;
   }
 }
 
@@ -1893,5 +2075,20 @@
 
   .court {
     width: min(320px, 32vw);
+  }
+}
+
+@media (min-width: 760px) and (max-width: 940px) {
+  .teamMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .teamMeta span {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
   }
 }

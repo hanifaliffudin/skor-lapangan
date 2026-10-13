@@ -1,23 +1,40 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { App } from "./App";
 import { LocaleProvider } from "./lib/i18n";
-import { AuthProvider } from "./lib/auth";
 import { sanitizeAnalyticsEvent } from "./lib/analytics";
 import "./styles/global.css";
+
+const AuthProvider = lazy(() =>
+  import("./lib/auth").then(({ AuthProvider: provider }) => ({
+    default: provider,
+  })),
+);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <>
-      <BrowserRouter>
-        <LocaleProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </LocaleProvider>
-      </BrowserRouter>
+      <Suspense
+        fallback={
+          <div
+            className="grid min-h-screen min-h-dvh place-items-center bg-paper px-6 text-sm font-semibold text-muted"
+            role="status"
+            aria-live="polite"
+          >
+            Loading…
+          </div>
+        }
+      >
+        <BrowserRouter>
+          <LocaleProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </LocaleProvider>
+        </BrowserRouter>
+      </Suspense>
       <Analytics beforeSend={sanitizeAnalyticsEvent} />
     </>
   </StrictMode>,
