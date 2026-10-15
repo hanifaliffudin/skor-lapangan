@@ -2,7 +2,7 @@
 
 Use this checklist before a public release and again after a scoring, sync, or database change. Record the version, environment, browser/device, tester, date, and result in the release notes or issue tracker. Do not mark a check complete without evidence.
 
-The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md). The earlier partial run remains available in [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). Neither is a production release sign-off; database, deployment, real-device, and owner-approval checks remain open.
+The latest engineering evidence run from 2026-10-15 is recorded in [qa-evidence-v1.0-2026-10-15.md](qa-evidence-v1.0-2026-10-15.md). The earlier runs remain available in [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md) and [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). None is a production release sign-off; database, deployment, real-device, and owner-approval checks remain open.
 
 ## Automated checks
 

@@ -19,13 +19,13 @@ The service is a scorekeeping aid. It is not a referee, a federation service, or
 
 Official Rules in the app are based on the sources listed in [rules-sources.md](rules-sources.md). Federations may update their rules, and the app may not reflect a change immediately. Each match uses the ruleset selected when that match starts.
 
-The current release supports Official Rules and guest custom rules for the current match. Community Rules are not available. Google account linking, account history, and account deletion are being rolled out through local and Preview checks before production promotion.
+The public V1.0 release supports Official Rules and guest custom rules for the current match. The current local and Preview build also exposes Community Rules for browsing, publishing, and reports; those features remain gated from production until moderation, security, privacy, contact, and legal checks are approved. Google account linking, account history, and account deletion are being rolled out through local and Preview checks before production promotion.
 
 ## 3. Guest matches and accounts
 
 Guests can play without an account. Local match data is stored in the browser. When server sync is enabled, a guest match becomes inaccessible after 12 hours without accepted server activity, capped at 24 hours after creation. The hourly cleanup job physically deletes expired match and event data, and deletes anonymous Auth records after 30 days. A failed or paused cleanup job can delay physical deletion but does not restore access to expired records.
 
-Guests may link the current anonymous session to Google. This preserves eligible guest matches and makes them available in account history. Account history is scoped by Supabase row-level security and can be reopened on another browser or device. An active match has one editor at a time; another device is read-only until the user explicitly takes over, while completed matches are read-only. A Google-linked user can sign out, and can permanently delete the account from `/account`; deletion removes the account's match data, related events, reports, user-created rules and versions if present, associated viewer capabilities, local match journals, and the Auth user. Community Rules are not currently available to publish or browse through the app.
+Guests may link the current anonymous session to Google. This preserves eligible guest matches and makes them available in account history. Account history is scoped by Supabase row-level security and can be reopened on another browser or device. An active match has one editor at a time; another device is read-only until the user explicitly takes over, while completed matches are read-only. A Google-linked user can sign out, and can permanently delete the account from `/account`; deletion removes the account's match data, related events, reports, user-created rules and versions if present, associated viewer capabilities, local match journals, and the Auth user. Community Rules are available only in the staged local/Preview rollout and remain subject to the production gate described above.
 
 ## 4. Live Viewer links
 

@@ -2,6 +2,21 @@
 
 Perubahan penting pada Skor Lapangan dicatat di sini. Entri bertanda `Unreleased` mencatat working tree dan belum menjadi tanda bahwa rilis publik sudah disetujui.
 
+## Unreleased, 2026-10-15
+
+### Diperbaiki
+
+- Test alur Tennis dibuat menunggu perpindahan halaman lazy-loaded dan kontrol skor sebelum melakukan assertion, sehingga suite penuh tidak lagi bergantung pada timing.
+- Smoke coverage Playwright diperluas ke Badminton, Pickleball, Tennis, dan Padel; coverage yang sudah ada untuk Tenis meja, Squash, dan Community Rules tetap dipertahankan.
+- Hint olahraga di layar sempit kini membungkus teks alih-alih memotong perbedaan aturan dengan ellipsis.
+- Metadata HTML statis mencantumkan enam olahraga, dan route setup, match, viewer, serta Community Rules memperbarui judul dokumen sesuai locale.
+
+### Verifikasi
+
+- `pnpm test`: scoring-core 68 test dan web 122 test lulus.
+- `pnpm test:coverage`: scoring-core statements 91,23%; web statements 73,59%; threshold lulus.
+- Smoke E2E lokal satu worker: 8 test lulus. Verifikasi job CI dan dependency audit tetap mengikuti pipeline release.
+
 ## Unreleased, 2026-10-13
 
 ### Ditambahkan

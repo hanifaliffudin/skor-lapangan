@@ -924,6 +924,7 @@
 
 .communityRuleCard,
 .rulesEmpty {
+  padding: 18px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: var(--surface);
@@ -1144,6 +1145,23 @@
 .reportForm h2 {
   margin: 0;
   font-size: 20px;
+}
+
+.reportSuccess {
+  border: 2px solid var(--lime-dark);
+  background: color-mix(in srgb, var(--lime) 18%, var(--surface));
+}
+
+.reportSuccess p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.reportSuccess .secondaryButton {
+  justify-self: start;
+  margin-top: 2px;
 }
 
 .reportForm label,
@@ -2537,11 +2555,9 @@
   .choiceCopy small {
     display: block;
     max-width: 100%;
-    overflow: hidden;
     font-size: 12px;
     line-height: 1.3;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .rulesPageHeading {
@@ -2696,6 +2712,21 @@
   }
 }
 
+@media (min-width: 561px) and (max-width: 899px) {
+  .matchMain {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .matchActions {
+    order: 1;
+  }
+
+  .courtPanel {
+    order: 2;
+  }
+}
+
 @media (max-width: 370px) {
   .matchMain {
     padding-inline: 10px;
@@ -2714,7 +2745,7 @@
   }
 }
 
-@media (min-width: 760px) {
+@media (min-width: 900px) {
   .matchMain {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 350px);
@@ -2750,7 +2781,7 @@
   }
 }
 
-@media (min-width: 760px) and (max-width: 940px) {
+@media (min-width: 900px) and (max-width: 940px) {
   .teamMeta {
     align-items: flex-start;
     flex-direction: column;

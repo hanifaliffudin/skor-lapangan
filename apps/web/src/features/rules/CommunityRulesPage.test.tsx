@@ -183,6 +183,65 @@ describe("Community Rules pages", () => {
     });
   });
 
+  it("confirms a report and lets the reporter start another one", async () => {
+    authState.user = { id: "guest-report" };
+    authState.isAnonymous = true;
+    rpcMock.mockImplementation((functionName: string) => {
+      if (functionName === "read_community_rule") {
+        return Promise.resolve({ data: [publicRule], error: null });
+      }
+      if (functionName === "read_community_rule_version") {
+        return Promise.resolve({
+          data: [
+            {
+              rule_id: publicRule.id,
+              version: publicRule.current_version,
+              configuration: defaultCommunityRuleConfiguration("tennis"),
+            },
+          ],
+          error: null,
+        });
+      }
+      if (functionName === "report_community_rule_v2") {
+        return Promise.resolve({ data: "report-id", error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const user = userEvent.setup();
+    renderRoute("/rules/public-tennis-rule", <CommunityRuleDetailPage />);
+
+    await screen.findByRole("heading", { name: "Report this ruleset" });
+    await user.click(screen.getByRole("button", { name: "Submit report" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your report has been recorded.",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText(/A reviewer will check it manually/)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Submit report" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Report another problem" }),
+    ).toBeVisible();
+    expect(rpcMock).toHaveBeenCalledWith("report_community_rule_v2", {
+      p_rule_id: publicRule.id,
+      p_reason: "misleading",
+      p_details: "",
+      p_reporter_contact: null,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Report another problem" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Report this ruleset" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Submit report" })).toBeVisible();
+  });
+
   it("lets the owner republish without creating a new version", async () => {
     const unpublishedOwnerRule = {
       ...publicRule,

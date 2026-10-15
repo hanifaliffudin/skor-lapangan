@@ -82,6 +82,11 @@ export function SetupPage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
+
+  useEffect(() => {
+    document.title = t("setupPageTitle");
+  }, [t]);
+
   const [names, setNames] = useState(["", "", "", ""]);
   const [format, setFormat] = useState<MatchFormat>(draft?.format ?? "doubles");
   const [firstServer, setFirstServer] = useState("A-0");

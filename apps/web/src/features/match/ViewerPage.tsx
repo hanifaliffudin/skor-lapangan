@@ -225,6 +225,11 @@ export function ViewerPage() {
   const { token } = useParams();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
+
+  useEffect(() => {
+    document.title = t("viewerPageTitle");
+  }, [t]);
+
   const [snapshot, setSnapshot] = useState<ViewerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);

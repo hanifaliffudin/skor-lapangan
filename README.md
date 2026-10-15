@@ -77,7 +77,7 @@ Import the repository with its root directory unchanged. `vercel.json` builds th
 - [V1.0 implementation specification](docs/v1-implementation-spec.md)
 - [Player guide](docs/user-guide.md)
 - [QA and release checklist](docs/qa-release-checklist.md)
-- [Latest QA evidence](docs/qa-evidence-v1.0-2026-10-13.md)
+- [Latest QA evidence](docs/qa-evidence-v1.0-2026-10-15.md)
 - [Operations runbook](docs/operations-runbook.md)
 - [Official rules sources](docs/rules-sources.md)
 - [Supabase setup](docs/supabase-setup.md)

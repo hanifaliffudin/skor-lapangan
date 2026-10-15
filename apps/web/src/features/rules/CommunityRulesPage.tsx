@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
@@ -37,6 +37,11 @@ type CommunityRuleScope = "all" | "published" | "mine";
 export function CommunityRulesDirectoryPage() {
   const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
+
+  useEffect(() => {
+    document.title = t("communityRulesPageTitle");
+  }, [t]);
+
   const [rules, setRules] = useState<CommunityRuleRecord[]>([]);
   const [sportFilter, setSportFilter] = useState<Sport | "all">("all");
   const [searchInput, setSearchInput] = useState("");
@@ -321,6 +326,11 @@ export function CommunityRuleDetailPage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { loading: authLoading, user, isAnonymous } = useAuth();
+
+  useEffect(() => {
+    document.title = t("communityRulesPageTitle");
+  }, [t]);
+
   const [rule, setRule] = useState<CommunityRuleRecord | null>(null);
   const [configuration, setConfiguration] =
     useState<CommunityRuleConfiguration | null>(null);
@@ -332,9 +342,14 @@ export function CommunityRuleDetailPage() {
   const [reportDetails, setReportDetails] = useState("");
   const [reportContact, setReportContact] = useState("");
   const [reporting, setReporting] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const reportHeadingRef = useRef<HTMLHeadingElement>(null);
   const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
+    setReportSubmitted(false);
+    setReportError("");
     if (!ruleId || !supabase) {
       setLoading(false);
       return;
@@ -444,6 +459,7 @@ export function CommunityRuleDetailPage() {
     event.preventDefault();
     if (!ruleId || !supabase) return;
     setReporting(true);
+    setReportError("");
     const { error } = await supabase.rpc("report_community_rule_v2", {
       p_rule_id: ruleId,
       p_reason: reportReason,
@@ -451,13 +467,22 @@ export function CommunityRuleDetailPage() {
       p_reporter_contact: reportContact.trim() || null,
     });
     setReporting(false);
-    setMessage(
-      error
-        ? isRateLimitError(error.message)
-          ? t("rateLimited")
-          : error.message
-        : t("reportSubmitted"),
-    );
+    if (error) {
+      setReportError(
+        isRateLimitError(error.message) ? t("rateLimited") : error.message,
+      );
+      return;
+    }
+    setReportDetails("");
+    setReportContact("");
+    setReportSubmitted(true);
+  }
+
+  function startAnotherReport() {
+    setReportReason("misleading");
+    setReportError("");
+    setReportSubmitted(false);
+    window.setTimeout(() => reportHeadingRef.current?.focus(), 0);
   }
 
   return (
@@ -575,57 +600,86 @@ export function CommunityRuleDetailPage() {
                 )}
               </div>
             ) : rule.is_published ? (
-              <form className={styles.reportForm} onSubmit={submitReport}>
-                <h2>{t("reportRule")}</h2>
-                <Label>
-                  <span>{t("reportReason")}</span>
-                  <SelectControl
-                    name="report-reason"
-                    value={reportReason}
-                    onChange={(event) => setReportReason(event.target.value)}
-                  >
-                    <option value="incorrect">{t("reportIncorrect")}</option>
-                    <option value="misleading">{t("reportMisleading")}</option>
-                    <option value="unsafe">{t("reportUnsafe")}</option>
-                    <option value="spam">{t("reportSpam")}</option>
-                    <option value="rights">{t("reportRights")}</option>
-                    <option value="other">{t("reportOther")}</option>
-                  </SelectControl>
-                </Label>
-                <Label>
-                  <span>{t("reportDetails")}</span>
-                  <Textarea
-                    name="report-details"
-                    maxLength={500}
-                    value={reportDetails}
-                    onChange={(event) => setReportDetails(event.target.value)}
-                  />
-                </Label>
-                <Label>
-                  <span>{t("reportContact")}</span>
-                  <Input
-                    name="report-contact"
-                    type="email"
-                    autoComplete="email"
-                    maxLength={254}
-                    value={reportContact}
-                    onChange={(event) => setReportContact(event.target.value)}
-                  />
-                  <small>{t("reportContactHint")}</small>
-                </Label>
-                <p>{t("reportReviewNote")}</p>
-                {!user && !authLoading ? (
-                  <p role="status">{t("reportSessionRequired")}</p>
-                ) : null}
-                <Button
-                  variant="outline"
-                  className={styles.secondaryButton}
-                  type="submit"
-                  disabled={reporting || authLoading || !user}
+              reportSubmitted ? (
+                <section
+                  className={`${styles.reportForm} ${styles.reportSuccess}`}
+                  role="status"
+                  aria-live="polite"
                 >
-                  {reporting ? t("working") : t("submitReport")}
-                </Button>
-              </form>
+                  <h2>{t("reportSubmitted")}</h2>
+                  <p>{t("reportSubmittedBody")}</p>
+                  <Button
+                    variant="outline"
+                    className={styles.secondaryButton}
+                    type="button"
+                    onClick={startAnotherReport}
+                  >
+                    {t("reportAnother")}
+                  </Button>
+                </section>
+              ) : (
+                <form className={styles.reportForm} onSubmit={submitReport}>
+                  <h2 ref={reportHeadingRef} tabIndex={-1}>
+                    {t("reportRule")}
+                  </h2>
+                  <Label>
+                    <span>{t("reportReason")}</span>
+                    <SelectControl
+                      name="report-reason"
+                      value={reportReason}
+                      onChange={(event) => setReportReason(event.target.value)}
+                    >
+                      <option value="incorrect">{t("reportIncorrect")}</option>
+                      <option value="misleading">
+                        {t("reportMisleading")}
+                      </option>
+                      <option value="unsafe">{t("reportUnsafe")}</option>
+                      <option value="spam">{t("reportSpam")}</option>
+                      <option value="rights">{t("reportRights")}</option>
+                      <option value="other">{t("reportOther")}</option>
+                    </SelectControl>
+                  </Label>
+                  <Label>
+                    <span>{t("reportDetails")}</span>
+                    <Textarea
+                      name="report-details"
+                      maxLength={500}
+                      value={reportDetails}
+                      onChange={(event) => setReportDetails(event.target.value)}
+                    />
+                  </Label>
+                  <Label>
+                    <span>{t("reportContact")}</span>
+                    <Input
+                      name="report-contact"
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      value={reportContact}
+                      onChange={(event) => setReportContact(event.target.value)}
+                    />
+                    <small>{t("reportContactHint")}</small>
+                  </Label>
+                  <p>{t("reportReviewNote")}</p>
+                  <p>{t("reportLimitNote")}</p>
+                  {reportError ? (
+                    <p className={styles.formError} role="alert">
+                      {reportError}
+                    </p>
+                  ) : null}
+                  {!user && !authLoading ? (
+                    <p role="status">{t("reportSessionRequired")}</p>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    className={styles.secondaryButton}
+                    type="submit"
+                    disabled={reporting || authLoading || !user}
+                  >
+                    {reporting ? t("working") : t("submitReport")}
+                  </Button>
+                </form>
+              )
             ) : null}
             {message ? (
               <p className={styles.formStatus} role="status">
@@ -644,6 +698,11 @@ export function CommunityRuleEditorPage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
+
+  useEffect(() => {
+    document.title = t("communityRulesPageTitle");
+  }, [t]);
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [sport, setSport] = useState<Sport>("badminton");

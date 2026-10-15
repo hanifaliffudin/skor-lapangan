@@ -114,6 +114,11 @@ export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
+
+  useEffect(() => {
+    document.title = t("matchPageTitle");
+  }, [t]);
+
   const {
     action,
     isAnonymous,

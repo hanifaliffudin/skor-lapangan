@@ -162,8 +162,8 @@ describe("quick start", () => {
     );
 
     await user.click(screen.getByText("Tennis"));
-    expect(screen.getByText("Mixed doubles")).toBeVisible();
-    await user.click(screen.getByText("Mixed doubles"));
+    expect(await screen.findByText("Mixed doubles")).toBeVisible();
+    await user.click(await screen.findByText("Mixed doubles"));
     await user.click(screen.getByRole("button", { name: /Continue/i }));
 
     expect(
@@ -261,12 +261,16 @@ describe("quick start", () => {
       screen.getByRole("button", { name: "Continue to player setup" }),
     );
     expect(
-      screen.getAllByLabelText("Player who serves first for this team"),
+      await screen.findAllByLabelText("Player who serves first for this team"),
     ).toHaveLength(2);
-    expect(screen.getAllByLabelText("Deuce-court receiver")).toHaveLength(2);
+    expect(
+      await screen.findAllByLabelText("Deuce-court receiver"),
+    ).toHaveLength(2);
     await user.click(screen.getByRole("button", { name: "Start match" }));
     await user.click(
-      screen.getByRole("button", { name: /Tennis point won by Team B/ }),
+      await screen.findByRole("button", {
+        name: /Tennis point won by Team B/,
+      }),
     );
 
     expect(

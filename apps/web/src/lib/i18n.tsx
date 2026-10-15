@@ -35,6 +35,8 @@ const messages = {
     chooseSport: "Pilih olahraga",
     chooseFormat: "Pilih format permainan",
     quickStart: "Mulai cepat",
+    setupPageTitle: "Penyiapan pertandingan · Skor Lapangan",
+    matchPageTitle: "Pertandingan langsung · Skor Lapangan",
     matchControls: "Kontrol pertandingan",
     badminton: "Badminton",
     pickleball: "Pickleball",
@@ -387,6 +389,7 @@ const messages = {
       "Belum ada aturan komunitas yang dipublikasikan untuk olahraga ini.",
     loadRuleError: "Aturan ini tidak dapat dimuat. Coba pilih aturan lain.",
     viewerTitle: "Skor pertandingan langsung",
+    viewerPageTitle: "Skor pertandingan langsung · Skor Lapangan",
     viewerLoading: "Mengambil skor terbaru…",
     viewerUnavailable: "Tautan viewer tidak tersedia",
     viewerUnavailableBody:
@@ -397,6 +400,7 @@ const messages = {
     updatedAt: "diperbarui",
     score: "Skor",
     communityLibraryTitle: "Aturan komunitas",
+    communityRulesPageTitle: "Aturan komunitas · Skor Lapangan",
     communityLibraryIntro:
       "Jelajahi aturan buatan komunitas. Setiap aturan diberi label tidak resmi.",
     communitySearchPlaceholder: "Cari nama atau deskripsi aturan",
@@ -444,9 +448,14 @@ const messages = {
       "Hanya digunakan jika peninjau perlu menghubungi Anda tentang laporan ini.",
     reportReviewNote:
       "Laporan ditinjau secara manual dan tidak otomatis menyembunyikan aturan.",
+    reportLimitNote:
+      "Jika menemukan masalah yang berbeda, Anda dapat mengirim laporan lain. Satu akun dibatasi maksimal 3 laporan per jam.",
     reportSessionRequired: "Menyiapkan sesi tamu yang aman…",
     submitReport: "Kirim laporan",
-    reportSubmitted: "Laporan diterima.",
+    reportSubmitted: "Laporan Anda sudah dicatat.",
+    reportSubmittedBody:
+      "Laporan ini akan ditinjau secara manual. Aturan tetap tampil sampai peninjauan selesai.",
+    reportAnother: "Laporkan masalah lain",
     rateLimited: "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi.",
     saveFailed: "Tidak dapat menyimpan perubahan.",
     ruleUnpublished: "Aturan ini tidak lagi tampil di direktori publik.",
@@ -529,6 +538,8 @@ const messages = {
     chooseSport: "Choose a sport",
     chooseFormat: "Choose match format",
     quickStart: "Quick start",
+    setupPageTitle: "Match setup · Skor Lapangan",
+    matchPageTitle: "Live match · Skor Lapangan",
     matchControls: "Match controls",
     badminton: "Badminton",
     pickleball: "Pickleball",
@@ -879,6 +890,7 @@ const messages = {
     noCommunityRules: "No published community rules for this sport yet.",
     loadRuleError: "This ruleset could not be loaded. Choose another one.",
     viewerTitle: "Live match score",
+    viewerPageTitle: "Live match score · Skor Lapangan",
     viewerLoading: "Loading the latest score…",
     viewerUnavailable: "Viewer link unavailable",
     viewerUnavailableBody:
@@ -889,6 +901,7 @@ const messages = {
     updatedAt: "updated",
     score: "Score",
     communityLibraryTitle: "Community Rules",
+    communityRulesPageTitle: "Community Rules · Skor Lapangan",
     communityLibraryIntro:
       "Browse community-made rules. Each ruleset is marked unofficial.",
     communitySearchPlaceholder: "Search rule names or descriptions",
@@ -934,9 +947,14 @@ const messages = {
       "Used only if the reviewer needs to contact you about this report.",
     reportReviewNote:
       "Reports are reviewed manually and do not automatically hide a rule.",
+    reportLimitNote:
+      "If you find a different problem, you can send another report. Each account is limited to 3 reports per hour.",
     reportSessionRequired: "Preparing a secure guest session…",
     submitReport: "Submit report",
-    reportSubmitted: "Report received.",
+    reportSubmitted: "Your report has been recorded.",
+    reportSubmittedBody:
+      "A reviewer will check it manually. The ruleset stays visible until the review is complete.",
+    reportAnother: "Report another problem",
     rateLimited: "Too many requests. Please wait a little and try again.",
     saveFailed: "Could not save the change.",
     ruleUnpublished: "This ruleset is no longer listed publicly.",
