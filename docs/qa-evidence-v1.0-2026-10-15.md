@@ -18,6 +18,7 @@ This run covers the current working tree after the Tennis test synchronization f
 | `pnpm build`                            | Pass    | Scoring-core build, Vite production build, and PWA service-worker generation passed.                                                                                               |
 | Supabase migration history              | Pass    | Supabase project `skor lapangan` shows migrations through `20261015101000_bound_match_journal_reads`, matching the latest repository migration.                                    |
 | `pnpm exec playwright test --workers=1` | Pass    | Eight browser smoke tests passed: Badminton, Pickleball, Tennis, Padel, Table tennis reload, Squash service-box order, Community Rules directory, and unavailable viewer handling. |
+| Vercel production deployment            | Pass    | Deployment `dpl_CgRhVmBVM6APqn2xvyvQqihRsTGi` reached `READY`, aliased to `https://skor-lapangan.vercel.app`, and returned HTTP 200 from the public homepage.                      |
 | `supabase test db`                      | Not run | Docker/Postgres is not available on this host. Run the pgTAP suite in a disposable database.                                                                                       |
 | Production dependency audit             | Not run | Registry/audit access is an external CI or release-environment check.                                                                                                              |
 
