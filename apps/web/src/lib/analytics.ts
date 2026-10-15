@@ -6,7 +6,11 @@ const ANALYTICS_BASE_URL = "https://skor-lapangan.invalid";
 export function sanitizeAnalyticsEvent(
   event: BeforeSendEvent,
 ): BeforeSendEvent {
-  const url = new URL(event.url, ANALYTICS_BASE_URL);
+  const baseUrl =
+    typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : ANALYTICS_BASE_URL;
+  const url = new URL(event.url, baseUrl);
   let pathname = url.pathname;
 
   pathname = pathname.replace(/^\/view\/[^/]+(?=\/|$)/, "/view/[token]");
@@ -20,7 +24,7 @@ export function sanitizeAnalyticsEvent(
     pathname = pathname.replace(/^\/rules\/[^/]+(?=\/|$)/, "/rules/[ruleId]");
   }
 
-  return { ...event, url: pathname };
+  return { ...event, url: `${url.origin}${pathname}` };
 }
 
 export function trackMatchSignal(

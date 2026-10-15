@@ -109,19 +109,37 @@ describe("Supabase sync serialization", () => {
     const payload = serializeJournalForSync(guestJournal, "guest-user", true);
 
     expect(payload.match.is_guest).toBe(true);
-    expect(payload.match.ruleset_id).toBe("guest-custom-local");
+    expect(payload.match.ruleset_id).toBe("bwf-singles-3x21-2025");
     expect(payload.match.definition).toMatchObject({
       format: "singles",
       rulesetId: "bwf-singles-3x21-2025",
+      ruleset: {
+        id: "bwf-singles-3x21-2025",
+        source: "official",
+        configuration: { pointsToWin: 21 },
+      },
     });
     expect(payload.match.current_state).toMatchObject({ format: "singles" });
     expect(payload.match.definition).not.toHaveProperty("teams");
-    expect(payload.match.definition).not.toHaveProperty("ruleset");
     expect(JSON.stringify(payload.match)).not.toContain("Private Player Name");
     expect(JSON.stringify(payload.match)).not.toContain(
       "Private Opponent Name",
     );
-    expect(JSON.stringify(payload.match)).not.toContain("pointsToWin");
+    expect(JSON.stringify(payload.match)).not.toContain('"pointsToWin":15');
+    expect(JSON.stringify(payload.match)).not.toContain("Club night");
+  });
+
+  it("adds an official snapshot when an older journal has no ruleset", () => {
+    const payload = serializeJournalForSync(journal(), "account-user");
+
+    expect(payload.match.ruleset_id).toBe("bwf-doubles-3x21-2025");
+    expect(payload.match.definition).toMatchObject({
+      ruleset: {
+        id: "bwf-doubles-3x21-2025",
+        source: "official",
+        version: 1,
+      },
+    });
   });
 
   it("can serialize only events after the last synced sequence", () => {

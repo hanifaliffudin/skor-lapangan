@@ -649,7 +649,8 @@ export function SetupPage() {
     };
     const journal: MatchJournal = { definition, events: [] };
     saveMatch(journal, {
-      persistent: Boolean(user && !isAnonymous),
+      persistent:
+        ruleSource !== "guest_custom" && Boolean(user && !isAnonymous),
       ...(user?.id ? { ownerId: user.id } : {}),
     });
     navigate(localizedPath(`/match/${id}`, locale));

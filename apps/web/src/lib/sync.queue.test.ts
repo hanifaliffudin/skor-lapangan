@@ -42,6 +42,33 @@ function journal(): MatchJournal {
 }
 
 describe("match sync queue", () => {
+  it("does not send guest custom rules to the account sync RPC", async () => {
+    rpc.mockClear();
+    const localOnly = journal();
+    localOnly.definition.ruleset = {
+      id: "guest-custom-rules-1",
+      name: "Club night",
+      sport: "badminton",
+      source: "guest_custom",
+      version: 1,
+      configuration: {
+        pointsToWin: 15,
+        winBy: 2,
+        maxPoints: 21,
+        bestOf: 3,
+        scoringMode: "rally",
+        serversPerTurn: 2,
+        openingServerNumber: 1,
+      },
+    };
+
+    await expect(syncJournal(localOnly, "account-user")).resolves.toEqual({
+      status: "skipped",
+      reason: "local_only_rules",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it("serializes writes for the same match", async () => {
     let releaseFirst!: (value: { data: string; error: null }) => void;
     rpc.mockImplementationOnce(

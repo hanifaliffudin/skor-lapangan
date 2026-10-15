@@ -4,6 +4,7 @@ import {
   officialRulesetFor,
   type MatchEvent,
   type MatchJournal,
+  type RulesetSnapshot,
 } from "@skor-lapangan/scoring-core";
 import type { Database, Json } from "./database.types";
 import { supabase } from "./supabase";
@@ -18,7 +19,10 @@ export interface SyncPayload {
 
 export type SyncResult =
   | { status: "synced" }
-  | { status: "skipped"; reason: "not_configured" | "not_signed_in" }
+  | {
+      status: "skipped";
+      reason: "not_configured" | "not_signed_in" | "local_only_rules";
+    }
   | { status: "control_held"; error: "CONTROL_HELD" }
   | { status: "control_lost"; error: "CONTROL_LOST" }
   | { status: "conflict"; error: "SYNC_CONFLICT" }
@@ -64,6 +68,22 @@ function eventPayload(event: MatchEvent): Json {
   return toJson(payload);
 }
 
+export function isLocalOnlyRulesJournal(journal: MatchJournal): boolean {
+  return journal.definition.ruleset?.source === "guest_custom";
+}
+
+function officialRulesetForSync(journal: MatchJournal) {
+  const { definition } = journal;
+  const scoringMode =
+    definition.ruleset?.configuration?.scoringMode ??
+    (definition.rulesetId === "usap-singles-rally-2026" ? "rally" : undefined);
+  return officialRulesetFor(
+    definition.sport,
+    getMatchFormat(definition),
+    scoringMode,
+  );
+}
+
 export function serializeJournalForSync(
   journal: MatchJournal,
   userId: string,
@@ -73,48 +93,39 @@ export function serializeJournalForSync(
   const { definition, events } = journal;
   const { state } = deriveJournal(journal);
   const lastSequence = events.at(-1)?.clientSequence ?? 0;
-  const syncedRuleset =
-    definition.ruleset?.source === "guest_custom"
-      ? undefined
-      : definition.ruleset
-        ? {
-            id: definition.ruleset.id,
-            name: definition.ruleset.name,
-            sport: definition.ruleset.sport,
-            format: definition.ruleset.format,
-            source: definition.ruleset.source,
-            version: definition.ruleset.version,
-            configuration: definition.ruleset.configuration,
-            tennisConfiguration: definition.ruleset.tennisConfiguration,
-            padelConfiguration: definition.ruleset.padelConfiguration,
-            tableTennisConfiguration:
-              definition.ruleset.tableTennisConfiguration,
-            squashConfiguration: definition.ruleset.squashConfiguration,
-          }
-        : undefined;
+  const ruleset: RulesetSnapshot = isLocalOnlyRulesJournal(journal)
+    ? officialRulesetForSync(journal)
+    : (definition.ruleset ?? officialRulesetForSync(journal));
+  const syncedRuleset = {
+    id: ruleset.id,
+    name: ruleset.name,
+    sport: ruleset.sport,
+    format: ruleset.format,
+    source: ruleset.source,
+    version: ruleset.version,
+    configuration: ruleset.configuration,
+    tennisConfiguration: ruleset.tennisConfiguration,
+    padelConfiguration: ruleset.padelConfiguration,
+    tableTennisConfiguration: ruleset.tableTennisConfiguration,
+    squashConfiguration: ruleset.squashConfiguration,
+  };
+  const syncedRulesetId =
+    isLocalOnlyRulesJournal(journal) || !definition.ruleset
+      ? ruleset.id
+      : definition.rulesetId;
 
   return {
     match: {
       id: definition.id,
       owner_id: userId,
       sport: definition.sport,
-      ruleset_id:
-        isGuest && definition.ruleset?.source === "guest_custom"
-          ? "guest-custom-local"
-          : definition.rulesetId,
+      ruleset_id: syncedRulesetId,
       mode: definition.mode,
       definition: toJson({
         id: definition.id,
         sport: definition.sport,
         format: getMatchFormat(definition),
-        rulesetId:
-          isGuest && definition.ruleset?.source === "guest_custom"
-            ? officialRulesetFor(
-                definition.sport,
-                getMatchFormat(definition),
-                definition.ruleset.configuration?.scoringMode,
-              ).id
-            : definition.rulesetId,
+        rulesetId: syncedRulesetId,
         mode: definition.mode,
         createdAt: definition.createdAt,
         initialServingTeam: definition.initialServingTeam,
@@ -169,6 +180,9 @@ async function syncJournalNow(
 ): Promise<SyncResult> {
   if (!supabase) return { status: "skipped", reason: "not_configured" };
   if (!userId) return { status: "skipped", reason: "not_signed_in" };
+  if (!isGuest && isLocalOnlyRulesJournal(journal)) {
+    return { status: "skipped", reason: "local_only_rules" };
+  }
 
   try {
     const payload = serializeJournalForSync(

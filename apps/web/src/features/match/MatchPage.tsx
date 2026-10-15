@@ -58,7 +58,7 @@ import {
   saveMatch,
 } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
-import { syncJournal } from "../../lib/sync";
+import { isLocalOnlyRulesJournal, syncJournal } from "../../lib/sync";
 import {
   isSyncConflictError,
   isMatchControlHeldError,
@@ -172,6 +172,9 @@ export function MatchPage() {
     () => (journal ? deriveJournal(journal) : null),
     [journal],
   );
+  const localOnlyRules = Boolean(
+    journal && isLocalOnlyRulesJournal(journal) && user && !isAnonymous,
+  );
   const matchIsActive = view?.state.status === "active";
   const {
     status: controlStatus,
@@ -181,11 +184,11 @@ export function MatchPage() {
     takeOver,
   } = useMatchControl(matchId, {
     enabled: Boolean(matchIsActive && !remoteLoading && !remoteConflict),
-    server: Boolean(supabase && user),
+    server: Boolean(supabase && user && !localOnlyRules),
   });
 
   useEffect(() => {
-    if (!matchId || !supabase || isAnonymous) {
+    if (!matchId || !supabase || isAnonymous || localOnlyRules) {
       setRemoteLoading(false);
       setRemoteError("");
       setRemoteWarning(false);
@@ -241,7 +244,14 @@ export function MatchPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, isAnonymous, matchId, remoteReloadAttempt, user]);
+  }, [
+    authLoading,
+    isAnonymous,
+    localOnlyRules,
+    matchId,
+    remoteReloadAttempt,
+    user,
+  ]);
 
   useEffect(() => {
     if (
@@ -249,6 +259,7 @@ export function MatchPage() {
       !supabase ||
       !user ||
       isAnonymous ||
+      localOnlyRules ||
       !matchIsActive ||
       remoteLoading ||
       remoteConflict ||
@@ -403,6 +414,7 @@ export function MatchPage() {
   }, [
     controlStatus,
     isAnonymous,
+    localOnlyRules,
     matchId,
     matchIsActive,
     remoteConflict,
@@ -496,6 +508,11 @@ export function MatchPage() {
   }, [matchId]);
 
   useEffect(() => {
+    if (localOnlyRules) {
+      setSyncState("local");
+      setSyncError("");
+      return;
+    }
     if (!journal || !user || remoteLoading || remoteConflict || remoteError) {
       setSyncState("local");
       setSyncError("");
@@ -588,6 +605,7 @@ export function MatchPage() {
     controlStatus,
     controlToken,
     isAnonymous,
+    localOnlyRules,
     journal,
     matchIsActive,
     remoteConflict,
@@ -628,8 +646,11 @@ export function MatchPage() {
         : (accountOwnerId ?? user?.id);
     saveMatch(next, {
       persistent:
-        Boolean(accountOwnerId) || Boolean(storedMatchInfo?.persistent),
-      ...(localOwnerId ? { ownerId: localOwnerId } : {}),
+        next.definition.ruleset?.source !== "guest_custom" &&
+        (Boolean(accountOwnerId) || Boolean(storedMatchInfo?.persistent)),
+      ...(next.definition.ruleset?.source !== "guest_custom" && localOwnerId
+        ? { ownerId: localOwnerId }
+        : {}),
     });
   }
 
@@ -734,6 +755,7 @@ export function MatchPage() {
         matchId &&
         supabase &&
         user &&
+        !localOnlyRules &&
         canSyncStoredMatch(matchId, user.id, isAnonymous)
       ) {
         if (!navigator.onLine) {
@@ -1450,7 +1472,9 @@ export function MatchPage() {
                   variant="outline"
                   className={styles.secondaryButton}
                   type="button"
-                  disabled={viewerBusy || !canEditMatch || !user}
+                  disabled={
+                    viewerBusy || !canEditMatch || !user || localOnlyRules
+                  }
                   onClick={() => void createViewerLink()}
                 >
                   {viewerBusy ? t("working") : t("createViewerLink")}
@@ -1463,6 +1487,7 @@ export function MatchPage() {
                     viewerBusy ||
                     !canEditMatch ||
                     !user ||
+                    localOnlyRules ||
                     syncState !== "synced"
                   }
                   onClick={() => void revokeViewerLink()}
