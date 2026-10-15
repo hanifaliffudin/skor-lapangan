@@ -1380,7 +1380,7 @@
 .rulesChoices,
 .ruleFields {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1516,6 +1516,14 @@
 .ruleFields input:focus,
 .ruleFields select:focus {
   border-color: var(--cobalt);
+}
+
+.ruleFields [data-slot="select-value"] {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .formError {

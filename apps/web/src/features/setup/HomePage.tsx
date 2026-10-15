@@ -15,7 +15,12 @@ import { PwaInstallControl } from "../../components/PwaInstallControl";
 import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
-import { listGuestMatches, removeMatch, saveDraft } from "../../lib/session";
+import {
+  listGuestMatches,
+  loadDraft,
+  removeMatch,
+  saveDraft,
+} from "../../lib/session";
 import { applySeoMetadata, homeSchema } from "../../lib/seo";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -33,8 +38,12 @@ export function HomePage() {
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
   const isAccount = Boolean(user && !isAnonymous);
-  const [sport, setSport] = useState<Sport>("badminton");
-  const [format, setFormat] = useState<MatchFormat>("doubles");
+  const [sport, setSport] = useState<Sport>(
+    () => loadDraft()?.sport ?? "badminton",
+  );
+  const [format, setFormat] = useState<MatchFormat>(
+    () => loadDraft()?.format ?? "doubles",
+  );
   const [hasUserEngaged, setHasUserEngaged] = useState(false);
   const [savedMatches, setSavedMatches] = useState<MatchJournal[]>(() =>
     listGuestMatches(),

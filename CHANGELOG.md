@@ -11,6 +11,7 @@ Perubahan penting pada Skor Lapangan dicatat di sini. Entri bertanda `Unreleased
 - Hint olahraga di layar sempit kini membungkus teks alih-alih memotong perbedaan aturan dengan ellipsis.
 - Metadata HTML statis mencantumkan enam olahraga, dan route setup, match, viewer, serta Community Rules memperbarui judul dokumen sesuai locale.
 - SEO route publik diperkuat dengan entry HTML khusus untuk home dan direktori Community Rules, canonical/hreflang/structured data per locale, sitemap untuk halaman publik, dan `noindex` untuk halaman utilitas, detail, serta editor.
+- Quick start kini memulihkan olahraga dan format terakhir saat kembali dari Setup, dan field aturan Padel memakai grid dua kolom dengan teks dropdown yang tidak lagi meluber ke kolom sebelah.
 
 ### Verifikasi
 

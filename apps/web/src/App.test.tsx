@@ -204,6 +204,36 @@ describe("quick start", () => {
     expect(listGuestMatches()[0]?.events).toHaveLength(1);
   });
 
+  it("restores the selected sport and format after returning from setup", async () => {
+    const user = userEvent.setup();
+    await renderApp(
+      <MemoryRouter>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByText("Padel"));
+    const singles = screen.getByRole("radio", { name: /Club singles/i });
+    await user.click(singles);
+    await user.click(screen.getByRole("button", { name: /Continue/i }));
+    await screen.findByRole("heading", { name: "Who is playing?" });
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByRole("heading", {
+      name: "Keep score for racket sports",
+    });
+
+    expect(screen.getByRole("radio", { name: /Padel Track/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(
+      screen.getByRole("radio", { name: /Club singles/i }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
   it("lets a Community Rules entry point choose the match format", async () => {
     const user = userEvent.setup();
     window.sessionStorage.setItem(
