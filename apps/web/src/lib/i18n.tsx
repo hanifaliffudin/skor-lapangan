@@ -401,6 +401,8 @@ const messages = {
     score: "Skor",
     communityLibraryTitle: "Aturan komunitas",
     communityRulesPageTitle: "Aturan komunitas · Skor Lapangan",
+    communityRulesSeoDescription:
+      "Jelajahi aturan skor buatan komunitas untuk badminton, pickleball, tenis, padel, tenis meja, dan squash.",
     communityLibraryIntro:
       "Jelajahi aturan buatan komunitas. Setiap aturan diberi label tidak resmi.",
     communitySearchPlaceholder: "Cari nama atau deskripsi aturan",
@@ -902,6 +904,8 @@ const messages = {
     score: "Score",
     communityLibraryTitle: "Community Rules",
     communityRulesPageTitle: "Community Rules · Skor Lapangan",
+    communityRulesSeoDescription:
+      "Browse community-made scoring rules for badminton, pickleball, tennis, padel, table tennis, and squash.",
     communityLibraryIntro:
       "Browse community-made rules. Each ruleset is marked unofficial.",
     communitySearchPlaceholder: "Search rule names or descriptions",

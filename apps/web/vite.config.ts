@@ -33,6 +33,8 @@ export default defineConfig({
       input: {
         main: resolve(projectRoot, "index.html"),
         indonesian: resolve(projectRoot, "id/index.html"),
+        rules: resolve(projectRoot, "rules/index.html"),
+        indonesianRules: resolve(projectRoot, "id/rules/index.html"),
       },
       output: {
         manualChunks(id) {

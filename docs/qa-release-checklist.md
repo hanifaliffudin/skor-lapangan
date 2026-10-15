@@ -95,9 +95,9 @@ The latest engineering evidence run from 2026-10-15 is recorded in [qa-evidence-
 
 ## Search indexing
 
-- [ ] Confirm `/robots.txt` returns plain text and points to the deployed sitemap; confirm `/sitemap.xml` returns valid XML listing the English homepage and `/id/` with matching language alternates.
-- [ ] Confirm `/` and `/id/` return their own language-specific title, description, canonical URL, `hreflang` links, and `WebSite` structured data.
-- [ ] Confirm setup, match, viewer, and Community Rules utility URLs return `X-Robots-Tag: noindex, nofollow` where applicable; confirm direct Community Rules refreshes resolve through the SPA rewrite.
+- [ ] Confirm `/robots.txt` returns plain text and points to the deployed sitemap; confirm `/sitemap.xml` lists both language homepages and the public Community Rules directories with matching language alternates.
+- [ ] Confirm `/`, `/id/`, `/rules`, and `/id/rules` return their own language-specific title, description, canonical URL, `hreflang` links, and the expected `WebSite` or `CollectionPage` structured data before JavaScript runs.
+- [ ] Confirm setup, match, viewer, account, history, Community Rules detail, and Community Rules editor URLs return `X-Robots-Tag: noindex, nofollow` where applicable; confirm public directory refreshes resolve to their route-specific HTML entrypoints.
 - [ ] In Google Search Console, submit the sitemap and inspect both language homepages after deployment. Request indexing if each page is available to Googlebot.
 
 ## Public-launch blockers to resolve

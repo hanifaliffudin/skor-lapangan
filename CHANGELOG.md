@@ -10,6 +10,7 @@ Perubahan penting pada Skor Lapangan dicatat di sini. Entri bertanda `Unreleased
 - Smoke coverage Playwright diperluas ke Badminton, Pickleball, Tennis, dan Padel; coverage yang sudah ada untuk Tenis meja, Squash, dan Community Rules tetap dipertahankan.
 - Hint olahraga di layar sempit kini membungkus teks alih-alih memotong perbedaan aturan dengan ellipsis.
 - Metadata HTML statis mencantumkan enam olahraga, dan route setup, match, viewer, serta Community Rules memperbarui judul dokumen sesuai locale.
+- SEO route publik diperkuat dengan entry HTML khusus untuk home dan direktori Community Rules, canonical/hreflang/structured data per locale, sitemap untuk halaman publik, dan `noindex` untuk halaman utilitas, detail, serta editor.
 
 ### Verifikasi
 

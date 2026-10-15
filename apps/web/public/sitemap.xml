@@ -39,4 +39,40 @@
       href="https://skor-lapangan.vercel.app/"
     />
   </url>
+  <url>
+    <loc>https://skor-lapangan.vercel.app/rules</loc>
+    <xhtml:link
+      rel="alternate"
+      hreflang="en"
+      href="https://skor-lapangan.vercel.app/rules"
+    />
+    <xhtml:link
+      rel="alternate"
+      hreflang="id"
+      href="https://skor-lapangan.vercel.app/id/rules"
+    />
+    <xhtml:link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://skor-lapangan.vercel.app/rules"
+    />
+  </url>
+  <url>
+    <loc>https://skor-lapangan.vercel.app/id/rules</loc>
+    <xhtml:link
+      rel="alternate"
+      hreflang="en"
+      href="https://skor-lapangan.vercel.app/rules"
+    />
+    <xhtml:link
+      rel="alternate"
+      hreflang="id"
+      href="https://skor-lapangan.vercel.app/id/rules"
+    />
+    <xhtml:link
+      rel="alternate"
+      hreflang="x-default"
+      href="https://skor-lapangan.vercel.app/rules"
+    />
+  </url>
 </urlset>

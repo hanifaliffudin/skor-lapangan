@@ -16,6 +16,7 @@ import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { listGuestMatches, removeMatch, saveDraft } from "../../lib/session";
+import { applySeoMetadata, homeSchema } from "../../lib/seo";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Check, Trash2 } from "lucide-react";
@@ -52,32 +53,14 @@ export function HomePage() {
   }, [showDeleteToast]);
 
   useEffect(() => {
-    const canonicalUrl =
-      locale === "id"
-        ? "https://skor-lapangan.vercel.app/id/"
-        : "https://skor-lapangan.vercel.app/";
-    document.title = t("seoTitle");
-    document
-      .querySelector<HTMLMetaElement>('meta[name="description"]')
-      ?.setAttribute("content", t("seoDescription"));
-    document
-      .querySelector<HTMLLinkElement>('link[rel="canonical"]')
-      ?.setAttribute("href", canonicalUrl);
-    document
-      .querySelector<HTMLMetaElement>('meta[property="og:title"]')
-      ?.setAttribute("content", t("seoTitle"));
-    document
-      .querySelector<HTMLMetaElement>('meta[property="og:description"]')
-      ?.setAttribute("content", t("seoDescription"));
-    document
-      .querySelector<HTMLMetaElement>('meta[property="og:url"]')
-      ?.setAttribute("content", canonicalUrl);
-    document
-      .querySelector<HTMLMetaElement>('meta[name="twitter:title"]')
-      ?.setAttribute("content", t("seoTitle"));
-    document
-      .querySelector<HTMLMetaElement>('meta[name="twitter:description"]')
-      ?.setAttribute("content", t("seoDescription"));
+    const path = locale === "id" ? "/id/" : "/";
+    applySeoMetadata({
+      locale,
+      path,
+      title: t("seoTitle"),
+      description: t("seoDescription"),
+      schema: homeSchema(locale, t("seoDescription")),
+    });
   }, [locale, t]);
 
   function continueToSetup() {

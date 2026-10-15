@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
   type CommunityRuleConfiguration,
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { normalizeIntegerInput } from "../../lib/numberInput";
+import { applySeoMetadata, communityRulesSchema } from "../../lib/seo";
 import { saveDraft } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { isRateLimitError } from "../../lib/userError";
@@ -35,12 +36,24 @@ const RULES_PAGE_SIZE = 50;
 type CommunityRuleScope = "all" | "published" | "mine";
 
 export function CommunityRulesDirectoryPage() {
+  const location = useLocation();
   const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
 
   useEffect(() => {
-    document.title = t("communityRulesPageTitle");
-  }, [t]);
+    const path = locale === "id" ? "/id/rules" : "/rules";
+    applySeoMetadata({
+      locale,
+      path,
+      title: t("communityRulesPageTitle"),
+      description: t("communityRulesSeoDescription"),
+      schema: communityRulesSchema(
+        locale,
+        t("communityRulesPageTitle"),
+        t("communityRulesSeoDescription"),
+      ),
+    });
+  }, [locale, location.pathname, t]);
 
   const [rules, setRules] = useState<CommunityRuleRecord[]>([]);
   const [sportFilter, setSportFilter] = useState<Sport | "all">("all");
@@ -328,8 +341,14 @@ export function CommunityRuleDetailPage() {
   const { loading: authLoading, user, isAnonymous } = useAuth();
 
   useEffect(() => {
-    document.title = t("communityRulesPageTitle");
-  }, [t]);
+    applySeoMetadata({
+      locale,
+      path: `${locale === "id" ? "/id" : ""}/rules/${ruleId ?? "unknown"}`,
+      title: t("communityRulesPageTitle"),
+      description: t("communityRulesSeoDescription"),
+      robots: "noindex, nofollow",
+    });
+  }, [locale, ruleId, t]);
 
   const [rule, setRule] = useState<CommunityRuleRecord | null>(null);
   const [configuration, setConfiguration] =
@@ -700,8 +719,14 @@ export function CommunityRuleEditorPage() {
   const { user, isAnonymous } = useAuth();
 
   useEffect(() => {
-    document.title = t("communityRulesPageTitle");
-  }, [t]);
+    applySeoMetadata({
+      locale,
+      path: `${locale === "id" ? "/id" : ""}/rules/${ruleId ? `${ruleId}/edit` : "new"}`,
+      title: t("communityRulesPageTitle"),
+      description: t("communityRulesSeoDescription"),
+      robots: "noindex, nofollow",
+    });
+  }, [locale, ruleId, t]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
