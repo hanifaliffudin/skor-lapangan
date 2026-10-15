@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
   officialRulesetFor,
   type CommunityRuleConfiguration,
@@ -26,7 +26,12 @@ import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import { normalizeIntegerInput } from "../../lib/numberInput";
-import { loadDraft, saveDraft, saveMatch } from "../../lib/session";
+import {
+  loadDraft,
+  saveDraft,
+  saveMatch,
+  type SetupDraft,
+} from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,7 +83,13 @@ function hasValidCustomRules(rules: ScoringRules): boolean {
 }
 
 export function SetupPage() {
-  const draft = loadDraft();
+  const [searchParams] = useSearchParams();
+  const clubSessionId = searchParams.get("clubSessionId");
+  const clubMatchId = searchParams.get("clubMatchId");
+  const draft: SetupDraft | null =
+    clubSessionId && clubMatchId
+      ? ({ sport: "badminton", format: "doubles", mode: "casual" } as const)
+      : loadDraft();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
@@ -88,6 +99,10 @@ export function SetupPage() {
   }, [t]);
 
   const [names, setNames] = useState(["", "", "", ""]);
+  const [clubSetupLoading, setClubSetupLoading] = useState(
+    Boolean(clubMatchId),
+  );
+  const [clubSetupReady, setClubSetupReady] = useState(!clubMatchId);
   const [format, setFormat] = useState<MatchFormat>(draft?.format ?? "doubles");
   const [firstServer, setFirstServer] = useState("A-0");
   const [officialScoringMode, setOfficialScoringMode] =
@@ -146,6 +161,68 @@ export function SetupPage() {
       draft?.format ?? "doubles",
     ).configuration,
   }));
+
+  useEffect(() => {
+    if (!clubMatchId || !clubSessionId) {
+      setClubSetupLoading(false);
+      setClubSetupReady(true);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      if (!supabase) {
+        if (active) {
+          setRuleError(t("backendNotConfigured"));
+          setClubSetupLoading(false);
+        }
+        return;
+      }
+      const { data: assignment, error: assignmentError } = await supabase
+        .from("club_session_matches")
+        .select(
+          "match_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2",
+        )
+        .eq("match_id", clubMatchId)
+        .eq("session_id", clubSessionId)
+        .maybeSingle();
+      if (assignmentError || !assignment) {
+        if (active) {
+          setRuleError(t("clubSessionLoadError"));
+          setClubSetupLoading(false);
+        }
+        return;
+      }
+      const ids = [
+        assignment.team_a_player_1,
+        assignment.team_a_player_2,
+        assignment.team_b_player_1,
+        assignment.team_b_player_2,
+      ];
+      const { data: roster, error: rosterError } = await supabase
+        .from("club_session_players")
+        .select("id,display_name")
+        .eq("session_id", clubSessionId)
+        .in("id", ids);
+      if (rosterError || !roster) {
+        if (active) {
+          setRuleError(t("clubSessionLoadError"));
+          setClubSetupLoading(false);
+        }
+        return;
+      }
+      const namesById = new Map(
+        roster.map((player) => [player.id, player.display_name]),
+      );
+      if (active) {
+        setNames(ids.map((id) => namesById.get(id) ?? ""));
+        setClubSetupReady(true);
+        setClubSetupLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [clubMatchId, clubSessionId, t]);
 
   useEffect(() => {
     if (!draft || !supabase) {
@@ -377,9 +454,9 @@ export function SetupPage() {
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || clubSetupLoading || !clubSetupReady) return;
 
     if (ruleSource === "guest_custom" && !hasValidCustomRules(customRules)) {
       setRuleError(
@@ -414,7 +491,7 @@ export function SetupPage() {
         : `Player ${teamId}${playerIndex + 1}`;
     const cleanName = (index: number, teamId: TeamId, playerIndex: number) =>
       names[index]?.trim() || fallback(teamId, playerIndex);
-    const id = crypto.randomUUID();
+    const id = clubMatchId ?? crypto.randomUUID();
     const official = officialRulesetFor(
       draft.sport,
       format,
@@ -647,13 +724,33 @@ export function SetupPage() {
         },
       },
     };
+    if (clubMatchId && clubSessionId) {
+      if (!supabase || !user || isAnonymous) {
+        setRuleError(t("clubSessionSignInBody"));
+        return;
+      }
+      const { error: startError } = await supabase
+        .from("club_session_matches")
+        .update({ started_at: new Date().toISOString() })
+        .eq("match_id", clubMatchId)
+        .eq("session_id", clubSessionId);
+      if (startError) {
+        setRuleError(t("clubSessionSaveError"));
+        return;
+      }
+    }
     const journal: MatchJournal = { definition, events: [] };
     saveMatch(journal, {
       persistent:
         ruleSource !== "guest_custom" && Boolean(user && !isAnonymous),
       ...(user?.id ? { ownerId: user.id } : {}),
     });
-    navigate(localizedPath(`/match/${id}`, locale));
+    navigate(
+      localizedPath(
+        `/match/${id}${clubSessionId ? `?clubSessionId=${clubSessionId}` : ""}`,
+        locale,
+      ),
+    );
   }
 
   return (
@@ -664,7 +761,14 @@ export function SetupPage() {
           variant="outline"
           className={styles.textButton}
           type="button"
-          onClick={() => navigate(localizedPath("/", locale))}
+          onClick={() =>
+            navigate(
+              localizedPath(
+                clubSessionId ? `/sessions/${clubSessionId}` : "/",
+                locale,
+              ),
+            )
+          }
         >
           <span aria-hidden="true">←</span> {t("back")}
         </Button>
@@ -678,8 +782,22 @@ export function SetupPage() {
             · {t(draft.mode)}
           </p>
           <h1>{t("setupTitle")}</h1>
-          <p>{t("setupIntro")}</p>
+          <p>{clubSessionId ? t("clubSessionDetailIntro") : t("setupIntro")}</p>
         </div>
+
+        {clubSessionId ? (
+          <div
+            className="mb-5 grid gap-1 rounded-lg border border-line-strong bg-surface p-3 text-sm font-semibold leading-6 text-text-muted"
+            role="status"
+          >
+            <span>
+              {clubSetupLoading ? t("loading") : t("clubSessionPrivacyNote")}
+            </span>
+            {!clubSetupLoading ? (
+              <span>{t("clubSessionNamesLocked")}</span>
+            ) : null}
+          </div>
+        ) : null}
 
         {draft.communityRuleId ? (
           <Label className={styles.selectField}>
@@ -702,7 +820,10 @@ export function SetupPage() {
           </Label>
         ) : null}
 
-        <form className={styles.setupForm} onSubmit={submit}>
+        <form
+          className={styles.setupForm}
+          onSubmit={(event) => void submit(event)}
+        >
           <RulesSelector
             customRules={customRules}
             format={format}
@@ -735,6 +856,7 @@ export function SetupPage() {
           <TeamFields
             label={t("teamA")}
             teamKey="a"
+            readOnly={Boolean(clubMatchId)}
             names={Array.from(
               { length: playerCount },
               (_, index) => names[index] ?? "",
@@ -747,6 +869,7 @@ export function SetupPage() {
           <TeamFields
             label={t("teamB")}
             teamKey="b"
+            readOnly={Boolean(clubMatchId)}
             names={Array.from(
               { length: playerCount },
               (_, index) => names[index + 2] ?? "",
@@ -902,7 +1025,11 @@ export function SetupPage() {
             </Label>
           )}
 
-          <Button className={styles.primaryButton} type="submit">
+          <Button
+            className={styles.primaryButton}
+            type="submit"
+            disabled={clubSetupLoading || !clubSetupReady}
+          >
             {t("startMatch")} <span aria-hidden="true">→</span>
           </Button>
           {ruleError ? (
@@ -2011,6 +2138,7 @@ interface TeamFieldsProps {
   label: string;
   names: string[];
   playerLabels: string[];
+  readOnly?: boolean;
   teamKey: "a" | "b";
   onChange: (index: number, value: string) => void;
 }
@@ -2019,6 +2147,7 @@ function TeamFields({
   label,
   names,
   playerLabels,
+  readOnly = false,
   teamKey,
   onChange,
 }: TeamFieldsProps) {
@@ -2034,6 +2163,7 @@ function TeamFields({
             maxLength={30}
             placeholder={playerLabels[index]}
             value={name}
+            readOnly={readOnly}
             onChange={(event) => onChange(index, event.target.value)}
           />
         </Label>

@@ -7,7 +7,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   awardRally,
   canSelectPadelDecidingSide,
@@ -112,8 +112,14 @@ function pointLabel(state: MatchState, team: TeamId, locale: "en" | "id") {
 
 export function MatchPage() {
   const { matchId } = useParams();
+  const [searchParams] = useSearchParams();
+  const clubSessionId = searchParams.get("clubSessionId");
   const navigate = useNavigate();
   const { locale, t } = useLocale();
+  const returnPath = localizedPath(
+    clubSessionId ? `/sessions/${clubSessionId}` : "/",
+    locale,
+  );
 
   useEffect(() => {
     document.title = t("matchPageTitle");
@@ -799,7 +805,7 @@ export function MatchPage() {
         }
       }
       if (matchId) removeMatch(matchId);
-      navigate(localizedPath("/", locale));
+      navigate(returnPath);
     } catch {
       setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
     } finally {
@@ -866,7 +872,7 @@ export function MatchPage() {
               <Button
                 type="button"
                 className={styles.primaryButton}
-                onClick={() => navigate(localizedPath("/", locale))}
+                onClick={() => navigate(returnPath)}
               >
                 {t("backToHome")}
               </Button>
@@ -887,7 +893,7 @@ export function MatchPage() {
           <Button
             className={styles.primaryButton}
             type="button"
-            onClick={() => navigate(localizedPath("/", locale))}
+            onClick={() => navigate(returnPath)}
           >
             {t("newMatch")}
           </Button>
@@ -1063,6 +1069,16 @@ export function MatchPage() {
     <div className="min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <AppHeader compact />
       <main className={styles.matchMain}>
+        {clubSessionId ? (
+          <Button
+            variant="outline"
+            className="mb-4 min-h-11"
+            type="button"
+            onClick={() => navigate(returnPath)}
+          >
+            <span aria-hidden="true">←</span> {t("clubSessions")}
+          </Button>
+        ) : null}
         <div className={styles.matchTopline}>
           <div>
             <p className={styles.eyebrow}>

@@ -22,6 +22,14 @@ Keep the product mobile-first and English by default, with Indonesian available.
 
 The sequence after V1.1 is a proposal, not a promise. Preview availability is not public release approval. Do not wait for six sports before launching V1.0. Promote one sport at a time, and change the order when player feedback supports a different choice.
 
+## Club Sessions and tournament-lite
+
+Status: Badminton doubles MVP implemented in application code; rollout is blocked on applying the Supabase migration and Preview validation.
+
+A club organizer can create a private session, manage its player list and courts, manually queue matches, and follow played/won/lost records in roster order. The first version reuses the existing match setup and scoring flow. Automatic rotations and tournament brackets remain out of scope until the club workflow has been validated.
+
+See the [Club Sessions and Tournament Mode plan](club-session-plan.md) for MVP scope, implementation status, and rollout checks.
+
 ## Current implementation snapshot
 
 The current preview implementation is ahead of the public release sequence:

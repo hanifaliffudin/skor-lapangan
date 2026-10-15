@@ -161,6 +161,12 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
                 </Link>
                 <Link
                   className="flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-ink no-underline hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  to={localizedPath("/sessions", locale)}
+                >
+                  {t("clubSessions")}
+                </Link>
+                <Link
+                  className="flex min-h-11 items-center rounded-md px-3 text-sm font-semibold text-ink no-underline hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   to={localizedPath("/account", locale)}
                 >
                   {t("accountSettings")}

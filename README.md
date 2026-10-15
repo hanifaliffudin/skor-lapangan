@@ -64,7 +64,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all twenty-five migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all twenty-seven migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions migration before deploying that feature. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 

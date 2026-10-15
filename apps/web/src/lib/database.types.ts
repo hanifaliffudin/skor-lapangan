@@ -9,6 +9,129 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      club_sessions: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          session_date: string;
+          sport: string;
+          format: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          session_date: string;
+          sport?: string;
+          format?: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          session_date?: string;
+          sport?: string;
+          format?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      club_session_players: {
+        Row: {
+          id: string;
+          session_id: string;
+          owner_id: string;
+          display_name: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          owner_id: string;
+          display_name: string;
+          sort_order: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          display_name?: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      club_session_courts: {
+        Row: {
+          id: string;
+          session_id: string;
+          owner_id: string;
+          name: string;
+          sort_order: number;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          owner_id: string;
+          name: string;
+          sort_order: number;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          sort_order?: number;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      club_session_matches: {
+        Row: {
+          id: string;
+          session_id: string;
+          owner_id: string;
+          match_id: string;
+          linked_match_id: string | null;
+          court_id: string;
+          team_a_player_1: string;
+          team_a_player_2: string;
+          team_b_player_1: string;
+          team_b_player_2: string;
+          queue_order: number;
+          started_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          session_id: string;
+          owner_id: string;
+          match_id: string;
+          linked_match_id?: string | null;
+          court_id: string;
+          team_a_player_1: string;
+          team_a_player_2: string;
+          team_b_player_1: string;
+          team_b_player_2: string;
+          queue_order: number;
+          started_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          court_id?: string;
+          queue_order?: number;
+          started_at?: string | null;
+        };
+        Relationships: [];
+      };
       matches: {
         Row: {
           id: string;

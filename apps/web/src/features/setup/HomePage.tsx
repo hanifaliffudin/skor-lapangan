@@ -330,6 +330,17 @@ export function HomePage() {
             {t(isAccount ? "accountNote" : "guestNote")}
           </p>
           <PwaInstallControl hasUserEngaged={hasUserEngaged} />
+          <div className="mt-5 border-t border-line pt-4 text-center">
+            <Link
+              className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-surface px-4 text-sm font-extrabold text-ink no-underline hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              to={localizedPath("/sessions", locale)}
+            >
+              {t("clubSessions")}
+            </Link>
+            <p className="mb-0 mt-2 text-xs leading-5 text-text-muted">
+              {t("clubSessionPrivacyNote")}
+            </p>
+          </div>
         </section>
       </main>
 

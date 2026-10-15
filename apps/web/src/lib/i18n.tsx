@@ -9,6 +9,16 @@ import {
 
 export type Locale = "id" | "en";
 
+export function fillMessage(
+  template: string,
+  values: Record<string, string | number>,
+): string {
+  return Object.entries(values).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
+
 const messages = {
   id: {
     appName: "Skor Lapangan",
@@ -297,6 +307,85 @@ const messages = {
     officialLocked: "Aturan federasi terkunci",
     matchCustomRules: "Aturan khusus untuk pertandingan ini",
     communityRules: "Aturan komunitas",
+    clubSessions: "Sesi klub",
+    clubSessionsPageTitle: "Sesi klub · Skor Lapangan",
+    clubSessionEyebrow: "PAPAN SESI · BADMINTON GANDA",
+    clubSessionsIntro:
+      "Atur pemain, lapangan, dan antrean pertandingan untuk sesi main bersama.",
+    clubSessionDetailIntro:
+      "Catat peserta dan lapangan, susun pasangan secara manual, lalu simpan hasil dari pencatat skor.",
+    clubSessionSignInTitle: "Sesi klub tersimpan di akun",
+    clubSessionSignInBody:
+      "Masuk dengan Google untuk membuat papan sesi privat. Nama peserta hanya terlihat oleh akun pengelola.",
+    clubSessionYourSessions: "Sesi Anda",
+    clubSessionListEmpty:
+      "Belum ada sesi. Buat sesi pertama untuk mulai menyusun permainan.",
+    clubSessionCreateTitle: "Buat sesi",
+    clubSessionCreateBody:
+      "Pilot ini mendukung sesi badminton ganda dengan pengelola tunggal.",
+    clubSessionName: "Nama sesi",
+    clubSessionDate: "Tanggal",
+    clubSessionCreateAction: "Buat papan sesi",
+    clubSessionLoadError:
+      "Sesi tidak dapat dimuat. Periksa koneksi, lalu coba lagi.",
+    clubSessionNotFound: "Sesi tidak tersedia",
+    clubSessionNotFoundBody:
+      "Sesi mungkin sudah dihapus atau Anda tidak memiliki akses ke sesi ini.",
+    clubSessionSaveError: "Perubahan belum tersimpan. Coba lagi sebentar.",
+    clubSessionStatus: "Status",
+    clubSessionActive: "Berjalan",
+    clubSessionCompleted: "Selesai",
+    clubSessionComplete: "Tutup sesi",
+    clubSessionReopen: "Buka kembali sesi",
+    clubSessionDelete: "Hapus sesi",
+    clubSessionDeleteConfirm:
+      "Roster, antrean, dan tautan sesi akan dihapus. Jurnal pertandingan tetap ada di riwayat akun.",
+    clubSessionDeleteConfirmAction: "Hapus permanen",
+    clubSessionPlayers: "Pemain aktif",
+    clubSessionRosterTitle: "Daftar pemain",
+    clubSessionRosterBody:
+      "Urutan ini dipertahankan; statistik tidak membuat peringkat.",
+    clubSessionPlayerName: "Nama pemain",
+    clubSessionPlayerPlaceholder: "Nama panggilan",
+    clubSessionAddPlayer: "Tambah pemain",
+    clubSessionRosterEmpty:
+      "Tambahkan empat pemain untuk mulai membuat antrean.",
+    clubSessionDeactivate: "Nonaktifkan",
+    clubSessionReactivate: "Aktifkan",
+    clubSessionRecord: "Main {played} · Menang {won} · Kalah {lost}",
+    clubSessionCourtsTitle: "Lapangan",
+    clubSessionCourtName: "Lapangan",
+    clubSessionCourtPlaceholder: "Contoh: Lapangan 1",
+    clubSessionAddCourt: "Tambah",
+    clubSessionCourtsEmpty:
+      "Tambahkan setidaknya satu lapangan untuk membuat antrean.",
+    clubSessionQueueTitle: "Antrean pertandingan",
+    clubSessionQueueBody:
+      "Pilih satu lapangan dan empat pemain. Sisi A dan B mengikuti urutan pilihan.",
+    clubSessionSelectCourt: "Pilih lapangan",
+    clubSessionSelectPlayer: "Pilih pemain",
+    clubSessionTeamAPlayer: "Tim A · Pemain {number}",
+    clubSessionTeamBPlayer: "Tim B · Pemain {number}",
+    clubSessionAddToQueue: "Tambah ke antrean",
+    clubSessionQueueRequirements:
+      "Perlu empat pemain aktif dan satu lapangan aktif.",
+    clubSessionAssignmentError: "Pilih lapangan dan empat pemain yang berbeda.",
+    clubSessionQueueClosed:
+      "Sesi ditutup. Buka kembali sesi untuk menambah antrean.",
+    clubSessionMatchNumber: "Pertandingan {number}",
+    clubSessionWinner: "Pemenang: {team}",
+    clubSessionMatchSynced: "Pertandingan tersimpan",
+    clubSessionMatchNotSynced: "Menunggu sinkronisasi skor",
+    clubSessionMatchQueued: "Dalam antrean",
+    clubSessionOpenMatch: "Buka skor",
+    clubSessionContinueSetup: "Lanjutkan setup",
+    clubSessionStartMatch: "Mulai skor",
+    remove: "Hapus",
+    clubSessionQueueEmpty: "Belum ada pertandingan di antrean.",
+    clubSessionPrivacyNote:
+      "Papan sesi bersifat privat. Peserta tidak perlu akun dan tidak dapat melihat data sesi dari perangkat lain.",
+    clubSessionNamesLocked:
+      "Nama mengikuti roster sesi agar hasil tetap tercatat ke pemain yang ditugaskan.",
     allSports: "Semua olahraga",
     communityRuleSetupNote:
       "Pilih aturan komunitas yang telah dipublikasikan untuk pertandingan ini.",
@@ -803,6 +892,83 @@ const messages = {
     officialLocked: "Locked federation rules",
     matchCustomRules: "Custom rules for this match only",
     communityRules: "Community Rules",
+    clubSessions: "Club sessions",
+    clubSessionsPageTitle: "Club sessions · Skor Lapangan",
+    clubSessionEyebrow: "SESSION BOARD · BADMINTON DOUBLES",
+    clubSessionsIntro:
+      "Organize players, courts, and a match queue for a casual club session.",
+    clubSessionDetailIntro:
+      "Add players and courts, assign pairs manually, then record results with the scorekeeper.",
+    clubSessionSignInTitle: "Club sessions are saved to your account",
+    clubSessionSignInBody:
+      "Sign in with Google to create a private session board. Player names are visible only to the organizer’s account.",
+    clubSessionYourSessions: "Your sessions",
+    clubSessionListEmpty:
+      "No sessions yet. Create one to start organizing play.",
+    clubSessionCreateTitle: "Create a session",
+    clubSessionCreateBody:
+      "This pilot supports badminton doubles with one organizer.",
+    clubSessionName: "Session name",
+    clubSessionDate: "Date",
+    clubSessionCreateAction: "Create session board",
+    clubSessionLoadError:
+      "Could not load the session. Check your connection and try again.",
+    clubSessionNotFound: "Session unavailable",
+    clubSessionNotFoundBody:
+      "This session may have been deleted, or you may not have access to it.",
+    clubSessionSaveError: "This change was not saved. Please try again.",
+    clubSessionStatus: "Status",
+    clubSessionActive: "Active",
+    clubSessionCompleted: "Completed",
+    clubSessionComplete: "Complete session",
+    clubSessionReopen: "Reopen session",
+    clubSessionDelete: "Delete session",
+    clubSessionDeleteConfirm:
+      "The roster, queue, and session links will be deleted. Match journals remain in account history.",
+    clubSessionDeleteConfirmAction: "Delete permanently",
+    clubSessionPlayers: "Active players",
+    clubSessionRosterTitle: "Player roster",
+    clubSessionRosterBody:
+      "Roster order stays fixed; player records do not create a ranking.",
+    clubSessionPlayerName: "Player name",
+    clubSessionPlayerPlaceholder: "Display name",
+    clubSessionAddPlayer: "Add player",
+    clubSessionRosterEmpty: "Add four players to start building the queue.",
+    clubSessionDeactivate: "Deactivate",
+    clubSessionReactivate: "Reactivate",
+    clubSessionRecord: "Played {played} · Won {won} · Lost {lost}",
+    clubSessionCourtsTitle: "Courts",
+    clubSessionCourtName: "Court",
+    clubSessionCourtPlaceholder: "For example: Court 1",
+    clubSessionAddCourt: "Add court",
+    clubSessionCourtsEmpty: "Add at least one court to create a queue entry.",
+    clubSessionQueueTitle: "Match queue",
+    clubSessionQueueBody:
+      "Choose a court and four players. Side A and B follow the selection order.",
+    clubSessionSelectCourt: "Select a court",
+    clubSessionSelectPlayer: "Select a player",
+    clubSessionTeamAPlayer: "Team A · Player {number}",
+    clubSessionTeamBPlayer: "Team B · Player {number}",
+    clubSessionAddToQueue: "Add to queue",
+    clubSessionQueueRequirements:
+      "Four active players and one active court are required.",
+    clubSessionAssignmentError: "Choose a court and four different players.",
+    clubSessionQueueClosed:
+      "This session is closed. Reopen it to add to the queue.",
+    clubSessionMatchNumber: "Match {number}",
+    clubSessionWinner: "Winner: {team}",
+    clubSessionMatchSynced: "Match saved",
+    clubSessionMatchNotSynced: "Waiting for score sync",
+    clubSessionMatchQueued: "Queued",
+    clubSessionOpenMatch: "Open score",
+    clubSessionContinueSetup: "Continue setup",
+    clubSessionStartMatch: "Start scoring",
+    remove: "Remove",
+    clubSessionQueueEmpty: "There are no matches in the queue yet.",
+    clubSessionPrivacyNote:
+      "Session boards are private. Players do not need accounts and cannot view session data from their own devices.",
+    clubSessionNamesLocked:
+      "Names follow the session roster so results stay attributed to the assigned players.",
     allSports: "All sports",
     communityRuleSetupNote:
       "Choose a published community ruleset for this match.",

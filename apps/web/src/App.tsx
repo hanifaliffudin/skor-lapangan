@@ -39,6 +39,11 @@ const MatchHistoryPage = lazy(() =>
     ({ MatchHistoryPage: page }) => ({ default: page }),
   ),
 );
+const ClubSessionsPage = lazy(() =>
+  import("./features/club-sessions/ClubSessionsPage").then(
+    ({ ClubSessionsPage: page }) => ({ default: page }),
+  ),
+);
 const CommunityRulesDirectoryPage = lazy(() =>
   import("./features/rules/CommunityRulesPage").then(
     ({ CommunityRulesDirectoryPage: page }) => ({ default: page }),
@@ -112,6 +117,10 @@ export function App() {
         <Route path="/id/account" element={<AccountPage />} />
         <Route path="/history" element={<MatchHistoryPage />} />
         <Route path="/id/history" element={<MatchHistoryPage />} />
+        <Route path="/sessions" element={<ClubSessionsPage />} />
+        <Route path="/id/sessions" element={<ClubSessionsPage />} />
+        <Route path="/sessions/:sessionId" element={<ClubSessionsPage />} />
+        <Route path="/id/sessions/:sessionId" element={<ClubSessionsPage />} />
         <Route path="/rules" element={<CommunityRulesDirectoryPage />} />
         <Route path="/id/rules" element={<CommunityRulesDirectoryPage />} />
         <Route path="/rules/new" element={<CommunityRuleEditorPage />} />
