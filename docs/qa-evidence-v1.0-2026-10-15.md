@@ -8,19 +8,19 @@ This run covers the current working tree after the Tennis test synchronization f
 
 ## Automated checks
 
-| Check                                   | Result  | Evidence                                                                                                                                                                           |
-| --------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`                     | Pass    | Prettier check passed after formatting the updated HTML, evidence, and Playwright spec files.                                                                                      |
-| `git diff --check`                      | Pass    | No whitespace errors in the working-tree diff.                                                                                                                                     |
-| `pnpm typecheck`                        | Pass    | Scoring-core and web TypeScript checks passed after route-title message keys were added.                                                                                           |
-| `pnpm test`                             | Pass    | Scoring-core: 5 files, 68 tests. Web: 17 files, 124 tests.                                                                                                                         |
-| `pnpm test:coverage`                    | Pass    | Scoring-core statements 91.23%, branches 78.19%, functions 93.86%. Web statements 73.59%, branches 71.48%, functions 55.73%. Configured thresholds passed.                         |
-| `pnpm build`                            | Pass    | Scoring-core build, Vite production build, PWA service-worker generation, and static `/rules` plus `/id/rules` entrypoints passed.                                                 |
-| Supabase migration history              | Pass    | Supabase project `skor lapangan` shows migrations through `20261015101000_bound_match_journal_reads`, matching the latest repository migration.                                    |
-| `pnpm exec playwright test --workers=1` | Pass    | Eight browser smoke tests passed: Badminton, Pickleball, Tennis, Padel, Table tennis reload, Squash service-box order, Community Rules directory, and unavailable viewer handling. |
-| Vercel production deployment            | Pass    | Deployment `dpl_CgRhVmBVM6APqn2xvyvQqihRsTGi` reached `READY`, aliased to `https://skor-lapangan.vercel.app`, and returned HTTP 200 from the public homepage.                      |
-| `supabase test db`                      | Not run | Docker/Postgres is not available on this host. Run the pgTAP suite in a disposable database.                                                                                       |
-| Production dependency audit             | Not run | Registry/audit access is an external CI or release-environment check.                                                                                                              |
+| Check                                   | Result  | Evidence                                                                                                                                                                                        |
+| --------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`                     | Pass    | Prettier check passed after formatting the updated HTML, evidence, and Playwright spec files.                                                                                                   |
+| `git diff --check`                      | Pass    | No whitespace errors in the working-tree diff.                                                                                                                                                  |
+| `pnpm typecheck`                        | Pass    | Scoring-core and web TypeScript checks passed after route-title message keys were added.                                                                                                        |
+| `pnpm test`                             | Pass    | Scoring-core: 5 files, 68 tests. Web: 17 files, 124 tests.                                                                                                                                      |
+| `pnpm test:coverage`                    | Pass    | Scoring-core statements 91.23%, branches 78.19%, functions 93.86%. Web statements 73.59%, branches 71.48%, functions 55.73%. Configured thresholds passed.                                      |
+| `pnpm build`                            | Pass    | Scoring-core build, Vite production build, PWA service-worker generation, and static `/rules` plus `/id/rules` entrypoints passed.                                                              |
+| Supabase migration history              | Pass    | Supabase project `skor lapangan` shows migrations through `20261015101000_bound_match_journal_reads`, matching the latest repository migration.                                                 |
+| `pnpm exec playwright test --workers=1` | Pass    | Eight browser smoke tests passed: Badminton, Pickleball, Tennis, Padel, Table tennis reload, Squash service-box order, Community Rules directory, and unavailable viewer handling.              |
+| Vercel production deployment            | Pass    | SEO deployment `dpl_4cdtRCxmLFEJ4DzYgENQxEMQ27rt` reached `READY`, aliased to `https://skor-lapangan.vercel.app`, and returned route-specific HTML for both public Community Rules directories. |
+| `supabase test db`                      | Not run | Docker/Postgres is not available on this host. Run the pgTAP suite in a disposable database.                                                                                                    |
+| Production dependency audit             | Not run | Registry/audit access is an external CI or release-environment check.                                                                                                                           |
 
 ## Changes verified in code
 
