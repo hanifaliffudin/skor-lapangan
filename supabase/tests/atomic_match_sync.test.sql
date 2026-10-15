@@ -18,6 +18,7 @@ select is(
     p_last_client_sequence => 0,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[]'::jsonb
   ),
   'applied',
@@ -38,6 +39,7 @@ select is(
     p_last_client_sequence => 1,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[{"id":"00000000-0000-4000-8000-000000000952","client_sequence":1,"event_type":"rally_awarded","payload":{"team":"A"},"created_at":"2026-10-13T00:00:01.000Z"}]'::jsonb
   ),
   'applied',
@@ -69,6 +71,7 @@ select is(
     p_last_client_sequence => 1,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[{"id":"00000000-0000-4000-8000-000000000952","client_sequence":1,"event_type":"rally_awarded","payload":{"team":"A"},"created_at":"2026-10-13T00:00:01.000Z"}]'::jsonb
   ),
   'already_synced',
@@ -89,6 +92,7 @@ select is(
     p_last_client_sequence => 0,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[]'::jsonb
   ),
   'stale',
@@ -109,6 +113,7 @@ select is(
     p_last_client_sequence => 1,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[]'::jsonb
   ),
   'conflict',
@@ -129,6 +134,7 @@ select throws_ok(
     p_last_client_sequence => 2,
     p_created_at => '2026-10-13T00:00:00.000Z'::timestamptz,
     p_is_guest => false,
+    p_control_token => 'sync-control-token-951',
     p_events => '[{"id":"00000000-0000-4000-8000-000000000953","client_sequence":2,"event_type":"unsupported_event","payload":{},"created_at":"2026-10-13T00:00:02.000Z"}]'::jsonb
   )$$,
   '23514',

@@ -121,6 +121,11 @@ describe("quick start", () => {
         name: "Keep score for racket sports",
       }),
     ).toBeVisible();
+    expect(
+      screen
+        .getAllByRole("link", { name: "Community Rules" })
+        .every((link) => link.getAttribute("href") === "/rules"),
+    ).toBe(true);
     await user.click(screen.getByRole("button", { name: "ID" }));
     expect(
       screen.getByRole("heading", {
@@ -197,6 +202,39 @@ describe("quick start", () => {
       screen.getByRole("button", { name: "Correct score: Team A" }),
     ).toHaveTextContent("15");
     expect(listGuestMatches()[0]?.events).toHaveLength(1);
+  });
+
+  it("lets a Community Rules entry point choose the match format", async () => {
+    const user = userEvent.setup();
+    window.sessionStorage.setItem(
+      "skor-lapangan:setup-draft",
+      JSON.stringify({
+        sport: "tennis",
+        format: "doubles",
+        mode: "casual",
+        communityRuleId: "community-tennis-rule",
+      }),
+    );
+
+    await renderApp(
+      <MemoryRouter initialEntries={["/setup"]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    const formatSelect = screen.getByLabelText("Choose match format");
+    expect(formatSelect).toHaveTextContent("Doubles");
+    await selectOption(user, "Choose match format", "Mixed doubles");
+
+    expect(formatSelect).toHaveTextContent("Mixed doubles");
+    expect(
+      JSON.parse(window.sessionStorage.getItem("skor-lapangan:setup-draft")!),
+    ).toMatchObject({
+      format: "mixed_doubles",
+      communityRuleId: "community-tennis-rule",
+    });
   });
 
   it("scores a Tennis doubles point with the selected service and receiver order", async () => {
@@ -620,28 +658,24 @@ describe("quick start", () => {
     ).toBeVisible();
   });
 
-  it.each(["/rules", "/rules/new", "/rules/example"])(
-    "redirects deferred feature route %s to the home page",
-    async (path) => {
-      await renderApp(
-        <MemoryRouter initialEntries={[path]}>
-          <LocaleProvider>
-            <App />
-          </LocaleProvider>
-        </MemoryRouter>,
-      );
+  it.each([
+    ["/rules", "Community Rules"],
+    ["/rules/new", "Sign in with Google to publish a ruleset."],
+  ])("opens Community Rules route %s", async (path, heading) => {
+    await renderApp(
+      <MemoryRouter initialEntries={[path]}>
+        <LocaleProvider>
+          <App />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
 
-      expect(
-        screen.getByRole("heading", {
-          name: "Keep score for racket sports",
-        }),
-      ).toBeVisible();
-      expect(
-        screen.queryByRole("button", { name: /Save history with Google/i }),
-      ).not.toBeInTheDocument();
-      expect(screen.queryByText("Community Rules")).not.toBeInTheDocument();
-    },
-  );
+    expect(
+      screen.getByRole("heading", {
+        name: heading,
+      }),
+    ).toBeVisible();
+  });
 
   it.each(["/history", "/id/history"])(
     "opens the match history route %s",
@@ -701,14 +735,19 @@ describe("quick start", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "End match" }));
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("Badminton · Doubles");
     expect(dialog).toHaveTextContent("0:0");
     expect(
-      screen.getByRole("heading", { name: "End this match?" }),
+      screen.getByRole("heading", {
+        name: "Close this match on this device?",
+      }),
     ).toBeVisible();
+    expect(dialog).toHaveTextContent("The match remains in progress");
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -728,8 +767,12 @@ describe("quick start", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "End match" }));
-    await user.click(screen.getByRole("button", { name: "End this match" }));
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
 
     expect(loadMatch(id)).toBeNull();
     expect(
@@ -757,17 +800,23 @@ describe("quick start", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "End match" }));
-    await user.click(screen.getByRole("button", { name: "End this match" }));
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
 
     expect(screen.getByRole("dialog")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "The match was not ended. Try again.",
+      "The match was not closed. Try again.",
     );
     expect(loadMatch(id)).not.toBeNull();
 
     removeSpy.mockRestore();
-    await user.click(screen.getByRole("button", { name: "End this match" }));
+    await user.click(
+      screen.getByRole("button", { name: "Close on this device" }),
+    );
 
     expect(loadMatch(id)).toBeNull();
     expect(
@@ -825,7 +874,9 @@ describe("quick start", () => {
     );
     expect(screen.getByRole("radio", { name: /Official Rules/ })).toBeVisible();
     expect(screen.getByRole("radio", { name: /Custom rules/ })).toBeVisible();
-    expect(screen.queryByText("Community Rules")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Community Rules/ }),
+    ).toBeVisible();
     await user.click(
       screen.getByRole("radio", { name: /Custom rules for this match/ }),
     );

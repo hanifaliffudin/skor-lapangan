@@ -19,9 +19,10 @@ V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, P
 - Squash doubles keeps a fixed server order and lets each pair confirm its left/right receiver mapping before the next game. Let, stroke, fault, appeal, injury, and referee calls remain outside the scorekeeper scope.
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
-- Guest matches with client-generated UUIDs, local-first scoring, rate-limited atomic server sync, and a 12-hour inactivity expiry capped at 24 hours. Stale or divergent multi-device snapshots are rejected; expired records are cleaned hourly.
+- Guest matches with client-generated UUIDs, local-first scoring, rate-limited atomic server sync, and a 12-hour inactivity expiry capped at 24 hours. Stale or divergent snapshots are rejected; expired records are cleaned hourly.
+- Google account history that can hydrate active or completed matches on another browser or device. Active matches use a single-editor lease with explicit takeover; other devices stay read-only until they acquire control.
 - Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
-- Locked Official Rules and guest-only custom rules that stay in the current browser and match.
+- Locked Official Rules, published Community Rules, and guest-only custom rules. Community Rules are versioned and snapshotted into each match.
 - One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
 - English by default, with Indonesian available.
 
@@ -30,7 +31,7 @@ V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, P
 - React 19, TypeScript, Vite, and React Router.
 - Vitest and Testing Library.
 - pnpm workspace with the scoring engine kept separate from the UI.
-- Supabase Auth, Postgres, and Row Level Security for temporary guest sync and Live Viewer links.
+- Supabase Auth, Postgres, and Row Level Security for guest sync, account match history, single-editor control leases, and Live Viewer links.
 
 ## Run locally
 
@@ -39,7 +40,7 @@ pnpm install
 pnpm dev
 ```
 
-The app can run locally without Supabase, but server sync, Google account features, and Live Viewer links require the Supabase setup below. The account foundation is implemented for local and Preview rollout; Community Rules remain gated. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
+The app can run locally without Supabase, but server sync, Google account features, Live Viewer links, and Community Rules require the Supabase setup below. Community Rules should be rolled out to Preview first with a disposable Google account and anonymous session. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -63,7 +64,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all sixteen migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply both atomic sync migrations, the account-deletion migration, and both guest-transfer migrations before deploying the account foundation. Enable anonymous sign-ins for guest matches and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Community Rules schema remains present for compatibility, but its routes and user flows stay disabled. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all twenty-five migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 
@@ -87,7 +88,7 @@ Public-facing drafts that need owner and legal review before publication:
 
 - [Privacy notice draft](docs/privacy-notice.md)
 - [Terms of use draft](docs/terms-of-use.md)
-- [Community Rules policy draft for V1.1](docs/community-rules-policy.md)
+- [Community Rules policy and moderation runbook](docs/community-rules-policy.md)
 - [Account deletion workflow](docs/account-deletion-request-draft.md)
 
 ## Project structure

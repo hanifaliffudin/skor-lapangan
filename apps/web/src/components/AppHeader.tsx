@@ -108,6 +108,12 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
         <span className="max-[560px]:hidden">{t("appName")}</span>
       </Link>
       <div className="flex items-center gap-[10px] max-[560px]:gap-[5px]">
+        <Link
+          className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-extrabold text-ink no-underline hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 max-[560px]:hidden"
+          to={localizedPath("/rules", locale)}
+        >
+          {t("communityRules")}
+        </Link>
         {user && !isAnonymous ? (
           <details className="relative max-[560px]:static">
             <summary className="flex min-h-11 max-w-[220px] cursor-pointer list-none items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-extrabold text-ink outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 max-[560px]:min-w-14 max-[560px]:max-w-14 max-[560px]:justify-center max-[560px]:px-1 max-[360px]:min-w-12 max-[360px]:max-w-12">

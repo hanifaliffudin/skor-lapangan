@@ -1,6 +1,11 @@
 import "@testing-library/jest-dom/vitest";
+import { beforeEach } from "vitest";
 
 window.scrollTo = () => undefined;
+
+beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+});
 
 if (typeof window.PointerEvent !== "function") {
   Object.defineProperty(window, "PointerEvent", {

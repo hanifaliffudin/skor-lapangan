@@ -2,59 +2,76 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  OFFICIAL_RULESETS,
-  officialRulesetFor,
+  type CommunityRuleConfiguration,
+  type PadelRules,
   type ScoringRules,
   type Sport,
+  type SquashRules,
+  type TableTennisRules,
+  type TennisRules,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SelectControl } from "@/components/ui/select-control";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "../../lib/auth";
-import { useLocale } from "../../lib/i18n";
+import { localizedPath, useLocale } from "../../lib/i18n";
+import { normalizeIntegerInput } from "../../lib/numberInput";
 import { saveDraft } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { isRateLimitError } from "../../lib/userError";
 import type { Json } from "../../lib/database.types";
+import {
+  decodeCommunityRuleConfiguration,
+  defaultCommunityRuleConfiguration,
+  isCommunitySport,
+  type CommunityRuleRecord,
+} from "./communityRule";
 import styles from "../../styles/App.module.css";
 
-interface CommunityRule {
-  id: string;
-  sport: string;
-  title: string;
-  description: string;
-  current_version: number;
-  is_published: boolean;
-  created_at: string;
-  updated_at: string;
-  is_owner: boolean;
-}
-
-function validSport(sport: string): sport is Sport {
-  return sport === "badminton" || sport === "pickleball";
-}
-
-function isScoringRules(value: unknown): value is ScoringRules {
-  if (!value || typeof value !== "object") return false;
-  const rules = value as Partial<ScoringRules>;
-  return (
-    Number.isInteger(rules.pointsToWin) &&
-    Number.isInteger(rules.winBy) &&
-    (rules.maxPoints === null || Number.isInteger(rules.maxPoints)) &&
-    (rules.bestOf === 1 || rules.bestOf === 3 || rules.bestOf === 5) &&
-    (rules.scoringMode === "rally" || rules.scoringMode === "side_out") &&
-    (rules.serversPerTurn === 1 || rules.serversPerTurn === 2) &&
-    (rules.openingServerNumber === 1 || rules.openingServerNumber === 2)
-  );
-}
+const RULES_PAGE_SIZE = 50;
+type CommunityRuleScope = "all" | "published" | "mine";
 
 export function CommunityRulesDirectoryPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
-  const [rules, setRules] = useState<CommunityRule[]>([]);
+  const [rules, setRules] = useState<CommunityRuleRecord[]>([]);
+  const [sportFilter, setSportFilter] = useState<Sport | "all">("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [scopeFilter, setScopeFilter] = useState<CommunityRuleScope>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rulesCursor, setRulesCursor] = useState<{
+    updatedAt: string;
+    id: string;
+  } | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setSearchQuery(searchInput.trim()),
+      250,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if ((!user || isAnonymous) && scopeFilter === "mine") {
+      setScopeFilter("all");
+    }
+  }, [isAnonymous, scopeFilter, user]);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError("");
+    setRules([]);
+    setRulesCursor(null);
+    setHasMore(false);
     async function load() {
       if (!supabase) {
         setLoading(false);
@@ -62,7 +79,15 @@ export function CommunityRulesDirectoryPage() {
         return;
       }
       const { data: visibleRules, error: publicError } = await supabase.rpc(
-        "list_community_rules",
+        "list_community_rules_page",
+        {
+          p_sport: sportFilter === "all" ? null : sportFilter,
+          p_search: searchQuery || null,
+          p_scope: scopeFilter,
+          p_limit: RULES_PAGE_SIZE,
+          p_before_updated_at: null,
+          p_before_id: null,
+        },
       );
       if (!active) return;
       if (publicError) {
@@ -70,19 +95,82 @@ export function CommunityRulesDirectoryPage() {
         setLoading(false);
         return;
       }
-      setRules((visibleRules ?? []) as CommunityRule[]);
+      const page = (visibleRules ?? []).filter(
+        (rule): rule is CommunityRuleRecord => isCommunitySport(rule.sport),
+      );
+      const last = page.at(-1);
+      setRules(page);
+      setRulesCursor(last ? { updatedAt: last.updated_at, id: last.id } : null);
+      setHasMore(page.length === RULES_PAGE_SIZE);
       setLoading(false);
     }
     void load();
     return () => {
       active = false;
     };
-  }, [user, isAnonymous, t]);
+  }, [isAnonymous, searchQuery, scopeFilter, sportFilter, t, user]);
+
+  async function loadMoreRules() {
+    if (!supabase || !rulesCursor || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const { data, error: publicError } = await supabase.rpc(
+      "list_community_rules_page",
+      {
+        p_sport: sportFilter === "all" ? null : sportFilter,
+        p_search: searchQuery || null,
+        p_scope: scopeFilter,
+        p_limit: RULES_PAGE_SIZE,
+        p_before_updated_at: rulesCursor.updatedAt,
+        p_before_id: rulesCursor.id,
+      },
+    );
+    if (publicError) {
+      setError(publicError.message);
+      setLoadingMore(false);
+      return;
+    }
+    const page = (data ?? []).filter((rule): rule is CommunityRuleRecord =>
+      isCommunitySport(rule.sport),
+    );
+    const last = page.at(-1);
+    setRules((current) => [...current, ...page]);
+    setRulesCursor(last ? { updatedAt: last.updated_at, id: last.id } : null);
+    setHasMore(page.length === RULES_PAGE_SIZE);
+    setLoadingMore(false);
+  }
+
+  const normalizedSearch = searchInput.trim().toLocaleLowerCase();
+  const visibleRules = rules.filter((rule) => {
+    const matchesSport = sportFilter === "all" || rule.sport === sportFilter;
+    const matchesScope =
+      scopeFilter === "all" ||
+      (scopeFilter === "published" && rule.is_published) ||
+      (scopeFilter === "mine" && rule.is_owner);
+    const matchesSearch =
+      !normalizedSearch ||
+      `${rule.title} ${rule.description}`
+        .toLocaleLowerCase()
+        .includes(normalizedSearch);
+    return matchesSport && matchesScope && matchesSearch;
+  });
+  const hasRuleFilters = Boolean(
+    searchInput.trim() || sportFilter !== "all" || scopeFilter !== "all",
+  );
+
+  function clearCommunityFilters() {
+    setSearchInput("");
+    setSearchQuery("");
+    setSportFilter("all");
+    setScopeFilter("all");
+  }
 
   return (
     <div className={styles.pageShell}>
       <AppHeader />
       <main className={styles.rulesMain}>
+        <Link className={styles.textButton} to={localizedPath("/", locale)}>
+          ← {t("backToHome")}
+        </Link>
         <div className={styles.rulesPageHeading}>
           <div>
             <p className={styles.eyebrow}>{t("communityRules")}</p>
@@ -90,46 +178,139 @@ export function CommunityRulesDirectoryPage() {
             <p>{t("communityLibraryIntro")}</p>
           </div>
           {user && !isAnonymous ? (
-            <Link className={styles.primaryButton} to="/rules/new">
+            <Link
+              className={styles.primaryButton}
+              to={localizedPath("/rules/new", locale)}
+            >
               {t("createCommunityRule")}
             </Link>
           ) : null}
         </div>
         <CommunityDisclaimer />
+        <section
+          className={styles.communityFilters}
+          aria-label={t("communityRules")}
+        >
+          <label className={styles.communitySearch}>
+            <span className="sr-only">{t("communitySearchPlaceholder")}</span>
+            <Input
+              type="search"
+              value={searchInput}
+              placeholder={t("communitySearchPlaceholder")}
+              onChange={(event) => setSearchInput(event.target.value)}
+            />
+          </label>
+          <div className={styles.communityFilterRow}>
+            <Label className={styles.selectField}>
+              <span>{t("sport")}</span>
+              <SelectControl
+                name="community-sport-filter"
+                value={sportFilter}
+                onChange={(event) =>
+                  setSportFilter(event.target.value as Sport | "all")
+                }
+              >
+                <option value="all">{t("allSports")}</option>
+                <option value="badminton">{t("badminton")}</option>
+                <option value="pickleball">{t("pickleball")}</option>
+                <option value="tennis">{t("tennis")}</option>
+                <option value="padel">{t("padel")}</option>
+                <option value="table_tennis">{t("table_tennis")}</option>
+                <option value="squash">{t("squash")}</option>
+              </SelectControl>
+            </Label>
+            <Label className={styles.selectField}>
+              <span>{t("communityFilterLabel")}</span>
+              <SelectControl
+                name="community-scope-filter"
+                value={scopeFilter}
+                onChange={(event) =>
+                  setScopeFilter(event.target.value as CommunityRuleScope)
+                }
+              >
+                <option value="all">{t("communityFilterAll")}</option>
+                <option value="published">
+                  {t("communityFilterPublished")}
+                </option>
+                {user && !isAnonymous ? (
+                  <option value="mine">{t("communityFilterMine")}</option>
+                ) : null}
+              </SelectControl>
+            </Label>
+          </div>
+        </section>
         {loading ? <p role="status">{t("loading")}</p> : null}
         {error ? (
           <p className={styles.formError} role="alert">
             {error}
           </p>
         ) : null}
-        {!loading && !error && rules.length === 0 ? (
+        {!loading && !error && visibleRules.length === 0 ? (
           <section className={styles.rulesEmpty}>
-            <h2>{t("noCommunityRulesYet")}</h2>
-            <p>{t("noCommunityRulesBody")}</p>
+            <h2>
+              {t(hasRuleFilters ? "communityNoResults" : "noCommunityRulesYet")}
+            </h2>
+            <p>
+              {t(
+                hasRuleFilters
+                  ? "communityLibraryIntro"
+                  : "noCommunityRulesBody",
+              )}
+            </p>
+            {hasRuleFilters ? (
+              <Button
+                variant="outline"
+                type="button"
+                className="mt-4 min-h-11"
+                onClick={clearCommunityFilters}
+              >
+                {t("clearCommunityFilters")}
+              </Button>
+            ) : null}
           </section>
         ) : null}
         <div className={styles.communityRuleList}>
-          {rules.map((rule) => (
+          {visibleRules.map((rule) => (
             <article className={styles.communityRuleCard} key={rule.id}>
-              <div className={styles.communityRuleCardTop}>
-                <span className={styles.unofficialBadge}>
-                  {t("unofficial")}
-                </span>
-                <span>
-                  {t(validSport(rule.sport) ? rule.sport : "badminton")}
-                </span>
-                {!rule.is_published ? <span>{t("unpublished")}</span> : null}
-              </div>
-              <h2>
-                <Link to={"/rules/" + rule.id}>{rule.title}</Link>
-              </h2>
-              <p>{rule.description || t("noRuleDescription")}</p>
-              <span className={styles.ruleVersion}>
-                {t("version")} {rule.current_version}
-              </span>
+              <Link
+                className={styles.communityRuleCardLink}
+                to={localizedPath(`/rules/${rule.id}`, locale)}
+              >
+                <div className={styles.communityRuleCardTop}>
+                  <span className={styles.unofficialBadge}>
+                    {t("unofficial")}
+                  </span>
+                  <span>
+                    {t(isCommunitySport(rule.sport) ? rule.sport : "badminton")}
+                  </span>
+                  {!rule.is_published ? <span>{t("unpublished")}</span> : null}
+                </div>
+                <h2>{rule.title}</h2>
+                <p>{rule.description || t("noRuleDescription")}</p>
+                <div className={styles.communityRuleCardFooter}>
+                  <span className={styles.ruleVersion}>
+                    {t("version")} {rule.current_version}
+                  </span>
+                  <span className={styles.communityRuleCardCta}>
+                    {t("viewCommunityRule")}
+                    <span aria-hidden="true">→</span>
+                  </span>
+                </div>
+              </Link>
             </article>
           ))}
         </div>
+        {hasMore && !error ? (
+          <Button
+            variant="outline"
+            className="mt-6 min-h-11"
+            type="button"
+            disabled={loadingMore}
+            onClick={() => void loadMoreRules()}
+          >
+            {loadingMore ? t("loading") : t("loadMore")}
+          </Button>
+        ) : null}
       </main>
     </div>
   );
@@ -138,17 +319,20 @@ export function CommunityRulesDirectoryPage() {
 export function CommunityRuleDetailPage() {
   const { ruleId } = useParams();
   const navigate = useNavigate();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { loading: authLoading, user, isAnonymous } = useAuth();
-  const [rule, setRule] = useState<CommunityRule | null>(null);
-  const [configuration, setConfiguration] = useState<ScoringRules | null>(null);
+  const [rule, setRule] = useState<CommunityRuleRecord | null>(null);
+  const [configuration, setConfiguration] =
+    useState<CommunityRuleConfiguration | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [configurationError, setConfigurationError] = useState("");
   const [reportReason, setReportReason] = useState("misleading");
   const [reportDetails, setReportDetails] = useState("");
   const [reportContact, setReportContact] = useState("");
   const [reporting, setReporting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     if (!ruleId || !supabase) {
@@ -163,11 +347,12 @@ export function CommunityRuleDetailPage() {
       );
       if (!active) return;
       const data = ruleRows?.[0];
-      if (error || !data || !validSport(data.sport)) {
+      if (error || !data || !isCommunitySport(data.sport)) {
         setLoading(false);
         return;
       }
-      setRule(data as CommunityRule);
+      const typedRule = { ...data, sport: data.sport } as CommunityRuleRecord;
+      setRule(typedRule);
       setIsOwner(data.is_owner && Boolean(user && !isAnonymous));
       const { data: versions } = await supabase.rpc(
         "read_community_rule_version",
@@ -175,9 +360,11 @@ export function CommunityRuleDetailPage() {
       );
       if (!active) return;
       const version = versions?.[0];
-      if (version && isScoringRules(version.configuration)) {
-        setConfiguration(version.configuration);
-      }
+      const decoded = version
+        ? decodeCommunityRuleConfiguration(version.configuration, data.sport)
+        : null;
+      setConfiguration(decoded);
+      setConfigurationError(decoded ? "" : t("loadRuleError"));
       setLoading(false);
     })();
     return () => {
@@ -211,14 +398,14 @@ export function CommunityRuleDetailPage() {
   }
 
   function useRule() {
-    if (!rule || !validSport(rule.sport)) return;
+    if (!rule || !isCommunitySport(rule.sport)) return;
     saveDraft({
       sport: rule.sport,
       format: "doubles",
       mode: "casual",
       communityRuleId: rule.id,
     });
-    navigate("/setup");
+    navigate(localizedPath("/setup", locale));
   }
 
   async function unpublish() {
@@ -234,6 +421,23 @@ export function CommunityRuleDetailPage() {
       current ? { ...current, is_published: false } : current,
     );
     setMessage(t("ruleUnpublished"));
+  }
+
+  async function publish() {
+    if (!ruleId || !supabase) return;
+    setPublishing(true);
+    const { data, error } = await supabase.rpc("publish_community_rule", {
+      p_rule_id: ruleId,
+    });
+    setPublishing(false);
+    if (error || !data) {
+      setMessage(error?.message ?? t("saveFailed"));
+      return;
+    }
+    setRule((current) =>
+      current ? { ...current, is_published: true } : current,
+    );
+    setMessage(t("ruleRepublished"));
   }
 
   async function submitReport(event: FormEvent<HTMLFormElement>) {
@@ -260,7 +464,10 @@ export function CommunityRuleDetailPage() {
     <div className={styles.pageShell}>
       <AppHeader />
       <main className={styles.rulesMain}>
-        <Link className={styles.textButton} to="/rules">
+        <Link
+          className={styles.textButton}
+          to={localizedPath("/rules", locale)}
+        >
           ← {t("backToRules")}
         </Link>
         {loading ? <p role="status">{t("loading")}</p> : null}
@@ -276,7 +483,7 @@ export function CommunityRuleDetailPage() {
               <div>
                 <p className={styles.eyebrow}>
                   {t("communityRules")} ·{" "}
-                  {t(validSport(rule.sport) ? rule.sport : "badminton")}
+                  {t(isCommunitySport(rule.sport) ? rule.sport : "badminton")}
                 </p>
                 <h1>{rule.title}</h1>
                 <p>{rule.description || t("noRuleDescription")}</p>
@@ -289,36 +496,45 @@ export function CommunityRuleDetailPage() {
                   </span>
                 ) : null}
               </div>
-              <button
+              <Button
                 className={styles.primaryButton}
                 type="button"
                 disabled={!configuration || !rule.is_published}
                 onClick={useRule}
               >
                 {t("useTheseRules")}
-              </button>
+              </Button>
             </div>
             <CommunityDisclaimer />
-            {configuration ? <RulesSummary rules={configuration} /> : null}
+            {configurationError ? (
+              <p className={styles.formError} role="alert">
+                {configurationError}
+              </p>
+            ) : null}
+            {configuration ? (
+              <RulesSummary sport={rule.sport} configuration={configuration} />
+            ) : null}
             <section className={styles.ruleSharePanel}>
               <div>
                 <h2>{t("shareCommunityRule")}</h2>
                 <p>{t("shareCommunityRuleBody")}</p>
                 <div className={styles.shareActions}>
-                  <button
+                  <Button
+                    variant="outline"
                     className={styles.secondaryButton}
                     type="button"
                     onClick={() => void shareRuleLink()}
                   >
                     {t("shareLink")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
                     className={styles.secondaryButton}
                     type="button"
                     onClick={() => void copyRuleLink()}
                   >
                     {t("copyLink")}
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className={styles.ruleQr} aria-label={t("qrCode")}>
@@ -331,29 +547,39 @@ export function CommunityRuleDetailPage() {
               </div>
             </section>
             {isOwner ? (
-              <div className={styles.shareActions}>
+              <div className={styles.ruleOwnerActions}>
                 <Link
                   className={styles.secondaryButton}
-                  to={"/rules/" + rule.id + "/edit"}
+                  to={localizedPath(`/rules/${rule.id}/edit`, locale)}
                 >
                   {t("editRule")}
                 </Link>
                 {rule.is_published ? (
-                  <button
-                    className={styles.dangerButton}
+                  <Button
+                    variant="destructive"
+                    className={styles.ruleUnpublishButton}
                     type="button"
                     onClick={() => void unpublish()}
                   >
                     {t("unpublishRule")}
-                  </button>
-                ) : null}
+                  </Button>
+                ) : (
+                  <Button
+                    className={styles.ruleRepublishButton}
+                    type="button"
+                    disabled={publishing}
+                    onClick={() => void publish()}
+                  >
+                    {publishing ? t("working") : t("republishRule")}
+                  </Button>
+                )}
               </div>
             ) : rule.is_published ? (
               <form className={styles.reportForm} onSubmit={submitReport}>
                 <h2>{t("reportRule")}</h2>
-                <label>
+                <Label>
                   <span>{t("reportReason")}</span>
-                  <select
+                  <SelectControl
                     name="report-reason"
                     value={reportReason}
                     onChange={(event) => setReportReason(event.target.value)}
@@ -364,20 +590,20 @@ export function CommunityRuleDetailPage() {
                     <option value="spam">{t("reportSpam")}</option>
                     <option value="rights">{t("reportRights")}</option>
                     <option value="other">{t("reportOther")}</option>
-                  </select>
-                </label>
-                <label>
+                  </SelectControl>
+                </Label>
+                <Label>
                   <span>{t("reportDetails")}</span>
-                  <textarea
+                  <Textarea
                     name="report-details"
                     maxLength={500}
                     value={reportDetails}
                     onChange={(event) => setReportDetails(event.target.value)}
                   />
-                </label>
-                <label>
+                </Label>
+                <Label>
                   <span>{t("reportContact")}</span>
-                  <input
+                  <Input
                     name="report-contact"
                     type="email"
                     autoComplete="email"
@@ -386,18 +612,19 @@ export function CommunityRuleDetailPage() {
                     onChange={(event) => setReportContact(event.target.value)}
                   />
                   <small>{t("reportContactHint")}</small>
-                </label>
+                </Label>
                 <p>{t("reportReviewNote")}</p>
                 {!user && !authLoading ? (
                   <p role="status">{t("reportSessionRequired")}</p>
                 ) : null}
-                <button
+                <Button
+                  variant="outline"
                   className={styles.secondaryButton}
                   type="submit"
                   disabled={reporting || authLoading || !user}
                 >
                   {reporting ? t("working") : t("submitReport")}
-                </button>
+                </Button>
               </form>
             ) : null}
             {message ? (
@@ -415,14 +642,15 @@ export function CommunityRuleDetailPage() {
 export function CommunityRuleEditorPage() {
   const { ruleId } = useParams();
   const navigate = useNavigate();
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const { user, isAnonymous } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [sport, setSport] = useState<Sport>("badminton");
-  const [rules, setRules] = useState<ScoringRules>({
-    ...OFFICIAL_RULESETS.badminton.configuration,
-  });
+  const [configuration, setConfiguration] =
+    useState<CommunityRuleConfiguration>(() =>
+      defaultCommunityRuleConfiguration("badminton"),
+    );
   const [expectedVersion, setExpectedVersion] = useState(0);
   const [loading, setLoading] = useState(Boolean(ruleId));
   const [saving, setSaving] = useState(false);
@@ -430,7 +658,12 @@ export function CommunityRuleEditorPage() {
   const [newRuleId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
-    if (!ruleId || !supabase) return;
+    if (!supabase) {
+      setError(t("backendNotConfigured"));
+      setLoading(false);
+      return;
+    }
+    if (!ruleId) return;
     let active = true;
     void (async () => {
       const { data: rules, error: loadError } = await supabase.rpc(
@@ -439,12 +672,22 @@ export function CommunityRuleEditorPage() {
       );
       if (!active) return;
       const rule = rules?.[0];
-      if (loadError || !rule || !user || isAnonymous || !rule.is_owner) {
+      if (loadError) {
+        setError(t("loadRuleError"));
+        setLoading(false);
+        return;
+      }
+      if (!user || isAnonymous) {
+        setError(t("googleRequired"));
+        setLoading(false);
+        return;
+      }
+      if (!rule || !rule.is_owner) {
         setError(t("notRuleOwner"));
         setLoading(false);
         return;
       }
-      if (!validSport(rule.sport)) {
+      if (!isCommunitySport(rule.sport)) {
         setError(t("loadRuleError"));
         setLoading(false);
         return;
@@ -453,14 +696,26 @@ export function CommunityRuleEditorPage() {
       setTitle(rule.title);
       setDescription(rule.description);
       setExpectedVersion(rule.current_version);
-      const { data: versions } = await supabase.rpc(
+      const { data: versions, error: versionError } = await supabase.rpc(
         "read_community_rule_version",
         { p_rule_id: rule.id, p_version: rule.current_version },
       );
       if (!active) return;
+      if (versionError) {
+        setError(t("loadRuleError"));
+        setLoading(false);
+        return;
+      }
       const version = versions?.[0];
-      if (version && isScoringRules(version.configuration))
-        setRules(version.configuration);
+      const decoded = version
+        ? decodeCommunityRuleConfiguration(version.configuration, rule.sport)
+        : null;
+      if (!decoded) {
+        setError(t("loadRuleError"));
+        setLoading(false);
+        return;
+      }
+      setConfiguration(decoded);
       setLoading(false);
     })();
     return () => {
@@ -470,24 +725,82 @@ export function CommunityRuleEditorPage() {
 
   function changeSport(nextSport: Sport) {
     setSport(nextSport);
-    setRules({ ...officialRulesetFor(nextSport).configuration });
+    setConfiguration(defaultCommunityRuleConfiguration(nextSport));
   }
 
   function updateRules<Key extends keyof ScoringRules>(
     key: Key,
     value: ScoringRules[Key],
   ) {
-    setRules((current) => ({ ...current, [key]: value }));
+    setConfiguration((current) => ({
+      ...current,
+      scoring: { ...current.scoring, [key]: value },
+    }));
+  }
+
+  function updateTennis<Key extends keyof TennisRules>(
+    key: Key,
+    value: TennisRules[Key],
+  ) {
+    if (!configuration.tennis) return;
+    setConfiguration((current) => ({
+      ...current,
+      tennis: { ...current.tennis!, [key]: value },
+    }));
+  }
+
+  function updatePadel<Key extends keyof PadelRules>(
+    key: Key,
+    value: PadelRules[Key],
+  ) {
+    if (!configuration.padel) return;
+    setConfiguration((current) => ({
+      ...current,
+      padel: { ...current.padel!, [key]: value },
+    }));
+  }
+
+  function updateTableTennis<Key extends keyof TableTennisRules>(
+    key: Key,
+    value: TableTennisRules[Key],
+  ) {
+    if (!configuration.tableTennis) return;
+    setConfiguration((current) => ({
+      ...current,
+      tableTennis: { ...current.tableTennis!, [key]: value },
+    }));
+  }
+
+  function updateSquash<Key extends keyof SquashRules>(
+    key: Key,
+    value: SquashRules[Key],
+  ) {
+    if (!configuration.squash) return;
+    setConfiguration((current) => ({
+      ...current,
+      squash: { ...current.squash!, [key]: value },
+    }));
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !user || isAnonymous) {
+    if (!supabase) {
+      setError(t("backendNotConfigured"));
+      return;
+    }
+    if (!user || isAnonymous) {
       setError(t("googleRequired"));
       return;
     }
-    if (rules.maxPoints !== null && rules.maxPoints < rules.pointsToWin) {
+    if (
+      configuration.scoring.maxPoints !== null &&
+      configuration.scoring.maxPoints < configuration.scoring.pointsToWin
+    ) {
       setError(t("capMustBeAtLeastTarget"));
+      return;
+    }
+    if (!decodeCommunityRuleConfiguration(configuration, sport)) {
+      setError(t("loadRuleError"));
       return;
     }
     setSaving(true);
@@ -499,7 +812,7 @@ export function CommunityRuleEditorPage() {
       p_sport: sport,
       p_title: title.trim(),
       p_description: description.trim(),
-      p_configuration: JSON.parse(JSON.stringify(rules)) as Json,
+      p_configuration: JSON.parse(JSON.stringify(configuration)) as Json,
       p_is_published: true,
     });
     setSaving(false);
@@ -507,7 +820,7 @@ export function CommunityRuleEditorPage() {
       setError(saveError.message);
       return;
     }
-    navigate("/rules/" + id);
+    navigate(localizedPath(`/rules/${id}`, locale));
   }
 
   if (!user || isAnonymous) {
@@ -515,6 +828,12 @@ export function CommunityRuleEditorPage() {
       <div className={styles.pageShell}>
         <AppHeader />
         <main className={styles.rulesMain}>
+          <Link
+            className={styles.textButton}
+            to={localizedPath("/rules", locale)}
+          >
+            ← {t("backToRules")}
+          </Link>
           <h1>{t("googleRequired")}</h1>
           <p>{t("googleRequiredBody")}</p>
         </main>
@@ -526,7 +845,10 @@ export function CommunityRuleEditorPage() {
     <div className={styles.pageShell}>
       <AppHeader />
       <main className={styles.rulesMain}>
-        <Link className={styles.textButton} to="/rules">
+        <Link
+          className={styles.textButton}
+          to={localizedPath("/rules", locale)}
+        >
           ← {t("backToRules")}
         </Link>
         <p className={styles.eyebrow}>{t("communityRules")}</p>
@@ -534,9 +856,9 @@ export function CommunityRuleEditorPage() {
         <CommunityDisclaimer />
         {loading ? <p role="status">{t("loading")}</p> : null}
         <form className={styles.communityRuleForm} onSubmit={save}>
-          <label>
+          <Label>
             <span>{t("ruleTitle")}</span>
-            <input
+            <Input
               name="community-rule-title"
               required
               minLength={3}
@@ -544,41 +866,54 @@ export function CommunityRuleEditorPage() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
             />
-          </label>
-          <label>
+          </Label>
+          <Label>
             <span>{t("sport")}</span>
-            <select
+            <SelectControl
               name="community-sport"
               value={sport}
               onChange={(event) => changeSport(event.target.value as Sport)}
             >
               <option value="badminton">{t("badminton")}</option>
               <option value="pickleball">{t("pickleball")}</option>
-            </select>
-          </label>
-          <label>
+              <option value="tennis">{t("tennis")}</option>
+              <option value="padel">{t("padel")}</option>
+              <option value="table_tennis">{t("table_tennis")}</option>
+              <option value="squash">{t("squash")}</option>
+            </SelectControl>
+          </Label>
+          <Label>
             <span>{t("ruleDescription")}</span>
-            <textarea
+            <Textarea
               name="community-rule-description"
               maxLength={500}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
-          </label>
-          <ScoringRulesFields rules={rules} updateRules={updateRules} t={t} />
+          </Label>
+          <CommunityConfigurationFields
+            sport={sport}
+            configuration={configuration}
+            updateRules={updateRules}
+            updateTennis={updateTennis}
+            updatePadel={updatePadel}
+            updateTableTennis={updateTableTennis}
+            updateSquash={updateSquash}
+            t={t}
+          />
           <p className={styles.rulePublishNote}>{t("publishNowNote")}</p>
           {error ? (
             <p className={styles.formError} role="alert">
               {error}
             </p>
           ) : null}
-          <button
+          <Button
             className={styles.primaryButton}
             type="submit"
             disabled={saving || loading}
           >
             {saving ? t("working") : t("publishRule")}
-          </button>
+          </Button>
         </form>
       </main>
     </div>
@@ -594,95 +929,258 @@ function CommunityDisclaimer() {
   );
 }
 
-function RulesSummary({ rules }: { rules: ScoringRules }) {
+function RulesSummary({
+  sport,
+  configuration,
+}: {
+  sport: Sport;
+  configuration: CommunityRuleConfiguration;
+}) {
   const { t } = useLocale();
+  const bestOfLabel = (bestOf: 1 | 3 | 5) =>
+    t(bestOf === 1 ? "bestOfOne" : bestOf === 3 ? "bestOfThree" : "bestOfFive");
+  const rows: Array<[string, string | number]> = [
+    [t("pointsToWin"), configuration.scoring.pointsToWin],
+    [t("winBy"), configuration.scoring.winBy],
+    [t("maxPoints"), configuration.scoring.maxPoints ?? t("noCap")],
+    [t("bestOf"), bestOfLabel(configuration.scoring.bestOf)],
+    [
+      t("scoringMode"),
+      t(
+        configuration.scoring.scoringMode === "rally"
+          ? "rallyScoring"
+          : "sideOutScoring",
+      ),
+    ],
+  ];
+
+  if (sport === "tennis" && configuration.tennis) {
+    rows.push(
+      [
+        t("tennisGameScoring"),
+        t(
+          configuration.tennis.gameScoring === "advantage"
+            ? "tennisAdvantage"
+            : "tennisNoAd",
+        ),
+      ],
+      [
+        t("tennisSetScoring"),
+        t(
+          configuration.tennis.setScoring === "tiebreak"
+            ? "tennisTiebreakSet"
+            : "tennisAdvantageSet",
+        ),
+      ],
+      [
+        t("tennisFinalSet"),
+        t(
+          configuration.tennis.finalSetScoring === "tiebreak"
+            ? "tennisTiebreakSet"
+            : configuration.tennis.finalSetScoring === "advantage"
+              ? "tennisAdvantageSet"
+              : "tennisMatchTiebreak",
+        ),
+      ],
+      [
+        t("tennisMatchTiebreakTarget"),
+        configuration.tennis.matchTieBreakPoints,
+      ],
+    );
+  }
+  if (sport === "padel" && configuration.padel) {
+    rows.push(
+      [
+        t("padelGameScoring"),
+        t(
+          configuration.padel.gameScoring === "advantage"
+            ? "padelAdvantage"
+            : configuration.padel.gameScoring === "star_point"
+              ? "padelStarPoint"
+              : "padelGoldenPoint",
+        ),
+      ],
+      [
+        t("padelSetScoring"),
+        t(
+          configuration.padel.setScoring === "standard"
+            ? "padelStandardSet"
+            : "padelMiniSet",
+        ),
+      ],
+      [
+        t("padelFinalSet"),
+        t(
+          configuration.padel.finalSetScoring === "standard"
+            ? "padelStandardSet"
+            : configuration.padel.finalSetScoring === "advantage"
+              ? "padelAdvantageSet"
+              : "padelMatchTiebreak",
+        ),
+      ],
+      [t("padelMatchTiebreakTarget"), configuration.padel.matchTieBreakPoints],
+    );
+  }
+  if (sport === "table_tennis" && configuration.tableTennis) {
+    rows.push([
+      t("tableTennisFormatTitle"),
+      bestOfLabel(configuration.tableTennis.bestOf),
+    ]);
+  }
+  if (sport === "squash" && configuration.squash) {
+    rows.push([
+      t("squashFormatTitle"),
+      bestOfLabel(configuration.squash.bestOf),
+    ]);
+  }
+
   return (
     <dl className={styles.rulesSummary}>
-      <div>
-        <dt>{t("pointsToWin")}</dt>
-        <dd>{rules.pointsToWin}</dd>
-      </div>
-      <div>
-        <dt>{t("winBy")}</dt>
-        <dd>{rules.winBy}</dd>
-      </div>
-      <div>
-        <dt>{t("maxPoints")}</dt>
-        <dd>{rules.maxPoints ?? t("noCap")}</dd>
-      </div>
-      <div>
-        <dt>{t("bestOf")}</dt>
-        <dd>{rules.bestOf}</dd>
-      </div>
-      <div>
-        <dt>{t("scoringMode")}</dt>
-        <dd>
-          {t(rules.scoringMode === "rally" ? "rallyScoring" : "sideOutScoring")}
-        </dd>
-      </div>
+      {rows.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
     </dl>
   );
 }
 
-function ScoringRulesFields({
-  rules,
+function CommunityConfigurationFields({
+  sport,
+  configuration,
   updateRules,
+  updateTennis,
+  updatePadel,
+  updateTableTennis,
+  updateSquash,
   t,
 }: {
-  rules: ScoringRules;
+  sport: Sport;
+  configuration: CommunityRuleConfiguration;
   updateRules: <Key extends keyof ScoringRules>(
     key: Key,
     value: ScoringRules[Key],
   ) => void;
+  updateTennis: <Key extends keyof TennisRules>(
+    key: Key,
+    value: TennisRules[Key],
+  ) => void;
+  updatePadel: <Key extends keyof PadelRules>(
+    key: Key,
+    value: PadelRules[Key],
+  ) => void;
+  updateTableTennis: <Key extends keyof TableTennisRules>(
+    key: Key,
+    value: TableTennisRules[Key],
+  ) => void;
+  updateSquash: <Key extends keyof SquashRules>(
+    key: Key,
+    value: SquashRules[Key],
+  ) => void;
   t: ReturnType<typeof useLocale>["t"];
 }) {
+  const rules = configuration.scoring;
+  const [numberDrafts, setNumberDrafts] = useState({
+    pointsToWin: String(rules.pointsToWin),
+    winBy: String(rules.winBy),
+    maxPoints: rules.maxPoints === null ? "" : String(rules.maxPoints),
+  });
+
+  useEffect(() => {
+    setNumberDrafts({
+      pointsToWin: String(rules.pointsToWin),
+      winBy: String(rules.winBy),
+      maxPoints: rules.maxPoints === null ? "" : String(rules.maxPoints),
+    });
+  }, [rules.maxPoints, rules.pointsToWin, rules.winBy]);
+
+  function updateNumberDraft(
+    field: "pointsToWin" | "winBy" | "maxPoints",
+    value: string,
+  ) {
+    if (!/^\d*$/.test(value)) return;
+    const normalized = normalizeIntegerInput(value);
+    setNumberDrafts((current) => ({ ...current, [field]: normalized }));
+
+    if (normalized === "") {
+      if (field === "maxPoints") updateRules("maxPoints", null);
+      return;
+    }
+
+    const numericValue = Number(normalized);
+    if (Number.isInteger(numericValue)) updateRules(field, numericValue);
+  }
+
+  function commitNumberDraft(field: "pointsToWin" | "winBy" | "maxPoints") {
+    const rawValue = numberDrafts[field];
+    if (field === "maxPoints" && rawValue === "") {
+      updateRules("maxPoints", null);
+      return;
+    }
+
+    if (rawValue === "") {
+      setNumberDrafts((current) => ({
+        ...current,
+        [field]: String(rules[field]),
+      }));
+      return;
+    }
+
+    const numericValue = Number(rawValue);
+    if (Number.isInteger(numericValue)) updateRules(field, numericValue);
+  }
+
   return (
     <div className={styles.communityScoringFields}>
-      <label>
+      <Label>
         <span>{t("pointsToWin")}</span>
-        <input
+        <Input
           name="community-points-to-win"
-          type="number"
-          min="1"
-          max="101"
-          value={rules.pointsToWin}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={3}
+          value={numberDrafts.pointsToWin}
           onChange={(event) =>
-            updateRules("pointsToWin", Number(event.target.value))
+            updateNumberDraft("pointsToWin", event.target.value)
           }
+          onBlur={() => commitNumberDraft("pointsToWin")}
           required
         />
-      </label>
-      <label>
+      </Label>
+      <Label>
         <span>{t("winBy")}</span>
-        <input
+        <Input
           name="community-win-by"
-          type="number"
-          min="1"
-          max="10"
-          value={rules.winBy}
-          onChange={(event) => updateRules("winBy", Number(event.target.value))}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={2}
+          value={numberDrafts.winBy}
+          onChange={(event) => updateNumberDraft("winBy", event.target.value)}
+          onBlur={() => commitNumberDraft("winBy")}
           required
         />
-      </label>
-      <label>
+      </Label>
+      <Label>
         <span>{t("maxPoints")}</span>
-        <input
+        <Input
           name="community-max-points"
-          type="number"
-          min={rules.pointsToWin}
-          max="101"
-          value={rules.maxPoints ?? ""}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={3}
+          value={numberDrafts.maxPoints}
           onChange={(event) =>
-            updateRules(
-              "maxPoints",
-              event.target.value === "" ? null : Number(event.target.value),
-            )
+            updateNumberDraft("maxPoints", event.target.value)
           }
+          onBlur={() => commitNumberDraft("maxPoints")}
         />
-      </label>
-      <label>
+      </Label>
+      <Label>
         <span>{t("bestOf")}</span>
-        <select
+        <SelectControl
           name="community-best-of"
           value={rules.bestOf}
           onChange={(event) =>
@@ -692,11 +1190,11 @@ function ScoringRulesFields({
           <option value="1">{t("bestOfOne")}</option>
           <option value="3">{t("bestOfThree")}</option>
           <option value="5">{t("bestOfFive")}</option>
-        </select>
-      </label>
-      <label>
+        </SelectControl>
+      </Label>
+      <Label>
         <span>{t("scoringMode")}</span>
-        <select
+        <SelectControl
           name="community-scoring-mode"
           value={rules.scoringMode}
           onChange={(event) =>
@@ -708,13 +1206,13 @@ function ScoringRulesFields({
         >
           <option value="rally">{t("rallyScoring")}</option>
           <option value="side_out">{t("sideOutScoring")}</option>
-        </select>
-      </label>
+        </SelectControl>
+      </Label>
       {rules.scoringMode === "side_out" ? (
         <>
-          <label>
+          <Label>
             <span>{t("serversPerTurn")}</span>
-            <select
+            <SelectControl
               name="community-servers-per-turn"
               value={rules.serversPerTurn}
               onChange={(event) =>
@@ -726,11 +1224,11 @@ function ScoringRulesFields({
             >
               <option value="1">1</option>
               <option value="2">2</option>
-            </select>
-          </label>
-          <label>
+            </SelectControl>
+          </Label>
+          <Label>
             <span>{t("openingServerNumber")}</span>
-            <select
+            <SelectControl
               name="community-opening-server-number"
               value={rules.openingServerNumber}
               onChange={(event) =>
@@ -742,10 +1240,244 @@ function ScoringRulesFields({
             >
               <option value="1">{t("serverOne")}</option>
               <option value="2">{t("serverTwo")}</option>
-            </select>
-          </label>
+            </SelectControl>
+          </Label>
         </>
       ) : null}
+      {sport === "tennis" && configuration.tennis ? (
+        <TennisConfigurationFields
+          rules={configuration.tennis}
+          update={updateTennis}
+          t={t}
+        />
+      ) : null}
+      {sport === "padel" && configuration.padel ? (
+        <PadelConfigurationFields
+          rules={configuration.padel}
+          update={updatePadel}
+          t={t}
+        />
+      ) : null}
+      {sport === "table_tennis" && configuration.tableTennis ? (
+        <TableTennisConfigurationFields
+          rules={configuration.tableTennis}
+          update={updateTableTennis}
+          t={t}
+        />
+      ) : null}
+      {sport === "squash" && configuration.squash ? (
+        <SquashConfigurationFields
+          rules={configuration.squash}
+          update={updateSquash}
+          t={t}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function TennisConfigurationFields({
+  rules,
+  update,
+  t,
+}: {
+  rules: TennisRules;
+  update: <Key extends keyof TennisRules>(
+    key: Key,
+    value: TennisRules[Key],
+  ) => void;
+  t: ReturnType<typeof useLocale>["t"];
+}) {
+  return (
+    <>
+      <Label>
+        <span>{t("tennisGameScoring")}</span>
+        <SelectControl
+          value={rules.gameScoring}
+          onChange={(event) =>
+            update(
+              "gameScoring",
+              event.target.value as TennisRules["gameScoring"],
+            )
+          }
+        >
+          <option value="advantage">{t("tennisAdvantage")}</option>
+          <option value="no_ad">{t("tennisNoAd")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("tennisSetScoring")}</span>
+        <SelectControl
+          value={rules.setScoring}
+          onChange={(event) =>
+            update(
+              "setScoring",
+              event.target.value as TennisRules["setScoring"],
+            )
+          }
+        >
+          <option value="tiebreak">{t("tennisTiebreakSet")}</option>
+          <option value="advantage">{t("tennisAdvantageSet")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("tennisFinalSet")}</span>
+        <SelectControl
+          value={rules.finalSetScoring}
+          onChange={(event) =>
+            update(
+              "finalSetScoring",
+              event.target.value as TennisRules["finalSetScoring"],
+            )
+          }
+        >
+          <option value="tiebreak">{t("tennisTiebreakSet")}</option>
+          <option value="advantage">{t("tennisAdvantageSet")}</option>
+          <option value="match_tiebreak">{t("tennisMatchTiebreak")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("tennisMatchTiebreakTarget")}</span>
+        <SelectControl
+          value={rules.matchTieBreakPoints}
+          onChange={(event) =>
+            update("matchTieBreakPoints", Number(event.target.value) as 7 | 10)
+          }
+        >
+          <option value="7">7</option>
+          <option value="10">10</option>
+        </SelectControl>
+      </Label>
+    </>
+  );
+}
+
+function PadelConfigurationFields({
+  rules,
+  update,
+  t,
+}: {
+  rules: PadelRules;
+  update: <Key extends keyof PadelRules>(
+    key: Key,
+    value: PadelRules[Key],
+  ) => void;
+  t: ReturnType<typeof useLocale>["t"];
+}) {
+  return (
+    <>
+      <Label>
+        <span>{t("padelGameScoring")}</span>
+        <SelectControl
+          value={rules.gameScoring}
+          onChange={(event) =>
+            update(
+              "gameScoring",
+              event.target.value as PadelRules["gameScoring"],
+            )
+          }
+        >
+          <option value="advantage">{t("padelAdvantage")}</option>
+          <option value="star_point">{t("padelStarPoint")}</option>
+          <option value="golden_point">{t("padelGoldenPoint")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("padelSetScoring")}</span>
+        <SelectControl
+          value={rules.setScoring}
+          onChange={(event) =>
+            update("setScoring", event.target.value as PadelRules["setScoring"])
+          }
+        >
+          <option value="standard">{t("padelStandardSet")}</option>
+          <option value="mini">{t("padelMiniSet")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("padelFinalSet")}</span>
+        <SelectControl
+          value={rules.finalSetScoring}
+          onChange={(event) =>
+            update(
+              "finalSetScoring",
+              event.target.value as PadelRules["finalSetScoring"],
+            )
+          }
+        >
+          <option value="standard">{t("padelStandardSet")}</option>
+          <option value="advantage">{t("padelAdvantageSet")}</option>
+          <option value="match_tiebreak">{t("padelMatchTiebreak")}</option>
+        </SelectControl>
+      </Label>
+      <Label>
+        <span>{t("padelMatchTiebreakTarget")}</span>
+        <SelectControl
+          value={rules.matchTieBreakPoints}
+          onChange={(event) =>
+            update("matchTieBreakPoints", Number(event.target.value) as 7 | 10)
+          }
+        >
+          <option value="7">7</option>
+          <option value="10">10</option>
+        </SelectControl>
+      </Label>
+    </>
+  );
+}
+
+function TableTennisConfigurationFields({
+  rules,
+  update,
+  t,
+}: {
+  rules: TableTennisRules;
+  update: <Key extends keyof TableTennisRules>(
+    key: Key,
+    value: TableTennisRules[Key],
+  ) => void;
+  t: ReturnType<typeof useLocale>["t"];
+}) {
+  return (
+    <Label>
+      <span>{t("bestOf")}</span>
+      <SelectControl
+        value={rules.bestOf}
+        onChange={(event) =>
+          update("bestOf", Number(event.target.value) as 3 | 5)
+        }
+      >
+        <option value="3">{t("bestOfThree")}</option>
+        <option value="5">{t("bestOfFive")}</option>
+      </SelectControl>
+    </Label>
+  );
+}
+
+function SquashConfigurationFields({
+  rules,
+  update,
+  t,
+}: {
+  rules: SquashRules;
+  update: <Key extends keyof SquashRules>(
+    key: Key,
+    value: SquashRules[Key],
+  ) => void;
+  t: ReturnType<typeof useLocale>["t"];
+}) {
+  return (
+    <Label>
+      <span>{t("bestOf")}</span>
+      <SelectControl
+        value={rules.bestOf}
+        onChange={(event) =>
+          update("bestOf", Number(event.target.value) as 3 | 5)
+        }
+      >
+        <option value="3">{t("bestOfThree")}</option>
+        <option value="5">{t("bestOfFive")}</option>
+      </SelectControl>
+    </Label>
   );
 }

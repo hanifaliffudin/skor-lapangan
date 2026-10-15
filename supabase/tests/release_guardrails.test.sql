@@ -145,7 +145,7 @@ select public.save_community_rule(
   'badminton',
   'Guardrail test rule',
   'A published rule used by the database regression test.',
-  '{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}'::jsonb,
+  '{"schemaVersion":2,"scoring":{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}}'::jsonb,
   true
 );
 

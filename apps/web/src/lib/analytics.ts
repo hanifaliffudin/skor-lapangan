@@ -1,3 +1,4 @@
+import { track } from "@vercel/analytics";
 import type { BeforeSendEvent } from "@vercel/analytics/react";
 
 const ANALYTICS_BASE_URL = "https://skor-lapangan.invalid";
@@ -20,4 +21,16 @@ export function sanitizeAnalyticsEvent(
   }
 
   return { ...event, url: pathname };
+}
+
+export function trackMatchSignal(
+  signal:
+    | "control_lost"
+    | "control_takeover"
+    | "sync_conflict"
+    | "remote_invalid"
+    | "remote_unavailable",
+  result: "detected" | "resolved" | "failed",
+): void {
+  track(`Match ${signal}`, { result });
 }

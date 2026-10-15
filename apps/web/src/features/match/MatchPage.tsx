@@ -48,6 +48,8 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
+import { normalizeIntegerInput } from "../../lib/numberInput";
+import { trackMatchSignal } from "../../lib/analytics";
 import {
   canSyncStoredMatch,
   getStoredMatchInfo,
@@ -59,9 +61,21 @@ import { supabase } from "../../lib/supabase";
 import { syncJournal } from "../../lib/sync";
 import {
   isSyncConflictError,
+  isMatchControlHeldError,
+  isMatchControlLostError,
   isRateLimitError,
   isUnsupportedMatchSportError,
 } from "../../lib/userError";
+import {
+  appendRemoteEvents,
+  journalSequence,
+  matchHeadHasSameState,
+  journalsHaveSameState,
+  readRemoteMatchEventsSince,
+  readRemoteMatchHead,
+  readRemoteMatch,
+  type RemoteMatchSnapshot,
+} from "../../lib/match-remote";
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
 import { useMatchControl } from "./useMatchControl";
@@ -100,15 +114,26 @@ export function MatchPage() {
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
-  const { action, isAnonymous, signInWithGoogle, user } = useAuth();
   const {
-    status: controlStatus,
-    canControl,
-    retry: retryControl,
-  } = useMatchControl(matchId);
+    action,
+    isAnonymous,
+    loading: authLoading,
+    signInWithGoogle,
+    user,
+  } = useAuth();
   const [journal, setJournal] = useState<MatchJournal | null>(() =>
     matchId ? loadMatch(matchId) : null,
   );
+  const journalRef = useRef(journal);
+  journalRef.current = journal;
+  const [remoteLoading, setRemoteLoading] = useState(
+    Boolean(matchId && supabase),
+  );
+  const [remoteError, setRemoteError] = useState("");
+  const [remoteWarning, setRemoteWarning] = useState(false);
+  const [remoteConflict, setRemoteConflict] =
+    useState<RemoteMatchSnapshot | null>(null);
+  const [remoteReloadAttempt, setRemoteReloadAttempt] = useState(0);
   const [syncState, setSyncState] = useState<
     "local" | "syncing" | "synced" | "offline" | "error"
   >("local");
@@ -118,9 +143,13 @@ export function MatchPage() {
   const [viewerBusy, setViewerBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
   const [endingSession, setEndingSession] = useState(false);
+  const [takeoverPending, setTakeoverPending] = useState(false);
   const [endError, setEndError] = useState("");
   const schemaBlockedMatches = useRef(new Set<string>());
   const previousSyncAttempt = useRef(0);
+  const syncedSequence = useRef<number | null>(null);
+  const pollInFlight = useRef(false);
+  const pollFailureCount = useRef(0);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [setOrdersOpen, setSetOrdersOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
@@ -138,6 +167,244 @@ export function MatchPage() {
     () => (journal ? deriveJournal(journal) : null),
     [journal],
   );
+  const matchIsActive = view?.state.status === "active";
+  const {
+    status: controlStatus,
+    canControl,
+    controlToken,
+    retry: retryControl,
+    takeOver,
+  } = useMatchControl(matchId, {
+    enabled: Boolean(matchIsActive && !remoteLoading && !remoteConflict),
+    server: Boolean(supabase && user),
+  });
+
+  useEffect(() => {
+    if (!matchId || !supabase || isAnonymous) {
+      setRemoteLoading(false);
+      setRemoteError("");
+      setRemoteWarning(false);
+      return;
+    }
+    if (authLoading || !user) {
+      setRemoteLoading(authLoading);
+      return;
+    }
+
+    let active = true;
+    setRemoteLoading(true);
+    setRemoteError("");
+    setRemoteWarning(false);
+    void readRemoteMatch(matchId).then((result) => {
+      if (!active) return;
+      if (result.status === "error") {
+        trackMatchSignal(
+          result.error === "REMOTE_UNAVAILABLE"
+            ? "remote_unavailable"
+            : "remote_invalid",
+          "detected",
+        );
+        const local = loadMatch(matchId);
+        if (!local) {
+          setRemoteError(result.error);
+        } else if (result.error === "REMOTE_UNAVAILABLE") {
+          setRemoteWarning(true);
+        } else {
+          setRemoteError(result.error);
+        }
+        setRemoteLoading(false);
+        return;
+      }
+
+      const local = loadMatch(matchId);
+      const remote = result.snapshot;
+      if (!local || remote.sequence > journalSequence(local)) {
+        syncedSequence.current = remote.sequence;
+        setJournal(remote.journal);
+        saveMatch(remote.journal, { ownerId: user.id, persistent: true });
+      } else if (
+        remote.sequence === journalSequence(local) &&
+        !journalsHaveSameState(local, remote.journal)
+      ) {
+        setRemoteConflict(remote);
+      } else if (remote.sequence === journalSequence(local)) {
+        syncedSequence.current = remote.sequence;
+      }
+      setRemoteLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [authLoading, isAnonymous, matchId, remoteReloadAttempt, user]);
+
+  useEffect(() => {
+    if (
+      !matchId ||
+      !supabase ||
+      !user ||
+      isAnonymous ||
+      !matchIsActive ||
+      remoteLoading ||
+      remoteConflict ||
+      remoteError
+    ) {
+      return;
+    }
+
+    const poll = async (): Promise<boolean> => {
+      const headResult = await readRemoteMatchHead(matchId);
+      if (headResult.status === "error") {
+        if (headResult.error === "REMOTE_UNAVAILABLE") {
+          trackMatchSignal("remote_unavailable", "detected");
+          setRemoteWarning(true);
+          return false;
+        }
+        trackMatchSignal("remote_invalid", "detected");
+        setRemoteError(headResult.error);
+        return true;
+      }
+
+      setRemoteWarning(false);
+      const local = journalRef.current;
+      if (!local) return true;
+      const head = headResult.head;
+      const localSequence = journalSequence(local);
+
+      if (head.sequence === localSequence) {
+        if (matchHeadHasSameState(local, head)) return true;
+        const conflictResult = await readRemoteMatch(matchId);
+        if (conflictResult.status === "loaded") {
+          setRemoteConflict(conflictResult.snapshot);
+          if (controlStatus === "active") setSyncError("CONTROL_LOST");
+        } else if (conflictResult.error === "REMOTE_UNAVAILABLE") {
+          trackMatchSignal("remote_unavailable", "detected");
+          setRemoteWarning(true);
+          return false;
+        } else if (conflictResult.error === "INVALID_REMOTE_MATCH") {
+          trackMatchSignal("remote_invalid", "detected");
+          setRemoteError(conflictResult.error);
+        }
+        return true;
+      }
+
+      if (head.sequence < localSequence) return true;
+
+      if (controlStatus === "active") {
+        const conflictResult = await readRemoteMatch(matchId);
+        if (conflictResult.status === "loaded") {
+          trackMatchSignal("control_lost", "detected");
+          setRemoteConflict(conflictResult.snapshot);
+          setSyncError("CONTROL_LOST");
+          return true;
+        }
+        if (conflictResult.error === "REMOTE_UNAVAILABLE") {
+          trackMatchSignal("remote_unavailable", "detected");
+          setRemoteWarning(true);
+          return false;
+        }
+        setRemoteError(conflictResult.error);
+        trackMatchSignal("remote_invalid", "detected");
+        return true;
+      }
+
+      const deltaResult = await readRemoteMatchEventsSince(
+        matchId,
+        localSequence,
+      );
+      if (deltaResult.status === "loaded") {
+        const nextJournal = appendRemoteEvents(local, deltaResult.events);
+        if (
+          nextJournal &&
+          journalSequence(nextJournal) === head.sequence &&
+          matchHeadHasSameState(nextJournal, head)
+        ) {
+          syncedSequence.current = head.sequence;
+          setJournal(nextJournal);
+          saveMatch(nextJournal, { ownerId: user.id, persistent: true });
+          return true;
+        }
+      } else if (deltaResult.error === "REMOTE_UNAVAILABLE") {
+        trackMatchSignal("remote_unavailable", "detected");
+        setRemoteWarning(true);
+        return false;
+      } else if (deltaResult.error === "INVALID_REMOTE_MATCH") {
+        trackMatchSignal("remote_invalid", "detected");
+        setRemoteError(deltaResult.error);
+        return true;
+      }
+
+      const fullResult = await readRemoteMatch(matchId);
+      if (fullResult.status === "loaded") {
+        syncedSequence.current = fullResult.snapshot.sequence;
+        setJournal(fullResult.snapshot.journal);
+        saveMatch(fullResult.snapshot.journal, {
+          ownerId: user.id,
+          persistent: true,
+        });
+        return true;
+      } else if (fullResult.error === "REMOTE_UNAVAILABLE") {
+        trackMatchSignal("remote_unavailable", "detected");
+        setRemoteWarning(true);
+        return false;
+      }
+      setRemoteError(fullResult.error);
+      trackMatchSignal("remote_invalid", "detected");
+      return true;
+    };
+    let active = true;
+    let timeoutId: number | null = null;
+    const baseDelay = 10_000;
+    const jitter = () => Math.floor(Math.random() * 1_500);
+    const schedule = (delay: number) => {
+      if (!active) return;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(run, delay);
+    };
+    const run = async () => {
+      if (!active) return;
+      if (document.visibilityState === "hidden" || pollInFlight.current) {
+        schedule(baseDelay + jitter());
+        return;
+      }
+      pollInFlight.current = true;
+      let succeeded = true;
+      try {
+        succeeded = await poll();
+      } catch {
+        succeeded = false;
+        setRemoteWarning(true);
+      } finally {
+        pollInFlight.current = false;
+      }
+      pollFailureCount.current = succeeded
+        ? 0
+        : Math.min(pollFailureCount.current + 1, 3);
+      const backoff = succeeded
+        ? baseDelay
+        : Math.min(baseDelay * 2 ** pollFailureCount.current, 60_000);
+      schedule(backoff + jitter());
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") schedule(0);
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    schedule(baseDelay + jitter());
+    return () => {
+      active = false;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [
+    controlStatus,
+    isAnonymous,
+    matchId,
+    matchIsActive,
+    remoteConflict,
+    remoteError,
+    remoteLoading,
+    user,
+  ]);
 
   useEffect(() => {
     const currentTennis = view?.state.tennis;
@@ -224,7 +491,7 @@ export function MatchPage() {
   }, [matchId]);
 
   useEffect(() => {
-    if (!journal || !user) {
+    if (!journal || !user || remoteLoading || remoteConflict || remoteError) {
       setSyncState("local");
       setSyncError("");
       return;
@@ -245,6 +512,11 @@ export function MatchPage() {
         setSyncError("");
         return;
       }
+      if (matchIsActive && controlStatus !== "active") {
+        setSyncState("local");
+        setSyncError("");
+        return;
+      }
       if (
         schemaBlockedMatches.current.has(currentMatchId) &&
         !retrySchemaBlocked
@@ -254,7 +526,13 @@ export function MatchPage() {
       }
       setSyncState("syncing");
       setSyncError("");
-      const result = await syncJournal(journal, user.id, isAnonymous);
+      const result = await syncJournal(
+        journal,
+        user.id,
+        isAnonymous,
+        controlToken,
+        syncedSequence.current ?? 0,
+      );
       if (!active) return;
       if (
         result.status === "failed" &&
@@ -263,19 +541,36 @@ export function MatchPage() {
         schemaBlockedMatches.current.add(currentMatchId);
       } else if (result.status === "synced") {
         schemaBlockedMatches.current.delete(currentMatchId);
+        syncedSequence.current = journalSequence(journal);
       }
       setSyncState(
         result.status === "synced"
           ? "synced"
-          : result.status === "failed" || result.status === "conflict"
+          : result.status === "failed" ||
+              result.status === "conflict" ||
+              result.status === "control_lost" ||
+              result.status === "control_held"
             ? "error"
             : "local",
       );
       setSyncError(
-        result.status === "failed" || result.status === "conflict"
+        result.status === "failed" ||
+          result.status === "conflict" ||
+          result.status === "control_lost" ||
+          result.status === "control_held"
           ? result.error
           : "",
       );
+      if (
+        result.status === "conflict" ||
+        result.status === "control_lost" ||
+        result.status === "control_held"
+      ) {
+        trackMatchSignal(
+          result.status === "conflict" ? "sync_conflict" : "control_lost",
+          "detected",
+        );
+      }
     };
     const handleOnline = () => void synchronize(true);
     void synchronize(manualRetry);
@@ -284,7 +579,18 @@ export function MatchPage() {
       active = false;
       window.removeEventListener("online", handleOnline);
     };
-  }, [journal, user, isAnonymous, syncAttempt]);
+  }, [
+    controlStatus,
+    controlToken,
+    isAnonymous,
+    journal,
+    matchIsActive,
+    remoteConflict,
+    remoteError,
+    remoteLoading,
+    syncAttempt,
+    user,
+  ]);
 
   function commit(next: MatchJournal) {
     const nextView = deriveJournal(next);
@@ -399,12 +705,17 @@ export function MatchPage() {
 
   async function endSession() {
     if (endingSession) return;
-    if (!canControl) {
+    if (authLoading) return;
+    if (!journal || !view) return;
+    const isComplete = view?.state.status === "complete";
+    if (view?.state.status !== "complete" && !canEndActiveMatch) {
       setEndError(
         t(
           controlStatus === "waiting"
             ? "matchControlWaiting"
-            : "matchControlError",
+            : controlLost
+              ? "matchControlLost"
+              : "matchControlError",
         ),
       );
       return;
@@ -413,25 +724,130 @@ export function MatchPage() {
     setEndingSession(true);
     setEndError("");
     try {
+      if (
+        isComplete &&
+        matchId &&
+        supabase &&
+        user &&
+        canSyncStoredMatch(matchId, user.id, isAnonymous)
+      ) {
+        if (!navigator.onLine) {
+          setEndError(t("finalScoreSaveFailed"));
+          return;
+        }
+
+        setSyncState("syncing");
+        setSyncError("");
+        const finalSync = await syncJournal(
+          journal,
+          user.id,
+          isAnonymous,
+          controlToken,
+          syncedSequence.current ?? 0,
+        );
+        if (finalSync.status !== "synced") {
+          setSyncState("error");
+          setSyncError(
+            finalSync.status === "failed" ||
+              finalSync.status === "conflict" ||
+              finalSync.status === "control_lost" ||
+              finalSync.status === "control_held"
+              ? finalSync.error
+              : "FINAL_SCORE_NOT_SAVED",
+          );
+          setEndError(t("finalScoreSaveFailed"));
+          return;
+        }
+        syncedSequence.current = journalSequence(journal);
+        setSyncState("synced");
+      }
+
       if (matchId && supabase && user) {
         const { error } = await supabase.rpc("revoke_live_viewer_link", {
           p_match_id: matchId,
         });
         if (error) {
-          setEndError(t("endFailure"));
+          setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
           return;
         }
       }
       if (matchId) removeMatch(matchId);
       navigate(localizedPath("/", locale));
     } catch {
-      setEndError(t("endFailure"));
+      setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
     } finally {
       setEndingSession(false);
     }
   }
 
+  async function handleTakeOver() {
+    if (takeoverPending) return;
+    setTakeoverPending(true);
+    setRemoteLoading(true);
+    try {
+      const acquired = await takeOver();
+      if (acquired) {
+        trackMatchSignal("control_takeover", "resolved");
+        setSyncError("");
+        setSyncState("local");
+        setRemoteConflict(null);
+        setRemoteReloadAttempt((current) => current + 1);
+      } else {
+        trackMatchSignal("control_takeover", "failed");
+        setRemoteLoading(false);
+      }
+    } finally {
+      setTakeoverPending(false);
+    }
+  }
+
+  function useServerVersion() {
+    if (!remoteConflict || !user) return;
+    syncedSequence.current = journalSequence(remoteConflict.journal);
+    setJournal(remoteConflict.journal);
+    saveMatch(remoteConflict.journal, { ownerId: user.id, persistent: true });
+    setRemoteConflict(null);
+  }
+
   if (!journal || !view) {
+    if (authLoading || remoteLoading) {
+      return (
+        <div className="min-h-screen min-h-dvh bg-paper">
+          <AppHeader />
+          <main className={styles.emptyState}>
+            <p role="status">{t("loadingMatch")}</p>
+          </main>
+        </div>
+      );
+    }
+    if (remoteError) {
+      return (
+        <div className="min-h-screen min-h-dvh bg-paper">
+          <AppHeader />
+          <main className={styles.emptyState}>
+            <h1>{t("matchLoadErrorTitle")}</h1>
+            <p>{t("matchLoadErrorBody")}</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button
+                variant="outline"
+                type="button"
+                className="min-h-11"
+                onClick={() => setRemoteReloadAttempt((current) => current + 1)}
+              >
+                {t("retryMatchLoad")}
+              </Button>
+              <Button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => navigate(localizedPath("/", locale))}
+              >
+                {t("backToHome")}
+              </Button>
+            </div>
+          </main>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen min-h-dvh bg-paper pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <AppHeader />
@@ -456,7 +872,132 @@ export function MatchPage() {
   const { definition } = journal;
   const { state } = view;
   const syncConflict = isSyncConflictError(syncError);
-  const canEditMatch = canControl && !syncConflict;
+  const controlLost = isMatchControlLostError(syncError);
+  const controlHeld = isMatchControlHeldError(syncError);
+  const displayedControlStatus =
+    controlStatus === "active" && controlLost
+      ? "lost"
+      : controlStatus === "active" && controlHeld
+        ? "held"
+        : controlStatus;
+  const canEditMatch =
+    state.status === "active" &&
+    !authLoading &&
+    canControl &&
+    !syncConflict &&
+    !controlLost &&
+    !controlHeld &&
+    !remoteConflict &&
+    !remoteLoading &&
+    !remoteError &&
+    !takeoverPending;
+  const canEndActiveMatch =
+    !authLoading &&
+    canControl &&
+    !controlLost &&
+    !controlHeld &&
+    !remoteConflict &&
+    !remoteLoading &&
+    !remoteError &&
+    !takeoverPending;
+  const matchStatusNotice = remoteLoading ? (
+    <div
+      className={styles.matchStatusBanner}
+      data-state="loading"
+      role="status"
+    >
+      <span>{t("loadingLatestMatch")}</span>
+    </div>
+  ) : remoteConflict ? (
+    <div
+      className={styles.matchStatusBanner}
+      data-state="conflict"
+      role="alert"
+    >
+      <span>{t("matchRemoteConflict")}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className={styles.controlButton}
+        type="button"
+        onClick={useServerVersion}
+      >
+        {t("useServerVersion")}
+      </Button>
+    </div>
+  ) : remoteError ? (
+    <div className={styles.matchStatusBanner} data-state="error" role="alert">
+      <span>{t("matchLoadErrorBody")}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className={styles.controlButton}
+        type="button"
+        onClick={() => setRemoteReloadAttempt((current) => current + 1)}
+      >
+        {t("retryMatchLoad")}
+      </Button>
+    </div>
+  ) : remoteWarning ? (
+    <div
+      className={styles.matchStatusBanner}
+      data-state="warning"
+      role="status"
+    >
+      <span>{t("remoteMatchWarning")}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className={styles.controlButton}
+        type="button"
+        onClick={() => setRemoteReloadAttempt((current) => current + 1)}
+      >
+        {t("retryMatchLoad")}
+      </Button>
+    </div>
+  ) : displayedControlStatus !== "active" ? (
+    <div
+      className={styles.matchStatusBanner}
+      data-state={displayedControlStatus}
+      role={displayedControlStatus === "lost" ? "alert" : "status"}
+    >
+      <span>
+        {t(
+          displayedControlStatus === "waiting"
+            ? "matchControlWaiting"
+            : displayedControlStatus === "held"
+              ? "matchControlHeld"
+              : displayedControlStatus === "lost"
+                ? "matchControlLost"
+                : displayedControlStatus === "disabled"
+                  ? "matchReadOnly"
+                  : "matchControlError",
+        )}
+      </span>
+      {displayedControlStatus === "held" ||
+      displayedControlStatus === "lost" ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={styles.controlButton}
+          type="button"
+          onClick={() => void handleTakeOver()}
+        >
+          {t("takeOverMatch")}
+        </Button>
+      ) : controlStatus === "error" ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className={styles.controlButton}
+          type="button"
+          onClick={retryControl}
+        >
+          {t("retryControl")}
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
   const tennis = state.tennis;
   const padel = state.padel;
   const tableTennis = state.tableTennis;
@@ -549,13 +1090,19 @@ export function MatchPage() {
           {syncError &&
           (isRateLimitError(syncError) ||
             isUnsupportedMatchSportError(syncError) ||
-            isSyncConflictError(syncError)) ? (
+            isSyncConflictError(syncError) ||
+            controlLost ||
+            controlHeld) ? (
             <span className={styles.syncErrorDetail}>
               {isRateLimitError(syncError)
                 ? t("rateLimited")
                 : isSyncConflictError(syncError)
                   ? t("syncConflict")
-                  : t("syncUnsupportedSport")}
+                  : controlLost
+                    ? t("matchControlLost")
+                    : controlHeld
+                      ? t("matchControlHeld")
+                      : t("syncUnsupportedSport")}
             </span>
           ) : null}
         </p>
@@ -571,7 +1118,9 @@ export function MatchPage() {
           </Button>
         ) : null}
         {isAnonymous ? (
-          <div className={`${styles.matchAuthNotice} mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-3`}>
+          <div
+            className={`${styles.matchAuthNotice} mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-strong bg-surface px-4 py-3`}
+          >
             <p className="m-0 max-w-[560px] text-sm leading-6 text-text-muted">
               {t("guestHistoryPrompt")}
             </p>
@@ -588,28 +1137,7 @@ export function MatchPage() {
             </Button>
           </div>
         ) : null}
-        {controlStatus !== "active" ? (
-          <div className={styles.readOnlyNotice} role="status">
-            <span>
-              {t(
-                controlStatus === "waiting"
-                  ? "matchControlWaiting"
-                  : "matchControlError",
-              )}
-            </span>
-            {controlStatus === "error" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className={styles.controlButton}
-                type="button"
-                onClick={retryControl}
-              >
-                {t("retryControl")}
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
+        {matchStatusNotice}
 
         {state.status === "complete" ? (
           <section className={styles.winnerBanner} aria-live="polite">
@@ -702,7 +1230,7 @@ export function MatchPage() {
                 {t("completedSets")}:{" "}
                 {tennis.completedSets
                   .map(
-                    (set, index) =>
+                    (set) =>
                       `${set.score.A}–${set.score.B}${set.tieBreakScore ? ` (${set.tieBreakScore.A}–${set.tieBreakScore.B})` : ""}`,
                   )
                   .join(" · ")}
@@ -892,13 +1420,15 @@ export function MatchPage() {
             variant="ghost"
             className={styles.dangerTextButton}
             type="button"
-            disabled={!canControl}
+            disabled={
+              authLoading || (state.status !== "complete" && !canControl)
+            }
             onClick={() => {
               setEndError("");
               setEndOpen(true);
             }}
           >
-            {state.status === "complete" ? t("newMatch") : t("endSession")}
+            {state.status === "complete" ? t("newMatch") : t("closeSession")}
           </Button>
 
           {supabase ? (
@@ -1110,10 +1640,12 @@ export function MatchPage() {
               <DialogTitle className={styles.endDialogTitle}>
                 {state.status === "complete"
                   ? t("newMatchPrompt")
-                  : t("endTitle")}
+                  : t("closeSessionTitle")}
               </DialogTitle>
               <DialogDescription className={styles.endDialogDescription}>
-                {state.status === "complete" ? t("newMatchBody") : t("endBody")}
+                {state.status === "complete"
+                  ? t("newMatchBody")
+                  : t("closeSessionBody")}
               </DialogDescription>
             </DialogHeader>
 
@@ -1135,13 +1667,15 @@ export function MatchPage() {
               </span>
             </div>
 
-            {endError || !canControl ? (
+            {endError || (state.status !== "complete" && !canEndActiveMatch) ? (
               <p className={styles.endError} role="alert">
                 {endError ||
                   t(
                     controlStatus === "waiting"
                       ? "matchControlWaiting"
-                      : "matchControlError",
+                      : controlLost
+                        ? "matchControlLost"
+                        : "matchControlError",
                   )}
               </p>
             ) : null}
@@ -1162,14 +1696,18 @@ export function MatchPage() {
                 variant="destructive"
                 className={styles.dangerButton}
                 type="button"
-                disabled={!canControl || endingSession}
+                disabled={
+                  authLoading ||
+                  (state.status !== "complete" && !canEndActiveMatch) ||
+                  endingSession
+                }
                 onClick={() => void endSession()}
               >
                 {endingSession
                   ? t("working")
                   : state.status === "complete"
                     ? t("goHome")
-                    : t("confirmEnd")}
+                    : t("confirmCloseSession")}
               </Button>
             </DialogFooter>
           </div>
@@ -1262,7 +1800,9 @@ function TennisCorrectionDialog({
                   min="0"
                   inputMode="numeric"
                   value={scoreA}
-                  onChange={(event) => setScoreA(event.target.value)}
+                  onChange={(event) =>
+                    setScoreA(normalizeIntegerInput(event.target.value))
+                  }
                   required
                 />
               ) : (
@@ -1297,7 +1837,9 @@ function TennisCorrectionDialog({
                   min="0"
                   inputMode="numeric"
                   value={scoreB}
-                  onChange={(event) => setScoreB(event.target.value)}
+                  onChange={(event) =>
+                    setScoreB(normalizeIntegerInput(event.target.value))
+                  }
                   required
                 />
               ) : (
@@ -1442,8 +1984,8 @@ function PadelCorrectionDialog({
                     value={team === "A" ? scoreA : scoreB}
                     onChange={(event) =>
                       team === "A"
-                        ? setScoreA(event.target.value)
-                        : setScoreB(event.target.value)
+                        ? setScoreA(normalizeIntegerInput(event.target.value))
+                        : setScoreB(normalizeIntegerInput(event.target.value))
                     }
                     required
                   />

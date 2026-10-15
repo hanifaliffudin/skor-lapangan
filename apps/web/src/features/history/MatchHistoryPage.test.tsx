@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ const historyQuery = vi.hoisted(() => {
   query.delete.mockReturnValue(query);
   return {
     query,
+    rpc: vi.fn(),
     from: vi.fn(() => query),
     user: { id: "history-user" },
   };
@@ -29,12 +30,12 @@ vi.mock("../../lib/auth", () => ({
 }));
 
 vi.mock("../../lib/supabase", () => ({
-  supabase: { from: historyQuery.from },
+  supabase: { rpc: historyQuery.rpc, from: historyQuery.from },
 }));
 
 describe("Tennis match history", () => {
   beforeEach(() => {
-    historyQuery.query.order.mockResolvedValue({
+    historyQuery.rpc.mockResolvedValue({
       data: [
         {
           id: "tennis-history-match",
@@ -79,10 +80,38 @@ describe("Tennis match history", () => {
     expect(screen.getByText("Sets 1–0")).toBeVisible();
     const detailLine = screen.getByText(/Match tie-break: 10–8/);
     expect(detailLine).toHaveTextContent("Games in set: 6–6");
+    expect(screen.getByRole("button", { name: "Resume" })).toBeVisible();
+  });
+
+  it("sends history search to the paginated server query", async () => {
+    const user = userEvent.setup();
+    historyQuery.rpc.mockClear();
+    render(
+      <MemoryRouter>
+        <LocaleProvider>
+          <MatchHistoryPage />
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/Tennis · Mixed doubles/);
+    await user.type(screen.getByRole("searchbox"), "Weekend");
+
+    await waitFor(() => {
+      expect(historyQuery.rpc).toHaveBeenLastCalledWith(
+        "list_my_match_summaries",
+        expect.objectContaining({
+          p_search: "Weekend",
+          p_status: null,
+          p_sport: null,
+          p_sort: "newest",
+        }),
+      );
+    });
   });
 
   it("renders the Padel format, set, games, and deciding point", async () => {
-    historyQuery.query.order.mockResolvedValue({
+    historyQuery.rpc.mockResolvedValue({
       data: [
         {
           id: "padel-history-match",
@@ -125,10 +154,11 @@ describe("Tennis match history", () => {
     expect(screen.getByText("Sets 1–0")).toBeVisible();
     expect(screen.getByText(/Games in set: 6–6/)).toBeVisible();
     expect(screen.getByText(/Score: Golden–Golden/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Resume" })).toBeVisible();
   });
 
   it("renders Squash games and numeric rally score in history", async () => {
-    historyQuery.query.order.mockResolvedValue({
+    historyQuery.rpc.mockResolvedValue({
       data: [
         {
           id: "squash-history-match",
@@ -163,7 +193,7 @@ describe("Tennis match history", () => {
 
   it("confirms and deletes a match from the account history", async () => {
     const user = userEvent.setup();
-    historyQuery.query.order.mockResolvedValue({
+    historyQuery.rpc.mockResolvedValue({
       data: [
         {
           id: "deletable-history-match",
@@ -192,6 +222,9 @@ describe("Tennis match history", () => {
       </MemoryRouter>,
     );
 
+    expect(
+      await screen.findByRole("button", { name: "View score" }),
+    ).toBeVisible();
     await user.click(
       await screen.findByRole("button", { name: "Delete from history" }),
     );

@@ -34,6 +34,29 @@ export default defineConfig({
         main: resolve(projectRoot, "index.html"),
         indonesian: resolve(projectRoot, "id/index.html"),
       },
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+
+          if (
+            id.includes("/node_modules/@supabase/") ||
+            id.includes("/node_modules/@hcaptcha/")
+          ) {
+            return "vendor-data";
+          }
+
+          if (
+            id.includes("/node_modules/@base-ui/") ||
+            id.includes("/node_modules/lucide-react/") ||
+            id.includes("/node_modules/qrcode.react/") ||
+            id.includes("/node_modules/class-variance-authority/")
+          ) {
+            return "vendor-ui";
+          }
+
+          return undefined;
+        },
+      },
     },
   },
   test: {

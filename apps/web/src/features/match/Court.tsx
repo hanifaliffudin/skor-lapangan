@@ -21,7 +21,7 @@ export function Court({
   state: MatchState;
 }) {
   const { t } = useLocale();
-  const side = servingSide(state, definition);
+  const side = servingSide(state);
   const serverName =
     definition.teams[state.servingTeam].players[state.currentServer]!.name;
   const receiverTeam = state.servingTeam === "A" ? "B" : "A";
@@ -104,7 +104,7 @@ function CourtHalf({
   // when both halves are drawn from the same spectator viewpoint.
   const displaySides =
     team === "A" ? (["left", "right"] as const) : (["right", "left"] as const);
-  const serviceSide = servingSide(state, definition);
+  const serviceSide = servingSide(state);
   const visibleSides =
     getMatchFormat(definition) === "singles"
       ? ([serviceSide] as CourtSide[])

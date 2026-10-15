@@ -14,7 +14,7 @@ The Vite web app reads these browser environment variables:
 
 Keep the Google OAuth secret, hCaptcha secret, and Supabase service-role key in their respective trusted dashboards or server-only secret stores. Never add them to a `VITE_` variable, frontend build, issue, or repository.
 
-The app can score locally without Supabase configuration. Guest server sync, Google account features, and Live Viewer require the Supabase project configuration. Community Rules remain deferred behind a separate moderation and legal gate.
+The app can score locally without Supabase configuration. Guest server sync, Google account features, Live Viewer, and Community Rules require the Supabase project configuration. Roll Community Rules out through Preview before Production, with the moderation, contact, security, and legal gates recorded in release evidence.
 
 ## Deploy the web app
 
@@ -47,9 +47,18 @@ For each new environment, run the SQL files once in filename order using the Sup
 14. `supabase/migrations/20261013140000_account_deletion.sql`
 15. `supabase/migrations/20261013150000_guest_match_transfer.sql`
 16. `supabase/migrations/20261014001000_fix_guest_transfer_anonymous_check.sql`
+17. `supabase/migrations/20261014100000_community_rules_all_sports.sql`
+18. `supabase/migrations/20261014110000_fix_community_match_snapshot.sql`
+19. `supabase/migrations/20261014120000_harden_community_snapshot_source.sql`
+20. `supabase/migrations/20261014130000_cross_device_match_control.sql`
+21. `supabase/migrations/20261014140000_republish_community_rule.sql`
+22. `supabase/migrations/20261014150000_scale_query_paths.sql`
+23. `supabase/migrations/20261014160000_history_and_rules_search.sql`
+24. `supabase/migrations/20261015100000_harden_match_event_integrity.sql`
+25. `supabase/migrations/20261015101000_bound_match_journal_reads.sql`
 
-Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema even though V1.0 does not expose those features. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply pending migrations in filename order before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The release-guardrail migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it. The atomic sync migration must be applied before deploying a client that calls `sync_match_journal`.
-The `20261014001000_fix_guest_transfer_anonymous_check.sql` migration updates the guest-transfer RPC to use Supabase's `auth.users.is_anonymous` flag, so apply it before testing OAuth guest transfer on an existing deployment.
+Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema, and `20261014100000_community_rules_all_sports.sql` must be applied before this frontend is deployed. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply pending migrations in filename order before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The release-guardrail migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it. The atomic sync migration must be applied before deploying a client that calls `sync_match_journal`. Apply `20261014130000_cross_device_match_control.sql` before deploying a client that calls `read_match_journal` or the match control RPCs. This migration replaces the sync RPC signature, so deploy the database migration before the frontend release that sends a control token. Apply `20261014140000_republish_community_rule.sql` before deploying a client that calls `publish_community_rule`.
+The `20261014001000_fix_guest_transfer_anonymous_check.sql` migration updates the guest-transfer RPC to use Supabase's `auth.users.is_anonymous` flag, so apply it before testing OAuth guest transfer on an existing deployment. The scale and history migrations add keyset pagination RPCs for account history and Community Rules, compact match-head reads, incremental event reads, search indexes, and viewer-token/query indexes. Apply them before deploying the client that uses those RPCs. The event-integrity migration adds server-side duplicate/sequence/sport checks and a deferred journal-completeness check. The bounded-reader migration adds `read_match_definition`, which the client uses before fetching event chunks; apply both before deploying the hardened cross-device client.
 
 ## Forward-only migration recovery and rollback
 
@@ -68,6 +77,7 @@ Database migrations are forward-only. A web deployment can roll back to a previo
 
 3. Apply pending files in filename order. The atomic sync migrations must be present before deploying a frontend that calls `sync_match_journal`.
 4. Verify the RPC signature, grants, RLS policies, viewer projection, and cleanup job before promoting the web deployment.
+5. For the cross-device migration, verify the `read_match_journal`, `acquire_match_control`, `renew_match_control`, and `release_match_control` signatures, the 45-second expiry, and the authenticated-only grants before promotion.
 
 ### If a migration fails
 
@@ -90,9 +100,9 @@ The atomic sync path reports `stale` and `conflict` instead of overwriting a new
 ## Configure Supabase Auth
 
 - Enable Anonymous Sign-Ins for guest play and sync.
-- Enable Google OAuth and the guest-match transfer flow for local and Preview after applying the account-deletion and guest-transfer migrations. Keep Community Rules disabled until its separate moderation and legal gate passes.
+- Enable Google OAuth and the guest-match transfer flow for local and Preview after applying the account-deletion and guest-transfer migrations. Community Rules publishing requires a Google-linked account; keep Production publication closed until its moderation, contact, security, and legal gate passes.
 - Deploy `supabase/functions/delete-account` with `supabase functions deploy delete-account` and `supabase/functions/transfer-guest-matches` with `supabase functions deploy transfer-guest-matches`. The service-role key must remain in the Edge Function environment and must never be added to Vercel client variables.
-- Set the Anonymous Sign-Ins rate limit in Supabase Auth to 10 sign-ins per IP per hour for the initial public release, if that control is available in the project. The database migration separately limits guest match creation (10/hour), match-state updates (500/hour), event inserts (500/hour), Live Viewer link creation (10/hour), and viewer reads (600/minute per match). Community Rule report limits remain in the schema for V1.1. These are safety ceilings, not expected usage targets.
+- Set the Anonymous Sign-Ins rate limit in Supabase Auth to 10 sign-ins per IP per hour for the initial public release, if that control is available in the project. The database migration separately limits guest match creation (10/hour), match-state updates (500/hour), event inserts (500/hour), Live Viewer link creation (10/hour), viewer reads (600/minute per match), and Community Rule reports (three/hour per anonymous account). These are safety ceilings, not expected usage targets.
 - Start with CAPTCHA disabled and monitor Auth errors and report volume. If repeated guest-signup abuse appears, enable Supabase CAPTCHA with hCaptcha, configure its secret in Supabase, the public site key in Vercel, and allowed hostnames in hCaptcha, then verify the challenge on the deployed hostname. The UI already supports a CAPTCHA response when Supabase requests one.
 - Do not assume an authentication provider is active because its environment variables exist. Test it from the deployed app.
 
@@ -104,9 +114,9 @@ After migration, verify the `purge-expired-guest-data` Cron job in Supabase and 
 
 Supabase Free projects with low activity may be paused after seven days. A paused project cannot run its database Cron job, so physical deletion can be delayed until the project resumes. Treat the hourly cleanup interval as an active-project target, not a deletion SLA. After resuming a project, check the Cron run history and invoke the cleanup function as an authorized operator if expired rows remain. See [Supabase's Free project pausing policy](https://supabase.com/docs/guides/platform/free-project-pausing) for current conditions.
 
-## V1.1 only: Community Rule reports
+## Community Rule reports and moderation
 
-This procedure is not part of V1.0 public operations. Do not accept Community Rules submissions or reports until the V1.1 policy, owner contact, response capacity, and security checks are approved.
+This procedure applies during Preview and Production only after the owner, moderation contact, response capacity, and security checks are approved. There is no moderator dashboard; use a restricted Supabase SQL Editor session.
 
 Reports are open to guests and Google-linked users; Google sign-in is not required. The optional email is only for follow-up. Each anonymous account can send up to three reports per hour. Reports do not automatically unpublish a rule, and Community Rules remain open for publication without pre-approval. Review them manually in Supabase SQL Editor using a restricted project session:
 
@@ -153,8 +163,18 @@ For a report that does not warrant action, set `status = 'dismissed'`, `resoluti
 - Create a Live Viewer link, open it in a private window, score a point, then revoke the link and confirm access stops.
 - Play one Table tennis and one Squash match in a fresh browser profile, including a doubles order confirmation and a reload during an active game.
 - Turn off the network, record a point, restore the network, and verify the score remains local until the next successful atomic sync.
-- Visit `/history` as a guest and confirm the Google sign-in state. Visit `/rules` and confirm it redirects to the home page; confirm the header keeps Community Rules unavailable.
+- Sign in with one disposable Google account in two browser profiles. Open the same active match in both, confirm the second profile is read-only, wait for a score update through polling, take over explicitly, and verify the previous editor loses input.
+- Complete the match in one profile, open it from the other profile, and confirm the history action opens a read-only score without requesting control.
+- Visit `/history` as a guest and confirm the Google sign-in state. Visit `/rules` and `/id/rules`, filter all six sports, and confirm empty/error states are understandable. With a disposable Google account, create and publish one clearly labeled test rule in Preview, use it from setup, and verify the match definition contains a community snapshot.
 - Review browser console and network errors. Do not use a real player's private information in test matches.
+
+## Scale validation
+
+The web client uses keyset pagination for account history and Community Rules. Match polling reads the compact head first and fetches event deltas only when `last_client_sequence` changes. Live Viewer refresh pauses while the tab is hidden and uses a five-second foreground interval. Do not remove these limits when diagnosing a missing row; use the page controls or reload the page.
+
+Before a public rollout, load-test a Preview project with realistic data: at least 10,000 history rows, 50 published rules per sport, and active matches with several hundred events. Exercise history pagination, rules filtering, match scoring, takeover, read-only polling, and Live Viewer reads simultaneously. Record p95/p99 latency, database CPU and connections, lock waits, API errors, response sizes, and Realtime connections if enabled. Increase the Supabase plan only after these measurements show a provider limit; request rate alone is not a capacity guarantee when journal payloads are large.
+
+The viewer-token index is required for high viewer fan-out. Verify it with `to_regclass('public.matches_viewer_token_hash_idx')` after migration. If Live Viewer traffic grows beyond polling capacity, replace the public viewer refresh path with a token-scoped push design after reviewing its authorization model; do not expose the owner-only match channel directly to anonymous viewers.
 
 ## Automated checks
 
@@ -162,20 +182,23 @@ The repository CI runs application checks with a frozen pnpm lockfile, formattin
 
 ## Troubleshooting
 
-| Symptom                                     | Checks                                                                                                                                                                 |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Guest sign-in fails                         | Confirm Supabase URL/key, Anonymous Sign-Ins, provider status, and the CAPTCHA setting. If CAPTCHA is enabled, verify the site key and allowed hostname.               |
-| Match stays local or sync fails             | Check network, Supabase status, current guest session, and browser console. Retry after connectivity returns. Do not manually change IDs to force a retry.             |
-| Match controls are read-only in another tab | Check whether another tab holds the match control lock. Close or release the controlling tab, then retry.                                                              |
-| Live Viewer says unavailable                | Check token expiry, revocation, match expiry, Supabase configuration, and the `read_live_viewer` RPC result. Create a new link only if the owner still wants to share. |
-| A deferred Community Rules URL opens        | Confirm the app redirects `/rules` routes to the localized home page. Verify that Google account controls do not expose Community Rules.                               |
+| Symptom                                      | Checks                                                                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Guest sign-in fails                          | Confirm Supabase URL/key, Anonymous Sign-Ins, provider status, and the CAPTCHA setting. If CAPTCHA is enabled, verify the site key and allowed hostname.                  |
+| Match stays local or sync fails              | Check network, Supabase status, current guest session, and browser console. Retry after connectivity returns. Do not manually change IDs to force a retry.                |
+| Account match is read-only on another device | Check whether another tab or device holds the 45-second match lease. Use explicit takeover only after confirming the server version is current.                           |
+| Match control was lost                       | Stop scoring, reload the server version, and check whether another device took over. Do not retry an old local branch against the server.                                 |
+| Account history cannot open a match          | Check `read_match_journal` grants, owner RLS, migration order, and the browser's Supabase session. Guest matches remain device-bound by design.                           |
+| Live Viewer says unavailable                 | Check token expiry, revocation, match expiry, Supabase configuration, and the `read_live_viewer` RPC result. Create a new link only if the owner still wants to share.    |
+| A Community Rules URL fails                  | Confirm the latest migration is applied, the safe read RPCs are callable, direct table reads remain denied, and the browser has the correct Supabase URL/publishable key. |
 
 ## Current operational gaps
 
 - CAPTCHA remains disabled initially; review anonymous Auth limits and abuse reports before enabling it.
 - Verify the hourly `purge-expired-guest-data` Cron job and its run history after the next successful hour.
-- Account deletion is an account-foundation operation and must be tested in Preview with a disposable account before production promotion. Community Rules moderation remains a separate unreleased operation.
+- Account deletion is an account-foundation operation and must be tested in Preview with a disposable account before production promotion. Community Rules require the same Preview evidence plus manual moderation, security, contact, and legal approval before Production publication.
 - Older database setups expose creator identifiers through direct Community Rules table reads until migration `20261009130000_revoke_community_rule_table_reads.sql` is applied. Verify direct reads are denied and safe read functions work after applying both Community Rules migrations.
 - New V1 matches use the single Casual workflow. Referee is hidden until it has meaningfully different controls; historical matches retain their saved mode label.
 - Multi-device scoring is treated as single-writer: a stale or divergent journal is rejected by `sync_match_journal` rather than overwriting the server snapshot. Investigate the sync conflict before continuing from another device.
+- Account match control uses a hashed in-memory tab token, a 45-second server lease, and 15-second heartbeats. Tokens are never stored in the database in raw form. Treat `CONTROL_LOST` and `SYNC_CONFLICT` as explicit recovery states, not as permission to merge or apply last-write-wins.
 - Privacy notice and terms still require real operator details, monitored contacts, provider verification, and legal approval. Track those actions in the [legal and owner release gate](legal-release-gate.md).

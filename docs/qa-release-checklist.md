@@ -12,8 +12,9 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 - [ ] `pnpm exec prettier --check .` passes.
 - [ ] `pnpm test:coverage` passes with the configured scoring-core and web thresholds.
 - [ ] `pnpm test:e2e` passes against a local preview or dev server; use the Chrome smoke flow as a manual fallback when the host cannot launch a headless browser.
-- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Community Rules checks cover migration security only; Community Rules are not user-facing yet. Never run test setup against production data.
+- [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Extend the Community Rules checks for all six sports, v2 validation, version locking, reports, and denied direct reads. Never run test setup against production data.
 - [ ] Review `supabase/tests/atomic_match_sync.test.sql` in the same disposable database. Verify first write, idempotent retry, stale snapshot rejection, divergent snapshot rejection, and rollback when an event fails.
+- [ ] Review `supabase/tests/cross_device_match_control.test.sql` and `supabase/tests/match_event_integrity.test.sql` in the same disposable database. Verify journal reads, initial lease, held lease, takeover, old-token rejection, complete read-only behavior, lease cleanup, duplicate-event rejection, sequence/sport validation, and journal completeness.
 - [ ] `git diff --check` passes and no secret key appears in the browser bundle or repository.
 
 ## Match setup and scoring
@@ -48,7 +49,7 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 - [ ] Interrupt the network during scoring, reconnect, and verify queued events sync with the original UUIDs and in order.
 - [ ] Retry the same sync more than once. Confirm no duplicate match or event rows appear.
 - [ ] Force a stale or divergent journal snapshot in a disposable test account. Confirm the atomic sync rejects it and does not change the server state.
-- [ ] Open the same match in two tabs. Confirm only one tab controls it and the other remains read-only until control is released.
+- [ ] Open the same active match in two tabs. Confirm only one tab controls it and the other remains read-only until control is released or explicitly taken over.
 - [ ] Verify a singles match sent to Live Viewer shows one generic player per side and preserves the format while continuing to hide entered names.
 - [ ] Verify guest expiry refreshes on accepted activity but never exceeds 24 hours from creation. Check expired records become inaccessible immediately and the hourly cleanup physically removes them and their events while the Supabase project is active.
 - [ ] Record that Supabase Free may pause a low-activity project and delay physical cleanup; after any resume, inspect Cron history and remove remaining expired rows through the authorized cleanup procedure.
@@ -65,19 +66,23 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 
 - [ ] As a guest, click Google login and confirm the OAuth callback transfers an unexpired guest match through `transfer-guest-matches`; confirm an expired guest match is not transferred or claimed.
 - [ ] Complete OAuth on local and Preview. Confirm the callback updates the session, guest transfer runs when a source guest token exists, and `claim_guest_matches()` runs once for matches already owned by the account, with a visible claiming state and a recoverable error state.
-- [ ] Refresh the same browser and open `/history`; confirm matches are ordered by `updated_at`, show sport/format/status/score/time, and reopen fully only when the local snapshot exists.
+- [ ] Refresh the same browser and open `/history`; confirm matches are grouped into active and completed sections, ordered by `updated_at`, show sport/format/status/score/time, and open from server history even when the local snapshot is absent.
 - [ ] Open `/history` and `/account` in English and Indonesian. Verify loading, empty, error, keyboard focus, 44 px controls, and narrow-phone layout.
 - [ ] Sign out and confirm the account menu disappears and a new anonymous guest session is available.
 - [ ] On Preview, delete a disposable Google test account after the second confirmation. Confirm match history, events, reports, rules, versions, viewer access, local match storage, and the Auth session are gone.
 - [ ] Confirm user A cannot read or delete user B's history, and confirm no service-role key appears in the browser bundle or Vercel client variables.
-- [ ] Repeat the complete account flow in a second browser. Confirm server history persists while full match detail remains device-local.
+- [ ] Repeat the complete account flow in a second browser. Confirm an active match hydrates from server history, remains read-only while another device owns control, takeover downloads the latest server snapshot, and a completed match opens read-only without a lease.
+- [ ] Confirm a long journal hydrates through bounded definition plus event reads, polling does not overlap requests, hidden tabs pause polling, and returning to a visible tab revalidates the control lease.
 
-## Community Rules scope controls
+## Community Rules rollout
 
-- [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and the Indonesian equivalents redirect to the localized home page.
-- [ ] Confirm Google account controls do not expose Community Rules routes or publishing actions.
-- [ ] Confirm match setup offers Official Rules and guest-only custom rules, with no Community Rules list.
-- [ ] Keep Community Rules policy and report-review checks out of the V1.0 public launch. Reintroduce them only after the V1.1 account deletion, contact, moderation, and security gates pass.
+- [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and the Indonesian equivalents open the intended directory, editor, and detail states.
+- [ ] Confirm the directory filters all six sports and exposes loading, empty, unavailable, and RPC error states without false statistics or seed data.
+- [ ] With a disposable Google account, create and edit a rule for every sport; verify canonical schema v2, optimistic-lock rejection, owner-only mutation, and publish/unpublish behavior.
+- [ ] From detail and setup, use a published rule for singles, doubles, and Tennis/Padel mixed doubles where supported. Verify `source: "community"`, version, sport-specific configuration, and singles server normalization in the match definition snapshot.
+- [ ] Edit or unpublish after match creation and confirm the existing match remains playable from its snapshot while new setup selections reject the unavailable rule.
+- [ ] Submit valid/invalid reports anonymously, verify the three-per-hour limit, and process the queue only through the restricted SQL Editor runbook.
+- [ ] Approve Community Rules for Production only after contact, moderation capacity, security, privacy, terms, and legal gates pass.
 
 ## Mobile, accessibility, and states
 
@@ -92,7 +97,7 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 
 - [ ] Confirm `/robots.txt` returns plain text and points to the deployed sitemap; confirm `/sitemap.xml` returns valid XML listing the English homepage and `/id/` with matching language alternates.
 - [ ] Confirm `/` and `/id/` return their own language-specific title, description, canonical URL, `hreflang` links, and `WebSite` structured data.
-- [ ] Confirm setup, match, and viewer URLs return `X-Robots-Tag: noindex, nofollow`; confirm deferred Community Rules URLs redirect to the homepage.
+- [ ] Confirm setup, match, viewer, and Community Rules utility URLs return `X-Robots-Tag: noindex, nofollow` where applicable; confirm direct Community Rules refreshes resolve through the SPA rewrite.
 - [ ] In Google Search Console, submit the sitemap and inspect both language homepages after deployment. Request indexing if each page is available to Googlebot.
 
 ## Public-launch blockers to resolve
@@ -103,6 +108,6 @@ The latest engineering evidence run from 2026-10-13 is recorded in [qa-evidence-
 - [ ] Apply the release-guardrail migration, verify the hourly `purge-expired-guest-data` Cron job succeeds, and confirm the job removes expired rows.
 - [ ] Publish the approved privacy notice and terms with real operator and privacy contact details.
 - [ ] Deploy Google OAuth, `delete-account`, and `transfer-guest-matches` to Preview first. Promote production only after the account foundation smoke test, guest-transfer test, deletion test, privacy notice, terms, and owner approval pass.
-- [ ] Verify the staged Community Rules read and revoke migrations are applied in the intended order as required by the migration chain. Do not expose Community Rules in the V1.0 interface.
+- [ ] Verify all Community Rules migrations, including `20261014100000_community_rules_all_sports.sql`, are applied in filename order. Confirm safe RPC reads work and direct table reads remain denied.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.
 - [ ] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests.

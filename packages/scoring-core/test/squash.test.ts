@@ -11,7 +11,6 @@ import {
   type MatchDefinition,
   type MatchFormat,
   type MatchJournal,
-  type PlayerIndex,
   type SquashGameOrders,
   type TeamId,
 } from "../src";

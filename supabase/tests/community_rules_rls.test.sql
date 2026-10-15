@@ -26,13 +26,16 @@ select is(
     'Club night doubles',
     'A local format used by the group.',
     '{
-      "pointsToWin": 15,
-      "winBy": 2,
-      "maxPoints": null,
-      "bestOf": 3,
-      "scoringMode": "side_out",
-      "serversPerTurn": 2,
-      "openingServerNumber": 2
+      "schemaVersion": 2,
+      "scoring": {
+        "pointsToWin": 15,
+        "winBy": 2,
+        "maxPoints": null,
+        "bestOf": 3,
+        "scoringMode": "side_out",
+        "serversPerTurn": 2,
+        "openingServerNumber": 2
+      }
     }'::jsonb,
     true
   ),
@@ -48,13 +51,16 @@ select is(
     'Club night doubles v2',
     'Updated local format.',
     '{
-      "pointsToWin": 11,
-      "winBy": 2,
-      "maxPoints": null,
-      "bestOf": 3,
-      "scoringMode": "side_out",
-      "serversPerTurn": 2,
-      "openingServerNumber": 2
+      "schemaVersion": 2,
+      "scoring": {
+        "pointsToWin": 11,
+        "winBy": 2,
+        "maxPoints": null,
+        "bestOf": 3,
+        "scoringMode": "side_out",
+        "serversPerTurn": 2,
+        "openingServerNumber": 2
+      }
     }'::jsonb,
     true
   ),
@@ -80,7 +86,7 @@ select ok(
   'public reader is not identified as the owner'
 );
 select is(
-  (select configuration ->> 'pointsToWin'
+  (select configuration -> 'scoring' ->> 'pointsToWin'
    from public.read_community_rule_version('00000000-0000-4000-8000-000000000201', 2)),
   '11',
   'public can read a published version configuration'

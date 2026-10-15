@@ -79,7 +79,7 @@ Before production account rollout, complete the account deletion process, publis
 ## Account foundation rollout gate
 
 - Google login starts OAuth for the account and transfers unexpired guest matches through the server-only transfer flow; `claim_guest_matches()` then runs once after OAuth for matches already owned by the account. Expired matches remain unavailable.
-- `/history` lists only the active account's matches, ordered by `updated_at`; full match reopening requires the local snapshot on the same device.
+- `/history` lists the active account's matches in active and completed groups, ordered by `updated_at`; account journals can be hydrated on another browser or device, while active matches remain single-editor through an explicit control lease.
 - `/account` provides the Google email, history link, sign out, and a second-confirmation permanent deletion flow.
 - Account deletion removes owned matches, events, rules, versions, reports, viewer capabilities, local browser matches, and the Auth user through the server-only Edge Function.
 - Verify English and Indonesian routes, loading/error/empty states, keyboard focus, mobile layout, RLS, and no service-role key in the browser bundle.

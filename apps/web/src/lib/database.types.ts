@@ -30,6 +30,9 @@ export interface Database {
           viewer_token_hash: string | null;
           viewer_expires_at: string | null;
           viewer_revoked_at: string | null;
+          control_token_hash: string | null;
+          control_heartbeat_at: string | null;
+          control_expires_at: string | null;
         };
         Insert: {
           id: string;
@@ -51,6 +54,9 @@ export interface Database {
           viewer_token_hash?: string | null;
           viewer_expires_at?: string | null;
           viewer_revoked_at?: string | null;
+          control_token_hash?: string | null;
+          control_heartbeat_at?: string | null;
+          control_expires_at?: string | null;
         };
         Update: {
           sport?: string;
@@ -69,6 +75,9 @@ export interface Database {
           viewer_token_hash?: string | null;
           viewer_expires_at?: string | null;
           viewer_revoked_at?: string | null;
+          control_token_hash?: string | null;
+          control_heartbeat_at?: string | null;
+          control_expires_at?: string | null;
         };
         Relationships: [];
       };
@@ -125,7 +134,7 @@ export interface Database {
       community_rule_reports: {
         Row: {
           id: string;
-          rule_id: string;
+          rule_id: string | null;
           reporter_id: string | null;
           reason: string;
           details: string;
@@ -157,6 +166,7 @@ export interface Database {
           p_last_client_sequence: number;
           p_created_at: string;
           p_is_guest: boolean;
+          p_control_token: string;
           p_events: Json;
         };
         Returns: string;
@@ -188,6 +198,103 @@ export interface Database {
           expires_at: string;
         }>;
       };
+      read_match_journal: {
+        Args: { p_match_id: string };
+        Returns: Array<{
+          id: string;
+          owner_id: string;
+          sport: string;
+          status: string;
+          winner: string | null;
+          definition: Json;
+          current_state: Json;
+          last_client_sequence: number;
+          created_at: string;
+          updated_at: string;
+          events: Json;
+        }>;
+      };
+      read_match_definition: {
+        Args: { p_match_id: string };
+        Returns: Array<{
+          id: string;
+          owner_id: string;
+          sport: string;
+          status: string;
+          winner: string | null;
+          definition: Json;
+          current_state: Json;
+          last_client_sequence: number;
+          created_at: string;
+          updated_at: string;
+          event_count: number;
+        }>;
+      };
+      read_match_head: {
+        Args: { p_match_id: string };
+        Returns: Array<{
+          id: string;
+          sport: string;
+          status: string;
+          winner: string | null;
+          current_state: Json;
+          last_client_sequence: number;
+          updated_at: string;
+        }>;
+      };
+      read_match_events_since: {
+        Args: {
+          p_match_id: string;
+          p_after_sequence?: number;
+          p_limit?: number;
+        };
+        Returns: Array<{
+          id: string;
+          match_id: string;
+          client_sequence: number;
+          event_type: string;
+          payload: Json;
+          created_at: string;
+        }>;
+      };
+      list_my_match_summaries: {
+        Args: {
+          p_search?: string | null;
+          p_status?: string | null;
+          p_sport?: string | null;
+          p_sort?: string;
+          p_limit?: number;
+          p_before_updated_at?: string | null;
+          p_before_id?: string | null;
+        };
+        Returns: Array<{
+          id: string;
+          sport: string;
+          status: string;
+          winner: string | null;
+          team_a_name: string;
+          team_b_name: string;
+          current_state: Json;
+          created_at: string;
+          updated_at: string;
+        }>;
+      };
+      acquire_match_control: {
+        Args: {
+          p_match_id: string;
+          p_control_token: string;
+          p_force?: boolean;
+        };
+        Returns: string;
+      };
+      renew_match_control: {
+        Args: { p_match_id: string; p_control_token: string };
+        Returns: boolean;
+      };
+      release_match_control: {
+        Args: { p_match_id: string; p_control_token: string };
+        Returns: boolean;
+      };
       save_community_rule: {
         Args: {
           p_rule_id: string;
@@ -201,6 +308,10 @@ export interface Database {
         Returns: number;
       };
       unpublish_community_rule: {
+        Args: { p_rule_id: string };
+        Returns: boolean;
+      };
+      publish_community_rule: {
         Args: { p_rule_id: string };
         Returns: boolean;
       };
@@ -223,6 +334,27 @@ export interface Database {
       };
       list_community_rules: {
         Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          sport: string;
+          title: string;
+          description: string;
+          current_version: number;
+          is_published: boolean;
+          created_at: string;
+          updated_at: string;
+          is_owner: boolean;
+        }>;
+      };
+      list_community_rules_page: {
+        Args: {
+          p_sport?: string | null;
+          p_search?: string | null;
+          p_scope?: string;
+          p_limit?: number;
+          p_before_updated_at?: string | null;
+          p_before_id?: string | null;
+        };
         Returns: Array<{
           id: string;
           sport: string;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   deriveJournal,
   padelScoreLabel,
@@ -344,6 +344,12 @@ export function HomePage() {
       <footer className={styles.footer}>
         <span>{t("officialRules")}</span>
         <span>{t("officialHint")}</span>
+        <Link
+          className={styles.communityFooterLink}
+          to={localizedPath("/rules", locale)}
+        >
+          {t("communityRules")}
+        </Link>
       </footer>
     </div>
   );

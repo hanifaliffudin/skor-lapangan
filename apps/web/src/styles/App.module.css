@@ -497,6 +497,8 @@
 .secondaryButton {
   width: 100%;
   background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .secondaryButton:hover {
@@ -680,6 +682,8 @@
 .dangerTextButton {
   min-height: 44px;
   padding: 6px 0;
+  display: inline-flex;
+  align-items: center;
   border: 0;
   background: transparent;
   font-weight: 800;
@@ -706,6 +710,41 @@
   padding: 10px 12px;
   border-left: 4px solid var(--cobalt);
   background: var(--surface);
+}
+
+.matchStatusBanner {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-left: 4px solid var(--cobalt);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.matchStatusBanner[data-state="conflict"],
+.matchStatusBanner[data-state="error"],
+.matchStatusBanner[data-state="lost"] {
+  border-left-color: var(--danger);
+}
+
+.matchStatusBanner[data-state="warning"],
+.matchStatusBanner[data-state="held"] {
+  border-left-color: #b7791f;
+}
+
+.matchStatusBanner > span {
+  min-width: 0;
+}
+
+.matchStatusBanner .controlButton {
+  flex: 0 0 auto;
+  min-height: 44px;
 }
 
 .matchAuthNotice p {
@@ -820,6 +859,15 @@
   gap: 24px;
 }
 
+.rulesPageHeading > div {
+  min-width: 0;
+}
+
+.rulesPageHeading > .primaryButton {
+  width: auto;
+  min-width: 180px;
+}
+
 .rulesPageHeading h1 {
   margin: 0 0 10px;
   font-size: clamp(32px, 6vw, 48px);
@@ -843,6 +891,30 @@
   line-height: 1.5;
 }
 
+.communityFilters {
+  margin: 20px 0 24px;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.communitySearch {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.communityFilterRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .communityRuleList {
   margin-top: 20px;
   display: grid;
@@ -852,28 +924,70 @@
 
 .communityRuleCard,
 .rulesEmpty {
-  padding: 18px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: var(--surface);
 }
 
+.communityRuleCard {
+  overflow: hidden;
+}
+
+.communityRuleCardLink {
+  min-height: 100%;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+}
+
+.communityRuleCardLink:hover {
+  background: #f3f5fb;
+}
+
+.communityRuleCardLink:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
 .communityRuleCard h2 {
   margin: 12px 0 8px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 20px;
 }
 
-.communityRuleCard h2 a {
-  color: var(--ink);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
-}
-
-.communityRuleCard > p {
+.communityRuleCardLink > p {
   min-height: 42px;
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   color: var(--text-muted);
   line-height: 1.45;
+}
+
+.communityRuleCardFooter {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.communityRuleCardCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cobalt-dark);
+  font-size: 13px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.communityRuleCardLink:hover .communityRuleCardCta {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .communityRuleCardTop {
@@ -921,6 +1035,56 @@
   background: var(--surface);
 }
 
+.ruleSharePanel > * {
+  min-width: 0;
+}
+
+.ruleOwnerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.ruleOwnerActions > .secondaryButton,
+.ruleOwnerActions > .ruleUnpublishButton,
+.ruleOwnerActions > .ruleRepublishButton {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 52px;
+  min-height: 52px;
+  white-space: nowrap;
+}
+
+.ruleUnpublishButton {
+  padding: 12px 18px;
+  border: 2px solid #b83c38;
+  border-radius: 8px;
+  color: #8a211f;
+  background: var(--surface);
+  font-weight: 850;
+}
+
+.ruleUnpublishButton:hover {
+  color: #7c1d1d;
+  background: #fbe8e7;
+}
+
+.ruleRepublishButton {
+  padding: 12px 18px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  color: white;
+  background: var(--cobalt);
+  font-weight: 850;
+}
+
+.ruleRepublishButton:hover {
+  background: var(--cobalt-dark);
+}
+
 .ruleSharePanel h2 {
   margin: 0 0 8px;
   font-size: 20px;
@@ -929,6 +1093,10 @@
 .ruleSharePanel p {
   color: var(--text-muted);
   line-height: 1.45;
+}
+
+.ruleSharePanel .shareActions {
+  margin-top: 16px;
 }
 
 .ruleQr {
@@ -987,13 +1155,13 @@
 }
 
 .reportForm input,
-.reportForm select,
+.reportForm [data-slot="select-trigger"],
 .reportForm textarea,
 .communityRuleForm input,
-.communityRuleForm select,
+.communityRuleForm [data-slot="select-trigger"],
 .communityRuleForm textarea,
 .communityScoringFields input,
-.communityScoringFields select {
+.communityScoringFields [data-slot="select-trigger"] {
   width: 100%;
   min-height: 46px;
   padding: 9px 11px;
@@ -1027,10 +1195,49 @@
   line-height: 1.5;
 }
 
+.historyFilters {
+  margin: 24px 0 26px;
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.historySearch,
+.historyFilterField {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.historyFilterRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.historyTeams {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .historyList {
   margin: 22px 0;
   display: grid;
   gap: 12px;
+}
+
+.historyGroupTitle {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 850;
 }
 
 .historyCard {
@@ -1109,8 +1316,12 @@
 }
 
 .textButton {
-  margin-bottom: 34px;
+  margin-bottom: 24px;
   color: var(--cobalt-dark);
+}
+
+.rulesMain > .textButton + .rulesPageHeading {
+  margin-top: 0;
 }
 
 .sectionHeading {
@@ -1141,16 +1352,23 @@
   font-weight: 900;
 }
 
+.rulesIntro {
+  margin: -2px 0 2px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .rulesChoices,
 .ruleFields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .ruleChoice {
   min-width: 0;
-  min-height: 64px;
+  min-height: 88px;
   padding: 12px;
   display: flex;
   align-items: flex-start;
@@ -1164,6 +1382,18 @@
   background: #f0f4ff;
 }
 
+.ruleChoice:disabled,
+.ruleChoice[data-unavailable="true"] {
+  border-style: dashed;
+  background: #f1f2f4;
+  color: var(--text-muted);
+}
+
+.ruleChoice:disabled strong,
+.ruleChoice[data-unavailable="true"] strong {
+  color: var(--text-muted);
+}
+
 .ruleChoice input {
   flex: 0 0 auto;
   width: 20px;
@@ -1172,27 +1402,76 @@
   accent-color: var(--cobalt);
 }
 
-.ruleChoice span {
+.ruleChoice > span:first-child {
   min-width: 0;
   display: grid;
   gap: 4px;
 }
 
+.ruleChoice strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
 .ruleChoice small {
   color: var(--text-muted);
+  font-size: 12px;
   line-height: 1.35;
 }
 
 .ruleEditor {
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
 }
 
-.ruleEditor > p {
+.ruleEditorIntro,
+.ruleEditor > p[role="status"] {
+  margin: 0;
   max-width: 58ch;
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.ruleEditor > label {
+  display: grid;
+  align-items: start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.communityRuleEmpty {
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface);
+}
+
+.communityRuleEmpty strong {
+  font-size: 14px;
+}
+
+.communityRuleEmpty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.communityRuleEmpty a,
+.communityRulesBrowseLink {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  color: var(--cobalt-dark);
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .ruleFields label {
@@ -1252,7 +1531,7 @@
 }
 
 .teamFields input,
-.selectField select,
+.selectField [data-slot="select-trigger"],
 .overrideFields input {
   width: 100%;
   min-height: 48px;
@@ -1264,7 +1543,7 @@
 }
 
 .teamFields input:focus,
-.selectField select:focus,
+.selectField [data-slot="select-trigger"]:focus,
 .overrideFields input:focus {
   border-color: var(--cobalt);
 }
@@ -1273,6 +1552,10 @@
   padding: 18px 20px;
   border: 2px solid var(--ink);
   background: var(--surface);
+}
+
+.rulesMain > .selectField {
+  margin-bottom: 14px;
 }
 
 .matchShell {
@@ -2234,6 +2517,15 @@
     border-width: 3px;
   }
 
+  .rulesGroup {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .ruleChoice {
+    min-height: 84px;
+  }
+
   .choiceCopy {
     gap: 3px;
   }
@@ -2255,6 +2547,63 @@
   .rulesPageHeading {
     align-items: flex-start;
     flex-direction: column;
+    gap: 16px;
+  }
+
+  .rulesPageHeading > .primaryButton {
+    width: 100%;
+  }
+
+  .ruleOwnerActions {
+    justify-content: stretch;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ruleOwnerActions > .secondaryButton,
+  .ruleOwnerActions > .ruleUnpublishButton,
+  .ruleOwnerActions > .ruleRepublishButton {
+    flex: 0 0 52px;
+    width: 100%;
+  }
+
+  .communityDisclaimer {
+    margin: 12px 0 18px;
+    padding: 12px;
+  }
+
+  .communityFilters {
+    margin-top: 18px;
+    padding: 12px;
+  }
+
+  .communityFilterRow {
+    grid-template-columns: 1fr;
+  }
+
+  .communityRuleCard,
+  .rulesEmpty,
+  .ruleSharePanel,
+  .reportForm,
+  .communityRuleForm {
+    padding: 16px;
+  }
+
+  .communityRuleCard {
+    padding: 0;
+  }
+
+  .communityRuleCardLink {
+    padding: 16px;
+  }
+
+  .communityRuleCardLink > p {
+    min-height: 0;
+    margin-bottom: 10px;
+  }
+
+  .ruleSharePanel {
+    gap: 16px;
   }
 
   .matchTopline {
@@ -2277,6 +2626,35 @@
   .matchAuthNotice button {
     width: 100%;
     max-width: none;
+  }
+
+  .matchStatusBanner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .matchStatusBanner .controlButton {
+    width: 100%;
+  }
+
+  .historyFilters {
+    margin-top: 20px;
+    padding: 12px;
+  }
+
+  .historyFilterRow {
+    grid-template-columns: 1fr;
+  }
+
+  .historyCardActions,
+  .historyCardActions > button,
+  .historyCardActions > div {
+    width: 100%;
+  }
+
+  .historyCardActions > div {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .quickStart {

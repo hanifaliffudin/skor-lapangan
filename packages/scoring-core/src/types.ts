@@ -16,8 +16,8 @@ export type OfficialRulesetId =
   | "ittf-table-tennis-2022"
   | "wsf-squash-singles-2025"
   | "wsf-squash-doubles-2022";
-export type RulesetSource =
-  "official" | "community" | "guest_custom" | "local_variant";
+export type RuleSource = "official" | "community" | "guest_custom";
+export type RulesetSource = RuleSource | "local_variant";
 export type ScoringMode = "rally" | "side_out";
 export type BestOf = 1 | 3 | 5;
 export type TennisGameScoring = "advantage" | "no_ad";
@@ -157,6 +157,15 @@ export interface ScoringRules {
   scoringMode: ScoringMode;
   serversPerTurn: 1 | 2;
   openingServerNumber: 1 | 2;
+}
+
+export interface CommunityRuleConfiguration {
+  schemaVersion: 2;
+  scoring: ScoringRules;
+  tennis?: TennisRules;
+  padel?: PadelRules;
+  tableTennis?: TableTennisRules;
+  squash?: SquashRules;
 }
 
 export interface RulesetSnapshot {

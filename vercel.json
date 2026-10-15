@@ -3,13 +3,7 @@
   "framework": "vite",
   "buildCommand": "pnpm build",
   "outputDirectory": "apps/web/dist",
-  "redirects": [
-    { "source": "/id", "destination": "/id/", "permanent": true },
-    { "source": "/rules", "destination": "/", "permanent": true },
-    { "source": "/rules/:path*", "destination": "/", "permanent": true },
-    { "source": "/id/rules", "destination": "/id/", "permanent": true },
-    { "source": "/id/rules/:path*", "destination": "/id/", "permanent": true }
-  ],
+  "redirects": [{ "source": "/id", "destination": "/id/", "permanent": true }],
   "headers": [
     {
       "source": "/setup",

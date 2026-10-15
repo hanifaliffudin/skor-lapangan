@@ -223,62 +223,77 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [action]);
 
+  const accountUserId =
+    session && !session.user.is_anonymous ? session.user.id : null;
+
   useEffect(() => {
-    if (!supabase || !session || session.user.is_anonymous) return;
-    if (claimAttempted.current === session.user.id) return;
-    claimAttempted.current = session.user.id;
+    if (!supabase || !accountUserId) return;
+    if (claimAttempted.current === accountUserId) return;
+    claimAttempted.current = accountUserId;
 
     let active = true;
     setAction("claiming");
     void (async () => {
-      for (const match of listStoredMatches()) {
-        const storedMatchInfo = getStoredMatchInfo(match.definition.id);
-        saveMatch(match, {
-          ownerId:
-            storedMatchInfo?.persistent && storedMatchInfo.ownerId
-              ? storedMatchInfo.ownerId
-              : session.user.id,
-          persistent: true,
-        });
-      }
-
-      const guestAccessToken = window.sessionStorage.getItem(
-        guestTransferTokenKey,
-      );
-      let transferredCount = 0;
-
-      if (guestAccessToken) {
-        const { data, error } = await supabase.functions.invoke<{
-          transferred: number;
-        }>("transfer-guest-matches", {
-          body: { guestAccessToken },
-        });
-        if (error) {
-          if (active) {
-            setAuthError(error.message);
-            setAuthErrorKind("claim");
-          }
-        } else {
-          window.sessionStorage.removeItem(guestTransferTokenKey);
-          transferredCount = data?.transferred ?? 0;
+      try {
+        for (const match of listStoredMatches()) {
+          const storedMatchInfo = getStoredMatchInfo(match.definition.id);
+          saveMatch(match, {
+            ownerId:
+              storedMatchInfo?.persistent && storedMatchInfo.ownerId
+                ? storedMatchInfo.ownerId
+                : accountUserId,
+            persistent: true,
+          });
         }
-      }
 
-      const { data, error } = await supabase.rpc("claim_guest_matches");
-      if (!active) return;
-      if (error) {
-        setAuthError(error.message);
-        setAuthErrorKind("claim");
-      } else if (transferredCount + (data ?? 0) > 0) {
-        setAuthNotice("guestMatchesSaved");
+        const guestAccessToken = window.sessionStorage.getItem(
+          guestTransferTokenKey,
+        );
+        let transferredCount = 0;
+
+        if (guestAccessToken) {
+          const { data, error } = await supabase.functions.invoke<{
+            transferred: number;
+          }>("transfer-guest-matches", {
+            body: { guestAccessToken },
+          });
+          if (error) {
+            if (active) {
+              setAuthError(error.message);
+              setAuthErrorKind("claim");
+            }
+          } else {
+            window.sessionStorage.removeItem(guestTransferTokenKey);
+            transferredCount = data?.transferred ?? 0;
+          }
+        }
+
+        const { data, error } = await supabase.rpc("claim_guest_matches");
+        if (!active) return;
+        if (error) {
+          setAuthError(error.message);
+          setAuthErrorKind("claim");
+        } else if (transferredCount + (data ?? 0) > 0) {
+          setAuthNotice("guestMatchesSaved");
+        }
+      } catch (error: unknown) {
+        if (active) {
+          setAuthError(
+            error instanceof Error
+              ? error.message
+              : "Could not save guest matches.",
+          );
+          setAuthErrorKind("claim");
+        }
+      } finally {
+        if (active) setAction("idle");
       }
-      setAction("idle");
     })();
 
     return () => {
       active = false;
     };
-  }, [session]);
+  }, [accountUserId]);
 
   useEffect(() => {
     if (!authNotice) return;

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type {
-  MatchFormat,
   MatchDefinition,
   MatchState,
   Sport,
@@ -13,10 +12,14 @@ import {
   tennisScoreLabel,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
-import { useLocale } from "../../lib/i18n";
+import { localizedPath, useLocale } from "../../lib/i18n";
 import { supabase } from "../../lib/supabase";
+import { Button } from "@/components/ui/button";
 import styles from "../../styles/App.module.css";
 import { Court } from "./Court";
+
+const VIEWER_POLL_MS = 5_000;
+const HIDDEN_VIEWER_POLL_MS = 15_000;
 
 interface ViewerSnapshot {
   sport: Sport;
@@ -220,16 +223,19 @@ function viewerDefinition(state: MatchState): MatchDefinition {
 
 export function ViewerPage() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const { locale, t } = useLocale();
   const [snapshot, setSnapshot] = useState<ViewerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const hasSnapshot = useRef(false);
 
   useEffect(() => {
     let active = true;
     let requestRunning = false;
+    let timerId: number | null = null;
     const refresh = async () => {
       if (!active || requestRunning || document.visibilityState === "hidden")
         return;
@@ -274,18 +280,36 @@ export function ViewerPage() {
       setLoading(false);
     };
 
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 3000);
-    const handleOnline = () => void refresh();
+    const schedule = () => {
+      if (!active) return;
+      timerId = window.setTimeout(
+        () => {
+          void refresh().finally(schedule);
+        },
+        document.visibilityState === "hidden"
+          ? HIDDEN_VIEWER_POLL_MS
+          : VIEWER_POLL_MS,
+      );
+    };
+    const refreshAndSchedule = () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      void refresh().finally(schedule);
+    };
+
+    void refresh().finally(schedule);
+    const handleOnline = refreshAndSchedule;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshAndSchedule();
+    };
     window.addEventListener("online", handleOnline);
-    document.addEventListener("visibilitychange", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       active = false;
-      window.clearInterval(interval);
+      if (timerId !== null) window.clearTimeout(timerId);
       window.removeEventListener("online", handleOnline);
-      document.removeEventListener("visibilitychange", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [token]);
+  }, [refreshAttempt, token]);
 
   const state = snapshot?.currentState;
   const definition = state ? viewerDefinition(state) : null;
@@ -311,6 +335,14 @@ export function ViewerPage() {
           <section className="mx-auto w-full max-w-[580px] px-[22px] py-20 text-center [&>p]:mx-auto [&>p]:max-w-[600px] [&>p]:text-[clamp(17px,3vw,21px)] [&>p]:leading-[1.55] [&>p]:text-text-muted">
             <h2>{t("viewerUnavailable")}</h2>
             <p>{t("viewerUnavailableBody")}</p>
+            <Button
+              variant="outline"
+              className="mt-6"
+              type="button"
+              onClick={() => navigate(localizedPath("/", locale))}
+            >
+              {t("backToHome")}
+            </Button>
           </section>
         ) : null}
         {snapshot && state && definition ? (
@@ -326,6 +358,16 @@ export function ViewerPage() {
                 : t(getMatchFormat(state))}{" "}
               · {t("updatedAt")} {updatedTime}
             </p>
+            {stale ? (
+              <Button
+                variant="outline"
+                className="mb-4 min-h-11"
+                type="button"
+                onClick={() => setRefreshAttempt((current) => current + 1)}
+              >
+                {t("viewerRefresh")}
+              </Button>
+            ) : null}
             <section className={styles.scoreboard} aria-label={t("score")}>
               {(["A", "B"] as const).map((team) => (
                 <article

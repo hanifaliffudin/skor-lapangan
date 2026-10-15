@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
-  getMatchFormat,
   officialRulesetFor,
+  type CommunityRuleConfiguration,
   type MatchFormat,
   type MatchDefinition,
   type MatchJournal,
@@ -25,12 +25,20 @@ import {
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
+import { normalizeIntegerInput } from "../../lib/numberInput";
 import { loadDraft, saveDraft, saveMatch } from "../../lib/session";
+import { supabase } from "../../lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SelectControl } from "@/components/ui/select-control";
+import {
+  decodeCommunityRuleConfiguration,
+  isCommunitySport,
+  snapshotForCommunityRule,
+  type CommunityRuleRecord,
+} from "../rules/communityRule";
 import styles from "../../styles/App.module.css";
 
 const defaultTennisRules: TennisRules = {
@@ -75,13 +83,26 @@ export function SetupPage() {
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
   const [names, setNames] = useState(["", "", "", ""]);
+  const [format, setFormat] = useState<MatchFormat>(draft?.format ?? "doubles");
   const [firstServer, setFirstServer] = useState("A-0");
   const [officialScoringMode, setOfficialScoringMode] =
     useState<ScoringMode>("side_out");
-  const [ruleSource, setRuleSource] = useState<"official" | "guest_custom">(
-    "official",
-  );
+  const [ruleSource, setRuleSource] = useState<
+    "official" | "community" | "guest_custom"
+  >(draft?.communityRuleId ? "community" : "official");
   const [ruleError, setRuleError] = useState("");
+  const [communityRules, setCommunityRules] = useState<CommunityRuleRecord[]>(
+    [],
+  );
+  const [communityRulesLoading, setCommunityRulesLoading] = useState(true);
+  const [communityRulesError, setCommunityRulesError] = useState("");
+  const [communityRule, setCommunityRule] =
+    useState<CommunityRuleRecord | null>(null);
+  const [communityConfiguration, setCommunityConfiguration] =
+    useState<CommunityRuleConfiguration | null>(null);
+  const [communityLoading, setCommunityLoading] = useState(
+    Boolean(draft?.communityRuleId),
+  );
   const [tennisRules, setTennisRules] =
     useState<TennisRules>(defaultTennisRules);
   const [padelRules, setPadelRules] = useState<PadelRules>(defaultPadelRules);
@@ -121,9 +142,106 @@ export function SetupPage() {
     ).configuration,
   }));
 
+  useEffect(() => {
+    if (!draft || !supabase) {
+      setCommunityRulesLoading(false);
+      setCommunityRulesError(draft ? t("backendNotConfigured") : "");
+      return;
+    }
+    let active = true;
+    void (async () => {
+      setCommunityRulesLoading(true);
+      setCommunityRulesError("");
+      const { data, error } = await supabase.rpc("list_community_rules_page", {
+        p_sport: draft.sport,
+        p_limit: 100,
+        p_before_updated_at: null,
+        p_before_id: null,
+      });
+      if (!active) return;
+      if (error) {
+        setCommunityRules([]);
+        setCommunityRulesError(t("communityRulesLoadError"));
+        setCommunityRulesLoading(false);
+        return;
+      }
+      setCommunityRules(
+        (data ?? []).filter(
+          (rule): rule is CommunityRuleRecord =>
+            isCommunitySport(rule.sport) && rule.is_published,
+        ),
+      );
+      setCommunityRulesLoading(false);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [draft?.sport, t]);
+
+  useEffect(() => {
+    if (!draft?.communityRuleId) {
+      setCommunityLoading(false);
+      return;
+    }
+    const communityRuleId = draft.communityRuleId;
+    let active = true;
+    void (async () => {
+      setCommunityLoading(true);
+      if (!supabase) {
+        if (active) {
+          setCommunityLoading(false);
+          setRuleError(t("backendNotConfigured"));
+        }
+        return;
+      }
+      const { data: rows, error } = await supabase.rpc("read_community_rule", {
+        p_rule_id: communityRuleId,
+      });
+      const row = rows?.[0];
+      if (
+        !active ||
+        error ||
+        !row ||
+        !isCommunitySport(row.sport) ||
+        row.sport !== draft.sport ||
+        !row.is_published
+      ) {
+        if (active) {
+          setCommunityRule(null);
+          setCommunityConfiguration(null);
+          setCommunityLoading(false);
+          setRuleError(t("loadRuleError"));
+        }
+        return;
+      }
+      const { data: versions, error: versionError } = await supabase.rpc(
+        "read_community_rule_version",
+        { p_rule_id: row.id, p_version: row.current_version },
+      );
+      const configuration = versions?.[0]
+        ? decodeCommunityRuleConfiguration(versions[0].configuration, row.sport)
+        : null;
+      if (!active) return;
+      if (versionError || !configuration) {
+        setCommunityRule(null);
+        setCommunityConfiguration(null);
+        setCommunityLoading(false);
+        setRuleError(t("loadRuleError"));
+        return;
+      }
+      const typedRule = { ...row, sport: row.sport } as CommunityRuleRecord;
+      setCommunityRule(typedRule);
+      setCommunityConfiguration(configuration);
+      setCommunityLoading(false);
+      setRuleError("");
+    })();
+    return () => {
+      active = false;
+    };
+  }, [draft?.communityRuleId, draft?.sport, t]);
+
   if (!draft) return <Navigate to={localizedPath("/", locale)} replace />;
 
-  const format = getMatchFormat(draft);
   const playerCount = format === "singles" ? 1 : 2;
   const serverChoices: Array<[TeamId, PlayerIndex]> =
     format === "singles"
@@ -179,22 +297,99 @@ export function SetupPage() {
     setSquashRules((current) => ({ ...current, [key]: value }));
   }
 
-  function changeRuleSource(source: "official" | "guest_custom") {
+  async function loadCommunityRule(ruleId: string) {
+    if (!draft || !supabase) {
+      setRuleError(t("backendNotConfigured"));
+      return;
+    }
+    setCommunityLoading(true);
+    setRuleError("");
+    const { data: rows, error } = await supabase.rpc("read_community_rule", {
+      p_rule_id: ruleId,
+    });
+    const row = rows?.[0];
+    if (
+      error ||
+      !row ||
+      !isCommunitySport(row.sport) ||
+      row.sport !== draft.sport ||
+      !row.is_published
+    ) {
+      setCommunityLoading(false);
+      setCommunityRule(null);
+      setCommunityConfiguration(null);
+      setRuleError(t("loadRuleError"));
+      return;
+    }
+    const { data: versions, error: versionError } = await supabase.rpc(
+      "read_community_rule_version",
+      { p_rule_id: row.id, p_version: row.current_version },
+    );
+    const configuration = versions?.[0]
+      ? decodeCommunityRuleConfiguration(versions[0].configuration, row.sport)
+      : null;
+    if (versionError || !configuration) {
+      setCommunityLoading(false);
+      setCommunityRule(null);
+      setCommunityConfiguration(null);
+      setRuleError(t("loadRuleError"));
+      return;
+    }
+    const typedRule = { ...row, sport: row.sport } as CommunityRuleRecord;
+    setCommunityRule(typedRule);
+    setCommunityConfiguration(configuration);
+    setCommunityLoading(false);
+    saveDraft({ ...draft, format, communityRuleId: ruleId });
+  }
+
+  function changeFormat(nextFormat: MatchFormat) {
+    if (
+      !draft ||
+      (nextFormat === "mixed_doubles" &&
+        draft.sport !== "tennis" &&
+        draft.sport !== "padel")
+    ) {
+      return;
+    }
+    setFormat(nextFormat);
+    saveDraft({ ...draft, format: nextFormat });
+    setRuleError("");
+  }
+
+  function changeRuleSource(source: "official" | "community" | "guest_custom") {
     setRuleSource(source);
-    if (draft) saveDraft({ sport: draft.sport, format, mode: draft.mode });
+    setRuleError(
+      source === "community" && !supabase ? t("backendNotConfigured") : "",
+    );
+    if (draft) {
+      if (source === "community" && communityRule) {
+        saveDraft({ ...draft, format, communityRuleId: communityRule.id });
+      } else {
+        const { communityRuleId: _communityRuleId, ...draftWithoutRule } =
+          draft;
+        saveDraft({ ...draftWithoutRule, format });
+      }
+    }
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
 
-    if (ruleSource !== "official" && !hasValidCustomRules(customRules)) {
+    if (ruleSource === "guest_custom" && !hasValidCustomRules(customRules)) {
       setRuleError(
         customRules.maxPoints !== null &&
           customRules.maxPoints < customRules.pointsToWin
           ? t("capMustBeAtLeastTarget")
           : t("customRulesInvalid"),
       );
+      return;
+    }
+    if (
+      ruleSource === "community" &&
+      (!communityRule || !communityConfiguration || communityLoading)
+    ) {
+      setRuleError(t("loadRuleError"));
       return;
     }
     if (
@@ -220,6 +415,14 @@ export function SetupPage() {
       format,
       officialScoringMode,
     );
+    const localRulesetId =
+      ruleSource === "guest_custom"
+        ? `guest-${crypto.randomUUID()}`
+        : official.id;
+    const localRulesetName =
+      ruleSource === "guest_custom" ? t("customRules") : official.name;
+    const localRulesetVersion =
+      ruleSource === "guest_custom" ? 1 : official.version;
     const selectedSetOrders: TennisSetOrders = {
       serviceOrder: {
         A:
@@ -273,75 +476,92 @@ export function SetupPage() {
         : {}),
     };
     const ruleset: RulesetSnapshot =
-      draft.sport === "squash"
-        ? {
-            id: official.id,
-            name: official.name,
-            sport: "squash",
+      ruleSource === "community" && communityRule && communityConfiguration
+        ? snapshotForCommunityRule(
+            communityRule,
+            communityConfiguration,
             format,
-            source: "official",
-            version: official.version,
-            configuration: {
-              ...official.configuration,
-              bestOf: squashRules.bestOf,
-            },
-            squashConfiguration: { ...squashRules },
-          }
-        : draft.sport === "table_tennis"
+          )
+        : draft.sport === "squash"
           ? {
-              id: official.id,
-              name: official.name,
-              sport: "table_tennis",
+              id: localRulesetId,
+              name: localRulesetName,
+              sport: "squash",
               format,
-              source: "official",
-              version: official.version,
+              source: ruleSource,
+              version: localRulesetVersion,
               configuration: {
-                ...official.configuration,
-                bestOf: tableTennisRules.bestOf,
+                ...(ruleSource === "official"
+                  ? official.configuration
+                  : customConfiguration),
+                bestOf: squashRules.bestOf,
               },
-              tableTennisConfiguration: { ...tableTennisRules },
+              squashConfiguration: { ...squashRules },
             }
-          : draft.sport === "tennis"
+          : draft.sport === "table_tennis"
             ? {
-                id: official.id,
-                name: official.name,
-                sport: "tennis",
+                id: localRulesetId,
+                name: localRulesetName,
+                sport: "table_tennis",
                 format,
-                source: "official",
-                version: official.version,
-                configuration: { ...official.configuration! },
-                tennisConfiguration: { ...tennisRules },
+                source: ruleSource,
+                version: localRulesetVersion,
+                configuration: {
+                  ...(ruleSource === "official"
+                    ? official.configuration
+                    : customConfiguration),
+                  bestOf: tableTennisRules.bestOf,
+                },
+                tableTennisConfiguration: { ...tableTennisRules },
               }
-            : draft.sport === "padel"
+            : draft.sport === "tennis"
               ? {
-                  id: official.id,
-                  name: official.name,
-                  sport: "padel",
+                  id: localRulesetId,
+                  name: localRulesetName,
+                  sport: "tennis",
                   format,
-                  source: official.source,
-                  version: official.version,
-                  configuration: { ...official.configuration! },
-                  padelConfiguration: { ...padelRules },
+                  source: ruleSource,
+                  version: localRulesetVersion,
+                  configuration:
+                    ruleSource === "official"
+                      ? { ...official.configuration! }
+                      : customConfiguration,
+                  tennisConfiguration: { ...tennisRules },
                 }
-              : ruleSource === "official"
+              : draft.sport === "padel"
                 ? {
-                    id: official.id,
-                    name: official.name,
-                    sport: draft.sport,
+                    id: localRulesetId,
+                    name: localRulesetName,
+                    sport: "padel",
                     format,
-                    source: "official",
-                    version: official.version,
-                    configuration: { ...official.configuration },
+                    source:
+                      ruleSource === "official" ? official.source : ruleSource,
+                    version: localRulesetVersion,
+                    configuration:
+                      ruleSource === "official"
+                        ? { ...official.configuration! }
+                        : customConfiguration,
+                    padelConfiguration: { ...padelRules },
                   }
-                : {
-                    id: `guest-${crypto.randomUUID()}`,
-                    name: t("customRules"),
-                    sport: draft.sport,
-                    format,
-                    source: "guest_custom",
-                    version: 1,
-                    configuration: customConfiguration,
-                  };
+                : ruleSource === "official"
+                  ? {
+                      id: localRulesetId,
+                      name: localRulesetName,
+                      sport: draft.sport,
+                      format,
+                      source: "official",
+                      version: localRulesetVersion,
+                      configuration: { ...official.configuration },
+                    }
+                  : {
+                      id: localRulesetId,
+                      name: localRulesetName,
+                      sport: draft.sport,
+                      format,
+                      source: "guest_custom",
+                      version: localRulesetVersion,
+                      configuration: customConfiguration,
+                    };
     const makePlayer = (
       index: number,
       teamId: TeamId,
@@ -455,6 +675,27 @@ export function SetupPage() {
           <p>{t("setupIntro")}</p>
         </div>
 
+        {draft.communityRuleId ? (
+          <Label className={styles.selectField}>
+            <span>{t("chooseFormat")}</span>
+            <SelectControl
+              name="community-match-format"
+              value={format}
+              onChange={(event) =>
+                changeFormat(event.target.value as MatchFormat)
+              }
+            >
+              <option value="singles">
+                {t(draft.sport === "padel" ? "padelSingles" : "singles")}
+              </option>
+              <option value="doubles">{t("doubles")}</option>
+              {draft.sport === "tennis" || draft.sport === "padel" ? (
+                <option value="mixed_doubles">{t("mixedDoubles")}</option>
+              ) : null}
+            </SelectControl>
+          </Label>
+        ) : null}
+
         <form className={styles.setupForm} onSubmit={submit}>
           <RulesSelector
             customRules={customRules}
@@ -473,6 +714,16 @@ export function SetupPage() {
             onSquashRulesChange={updateSquashRules}
             ruleSource={ruleSource}
             sport={draft.sport}
+            communityRules={communityRules}
+            communityRule={communityRule}
+            communityLoading={communityLoading || communityRulesLoading}
+            communityRulesAvailable={
+              communityRulesLoading ||
+              communityRules.length > 0 ||
+              Boolean(communityRule)
+            }
+            communityRulesError={communityRulesError}
+            onCommunityRuleChange={(ruleId) => void loadCommunityRule(ruleId)}
           />
 
           <TeamFields
@@ -676,6 +927,12 @@ function RulesSelector({
   onSquashRulesChange,
   ruleSource,
   sport,
+  communityRules,
+  communityRule,
+  communityLoading,
+  communityRulesAvailable,
+  communityRulesError,
+  onCommunityRuleChange,
 }: {
   customRules: ScoringRules;
   format: MatchFormat;
@@ -684,7 +941,9 @@ function RulesSelector({
   padelRules: PadelRules;
   tableTennisRules: TableTennisRules;
   squashRules: SquashRules;
-  onRuleSourceChange: (source: "official" | "guest_custom") => void;
+  onRuleSourceChange: (
+    source: "official" | "community" | "guest_custom",
+  ) => void;
   onOfficialScoringModeChange: (mode: ScoringMode) => void;
   onRulesChange: <Key extends keyof ScoringRules>(
     key: Key,
@@ -706,16 +965,27 @@ function RulesSelector({
     key: Key,
     value: SquashRules[Key],
   ) => void;
-  ruleSource: "official" | "guest_custom";
+  ruleSource: "official" | "community" | "guest_custom";
   sport: MatchDefinition["sport"];
+  communityRules: CommunityRuleRecord[];
+  communityRule: CommunityRuleRecord | null;
+  communityLoading: boolean;
+  communityRulesAvailable: boolean;
+  communityRulesError: string;
+  onCommunityRuleChange: (ruleId: string) => void;
 }) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [customNumberDrafts, setCustomNumberDrafts] = useState({
     pointsToWin: String(customRules.pointsToWin),
     winBy: String(customRules.winBy),
     maxPoints:
       customRules.maxPoints === null ? "" : String(customRules.maxPoints),
   });
+  const communityUnavailable =
+    !communityLoading &&
+    !communityRulesAvailable &&
+    communityRules.length === 0;
+  const communityStatus = communityRulesError || t("communityRulesUnavailable");
 
   useEffect(() => {
     setCustomNumberDrafts({
@@ -731,14 +1001,18 @@ function RulesSelector({
     value: string,
   ) {
     if (!/^\d*$/.test(value)) return;
-    setCustomNumberDrafts((current) => ({ ...current, [field]: value }));
+    const normalized = normalizeIntegerInput(value);
+    setCustomNumberDrafts((current) => ({
+      ...current,
+      [field]: normalized,
+    }));
 
-    if (value === "") {
+    if (normalized === "") {
       if (field === "maxPoints") onRulesChange("maxPoints", null);
       return;
     }
 
-    const numericValue = Number(value);
+    const numericValue = Number(normalized);
     if (Number.isInteger(numericValue)) {
       onRulesChange(field, numericValue);
     }
@@ -767,43 +1041,16 @@ function RulesSelector({
     }
   }
 
-  if (sport === "tennis") {
-    return (
-      <TennisRulesFields rules={tennisRules} onChange={onTennisRulesChange} />
-    );
-  }
-  if (sport === "padel") {
-    return (
-      <PadelRulesFields
-        format={format}
-        rules={padelRules}
-        onChange={onPadelRulesChange}
-      />
-    );
-  }
-  if (sport === "table_tennis") {
-    return (
-      <TableTennisRulesFields
-        rules={tableTennisRules}
-        onChange={onTableTennisRulesChange}
-      />
-    );
-  }
-  if (sport === "squash") {
-    return (
-      <SquashRulesFields rules={squashRules} onChange={onSquashRulesChange} />
-    );
-  }
-
   return (
     <fieldset className={styles.rulesGroup}>
       <legend>{t("rulesTitle")}</legend>
+      <p className={styles.rulesIntro}>{t("rulesIntro")}</p>
       <RadioGroup
         className={styles.rulesChoices}
         name="rules-source"
         value={ruleSource}
         onValueChange={(value) =>
-          onRuleSourceChange(value as "official" | "guest_custom")
+          onRuleSourceChange(value as "official" | "community" | "guest_custom")
         }
       >
         <RadioGroupItem
@@ -813,7 +1060,21 @@ function RulesSelector({
         >
           <span>
             <strong>{t("officialRules")}</strong>
-            <small>{t("officialLocked")}</small>
+            <small>{t("officialRulesBody")}</small>
+          </span>
+        </RadioGroupItem>
+        <RadioGroupItem
+          className={styles.ruleChoice}
+          data-selected={ruleSource === "community"}
+          data-unavailable={communityUnavailable}
+          disabled={communityUnavailable}
+          value="community"
+        >
+          <span>
+            <strong>{t("communityRules")}</strong>
+            <small>
+              {communityUnavailable ? communityStatus : t("communityRulesBody")}
+            </small>
           </span>
         </RadioGroupItem>
         <RadioGroupItem
@@ -823,10 +1084,92 @@ function RulesSelector({
         >
           <span>
             <strong>{t("customRules")}</strong>
-            <small>{t("rulesUnofficial")}</small>
+            <small>{t("customRulesBody")}</small>
           </span>
         </RadioGroupItem>
       </RadioGroup>
+
+      {ruleSource === "community" ? (
+        <div className={styles.ruleEditor}>
+          <p className={styles.ruleEditorIntro}>
+            {t("communityRuleSetupNote")}
+          </p>
+          {communityLoading ? <p role="status">{t("loading")}</p> : null}
+          {!communityLoading && communityRules.length === 0 ? (
+            <div
+              className={styles.communityRuleEmpty}
+              role={communityRulesError ? "alert" : "status"}
+            >
+              <strong>{communityStatus}</strong>
+              <p>
+                {communityRulesError
+                  ? t("communityRulesLoadErrorBody")
+                  : t("communityRulesEmptyBody")}
+              </p>
+              <Link to={localizedPath("/rules", locale)}>
+                {t("browseCommunityRules")}
+              </Link>
+            </div>
+          ) : null}
+          {communityRules.length > 0 ? (
+            <Label>
+              <span>{t("selectCommunityRules")}</span>
+              <SelectControl
+                name="community-rule"
+                value={communityRule?.id ?? ""}
+                onChange={(event) => onCommunityRuleChange(event.target.value)}
+                disabled={communityLoading || communityRules.length === 0}
+                required
+              >
+                <option value="">{t("communityRuleSelectPlaceholder")}</option>
+                {communityRules.map((rule) => (
+                  <option key={rule.id} value={rule.id}>
+                    {rule.title} · {t("version")} {rule.current_version}
+                  </option>
+                ))}
+              </SelectControl>
+            </Label>
+          ) : null}
+          {communityRules.length > 0 ? (
+            <Link
+              className={styles.communityRulesBrowseLink}
+              to={localizedPath("/rules", locale)}
+            >
+              {t("browseCommunityRules")}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
+      {ruleSource !== "community" && sport === "tennis" ? (
+        <TennisRulesFields
+          isCustom={ruleSource === "guest_custom"}
+          rules={tennisRules}
+          onChange={onTennisRulesChange}
+        />
+      ) : null}
+      {ruleSource !== "community" && sport === "padel" ? (
+        <PadelRulesFields
+          format={format}
+          isCustom={ruleSource === "guest_custom"}
+          rules={padelRules}
+          onChange={onPadelRulesChange}
+        />
+      ) : null}
+      {ruleSource !== "community" && sport === "table_tennis" ? (
+        <TableTennisRulesFields
+          isCustom={ruleSource === "guest_custom"}
+          rules={tableTennisRules}
+          onChange={onTableTennisRulesChange}
+        />
+      ) : null}
+      {ruleSource !== "community" && sport === "squash" ? (
+        <SquashRulesFields
+          isCustom={ruleSource === "guest_custom"}
+          rules={squashRules}
+          onChange={onSquashRulesChange}
+        />
+      ) : null}
 
       {ruleSource === "official" &&
       sport === "pickleball" &&
@@ -936,7 +1279,7 @@ function RulesSelector({
                 <option value="side_out">{t("sideOutScoring")}</option>
               </SelectControl>
             </Label>
-            {customRules.scoringMode === "side_out" && format === "doubles" ? (
+            {customRules.scoringMode === "side_out" && format !== "singles" ? (
               <>
                 <Label>
                   <span>{t("serversPerTurn")}</span>
@@ -980,9 +1323,11 @@ function RulesSelector({
 }
 
 function TennisRulesFields({
+  isCustom,
   rules,
   onChange,
 }: {
+  isCustom: boolean;
   rules: TennisRules;
   onChange: <Key extends keyof TennisRules>(
     key: Key,
@@ -992,8 +1337,12 @@ function TennisRulesFields({
   const { t } = useLocale();
   return (
     <fieldset className={styles.rulesGroup}>
-      <legend>{t("tennisFormatTitle")}</legend>
-      <p className={styles.fieldHint}>{t("tennisRulesSource")}</p>
+      <legend>
+        {t(isCustom ? "customTennisFormatTitle" : "tennisFormatTitle")}
+      </legend>
+      <p className={styles.fieldHint}>
+        {t(isCustom ? "customTennisRulesSource" : "tennisRulesSource")}
+      </p>
       <div className={styles.ruleFields}>
         <Label>
           <span>{t("bestOf")}</span>
@@ -1082,10 +1431,12 @@ function TennisRulesFields({
 
 function PadelRulesFields({
   format,
+  isCustom,
   rules,
   onChange,
 }: {
   format: MatchFormat;
+  isCustom: boolean;
   rules: PadelRules;
   onChange: <Key extends keyof PadelRules>(
     key: Key,
@@ -1096,10 +1447,22 @@ function PadelRulesFields({
   return (
     <fieldset className={styles.rulesGroup}>
       <legend>
-        {t(format === "singles" ? "padelLocalFormatTitle" : "padelFormatTitle")}
+        {t(
+          isCustom
+            ? "customPadelFormatTitle"
+            : format === "singles"
+              ? "padelLocalFormatTitle"
+              : "padelFormatTitle",
+        )}
       </legend>
       <p className={styles.fieldHint}>
-        {t(format === "singles" ? "padelLocalRulesSource" : "padelRulesSource")}
+        {t(
+          isCustom
+            ? "customPadelRulesSource"
+            : format === "singles"
+              ? "padelLocalRulesSource"
+              : "padelRulesSource",
+        )}
       </p>
       <div className={styles.ruleFields}>
         <Label>
@@ -1176,9 +1539,11 @@ function PadelRulesFields({
 }
 
 function TableTennisRulesFields({
+  isCustom,
   rules,
   onChange,
 }: {
+  isCustom: boolean;
   rules: TableTennisRules;
   onChange: <Key extends keyof TableTennisRules>(
     key: Key,
@@ -1188,8 +1553,16 @@ function TableTennisRulesFields({
   const { t } = useLocale();
   return (
     <fieldset className={styles.rulesGroup}>
-      <legend>{t("tableTennisFormatTitle")}</legend>
-      <p className={styles.fieldHint}>{t("tableTennisRulesSource")}</p>
+      <legend>
+        {t(
+          isCustom ? "customTableTennisFormatTitle" : "tableTennisFormatTitle",
+        )}
+      </legend>
+      <p className={styles.fieldHint}>
+        {t(
+          isCustom ? "customTableTennisRulesSource" : "tableTennisRulesSource",
+        )}
+      </p>
       <Label className={styles.selectField}>
         <span>{t("bestOf")}</span>
         <SelectControl
@@ -1208,9 +1581,11 @@ function TableTennisRulesFields({
 }
 
 function SquashRulesFields({
+  isCustom,
   rules,
   onChange,
 }: {
+  isCustom: boolean;
   rules: SquashRules;
   onChange: <Key extends keyof SquashRules>(
     key: Key,
@@ -1220,8 +1595,12 @@ function SquashRulesFields({
   const { t } = useLocale();
   return (
     <fieldset className={styles.rulesGroup}>
-      <legend>{t("squashFormatTitle")}</legend>
-      <p className={styles.fieldHint}>{t("squashRulesSource")}</p>
+      <legend>
+        {t(isCustom ? "customSquashFormatTitle" : "squashFormatTitle")}
+      </legend>
+      <p className={styles.fieldHint}>
+        {t(isCustom ? "customSquashRulesSource" : "squashRulesSource")}
+      </p>
       <Label className={styles.selectField}>
         <span>{t("bestOf")}</span>
         <SelectControl

@@ -56,8 +56,6 @@ import type {
   PadelSetOrders,
   TableTennisGameOrders,
   SquashGameOrders,
-  SquashServiceBoxSelectedEvent,
-  SquashRules,
 } from "./types";
 
 export const OFFICIAL_RULESETS = {
@@ -1155,10 +1153,7 @@ export function redo(
   };
 }
 
-export function servingSide(
-  state: MatchState,
-  definition?: MatchDefinition,
-): CourtSide {
+export function servingSide(state: MatchState): CourtSide {
   if (state.sport === "tennis") return tennisServingSide(state);
   if (state.sport === "padel") return padelServingSide(state);
   if (state.sport === "table_tennis") {

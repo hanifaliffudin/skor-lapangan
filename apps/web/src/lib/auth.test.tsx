@@ -388,6 +388,48 @@ describe("guest authentication", () => {
     expect(auth.rpc).toHaveBeenCalledWith("claim_guest_matches");
   });
 
+  it("clears the saving status when Supabase refreshes the same account session", async () => {
+    let authListener!: AuthListener;
+    let resolveClaim!: (value: { data: number; error: null }) => void;
+    const accountSession = {
+      user: {
+        id: "account-user",
+        is_anonymous: false,
+        email: "user@example.com",
+      },
+    };
+    auth.onAuthStateChange.mockImplementation((listener: AuthListener) => {
+      authListener = listener;
+      listener("INITIAL_SESSION", null);
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
+    auth.getSession.mockResolvedValue({
+      data: { session: accountSession },
+      error: null,
+    });
+    auth.rpc.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveClaim = resolve;
+        }),
+    );
+
+    render(<TestApp />);
+
+    await waitFor(() => expect(auth.rpc).toHaveBeenCalledTimes(1));
+    expect(
+      screen.getByText("Saving your guest matches to your account…"),
+    ).toBeVisible();
+    authListener("TOKEN_REFRESHED", accountSession);
+    resolveClaim({ data: 0, error: null });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Saving your guest matches to your account…"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("signs out and starts a fresh anonymous session", async () => {
     const user = userEvent.setup();
     const accountSession = {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { MatchState } from "@skor-lapangan/scoring-core";
 import { useLocale } from "../../lib/i18n";
+import { normalizeIntegerInput } from "../../lib/numberInput";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -64,7 +65,9 @@ export function OverrideDialog({
                 min="0"
                 inputMode="numeric"
                 value={scoreA}
-                onChange={(event) => setScoreA(event.target.value)}
+                onChange={(event) =>
+                  setScoreA(normalizeIntegerInput(event.target.value))
+                }
                 required
               />
             </Label>
@@ -76,7 +79,9 @@ export function OverrideDialog({
                 min="0"
                 inputMode="numeric"
                 value={scoreB}
-                onChange={(event) => setScoreB(event.target.value)}
+                onChange={(event) =>
+                  setScoreB(normalizeIntegerInput(event.target.value))
+                }
                 required
               />
             </Label>

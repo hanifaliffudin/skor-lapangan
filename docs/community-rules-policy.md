@@ -1,10 +1,10 @@
 # Community Rules policy
 
-**Status: Draft for V1.1. Community Rules are not available in V1.0. Do not publish or use this as an active policy until the owner approves the feature, moderation capacity, and legal terms.**
+**Status: Implementation policy for Preview rollout. Production publication requires owner approval, a monitored moderation contact, security verification, and legal review.**
 
 ## What Community Rules are
 
-Community Rules are user-created scoring configurations for Badminton or Pickleball. They are not federation rules. Every public rule must keep the app's unofficial label and use-at-your-own-risk notice.
+Community Rules are user-created scoring configurations for Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash. They are not federation rules. Every public rule must keep the app's unofficial label and use-at-your-own-risk notice.
 
 Official Rules remain locked and maintained separately using the federation sources recorded in [rules-sources.md](rules-sources.md). A Community Rule must never be labeled or presented as Official Rules.
 
@@ -17,20 +17,22 @@ Official Rules remain locked and maintained separately using the federation sour
 
 ## Rule content and limits
 
-The current editor supports the scoring settings implemented for the two V1.0 sports. It does not accept arbitrary rule scripts.
+The editor supports the common scoring settings plus the sport-specific fields implemented by the scoring engine. It does not accept arbitrary rule scripts. The stored canonical configuration is schema version 2, while the reader retains compatibility with legacy flat Badminton and Pickleball configurations.
 
 - A title must contain 3 to 80 characters.
 - A description can contain up to 500 characters.
-- Each rule is associated with Badminton or Pickleball and a scoring configuration.
+- Each rule is associated with one supported sport and a validated scoring configuration.
 - Describe the format clearly. Include relevant local conditions or a source in the description when useful, but do not imply federation approval.
 
 Do not publish content that impersonates a federation or official, contains private personal information, or is abusive, deceptive, or unrelated to scoring a game. The owner should review this proposed content standard before publishing it as a binding policy.
 
 ## Versions and match use
 
-Saving an edit creates a new numbered Community Rule version. The detail page displays the current version. A match started from a rule keeps the selected configuration on the device where the match was created. Do not assume that a full match journal or ruleset snapshot can be restored on a different device.
+Saving an edit creates a new numbered Community Rule version. The detail page displays the current version. A match started from a rule keeps a `source: "community"` configuration snapshot and version in its `definition` JSON. Later edits or unpublishing do not alter that match. Do not assume that a full match journal or ruleset snapshot can be restored on a different device.
 
 Unpublishing removes the rule from public discovery and prevents new matches from selecting it. It does not delete stored rule versions or reports. A match already using a local copy can continue with that copy.
+
+The owner can publish an unpublished rule again without editing its configuration. Republishing changes only its public visibility; it does not create a new numbered version.
 
 ## Reporting and moderation
 

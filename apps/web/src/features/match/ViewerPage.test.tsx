@@ -319,6 +319,7 @@ describe("live viewer", () => {
     );
 
     expect(await screen.findByText("Viewer link unavailable")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Back to home" })).toBeVisible();
   });
 
   it("rejects a public snapshot with negative scores", async () => {

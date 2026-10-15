@@ -39,6 +39,21 @@ const MatchHistoryPage = lazy(() =>
     ({ MatchHistoryPage: page }) => ({ default: page }),
   ),
 );
+const CommunityRulesDirectoryPage = lazy(() =>
+  import("./features/rules/CommunityRulesPage").then(
+    ({ CommunityRulesDirectoryPage: page }) => ({ default: page }),
+  ),
+);
+const CommunityRuleDetailPage = lazy(() =>
+  import("./features/rules/CommunityRulesPage").then(
+    ({ CommunityRuleDetailPage: page }) => ({ default: page }),
+  ),
+);
+const CommunityRuleEditorPage = lazy(() =>
+  import("./features/rules/CommunityRulesPage").then(
+    ({ CommunityRuleEditorPage: page }) => ({ default: page }),
+  ),
+);
 
 function RouteLoading() {
   const { t } = useLocale();
@@ -97,6 +112,20 @@ export function App() {
         <Route path="/id/account" element={<AccountPage />} />
         <Route path="/history" element={<MatchHistoryPage />} />
         <Route path="/id/history" element={<MatchHistoryPage />} />
+        <Route path="/rules" element={<CommunityRulesDirectoryPage />} />
+        <Route path="/id/rules" element={<CommunityRulesDirectoryPage />} />
+        <Route path="/rules/new" element={<CommunityRuleEditorPage />} />
+        <Route path="/id/rules/new" element={<CommunityRuleEditorPage />} />
+        <Route
+          path="/rules/:ruleId/edit"
+          element={<CommunityRuleEditorPage />}
+        />
+        <Route
+          path="/id/rules/:ruleId/edit"
+          element={<CommunityRuleEditorPage />}
+        />
+        <Route path="/rules/:ruleId" element={<CommunityRuleDetailPage />} />
+        <Route path="/id/rules/:ruleId" element={<CommunityRuleDetailPage />} />
         <Route path="/id/*" element={<Navigate to="/id/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -22,3 +22,15 @@ export function isSyncConflictError(
 ): boolean {
   return message === "SYNC_CONFLICT";
 }
+
+export function isMatchControlHeldError(
+  message: string | null | undefined,
+): boolean {
+  return message === "CONTROL_HELD";
+}
+
+export function isMatchControlLostError(
+  message: string | null | undefined,
+): boolean {
+  return message === "CONTROL_LOST";
+}

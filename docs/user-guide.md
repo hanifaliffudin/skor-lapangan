@@ -6,7 +6,7 @@ This guide describes the current product scope. The app labels are in English by
 
 1. Choose a sport and format. Badminton, Pickleball, Table tennis, and Squash offer Singles or Doubles; Tennis and Padel also offer Mixed doubles.
 2. Continue to player setup. V1 has one match workflow (Casual); Referee mode is hidden until it offers meaningfully different controls.
-3. For Badminton and Pickleball, choose Official Rules or guest custom rules. Tennis and Padel use event-announced scoring options in their setup.
+3. Choose Official Rules, a published Community Rule for the selected sport, or guest custom rules where available. Community Rules are available for Badminton, Pickleball, Tennis, Padel, Table tennis, and Squash; the setup still asks for server, receiver, service-box, and mixed-doubles role details locally.
 4. Enter one player name per side for Singles or two for Doubles. Choose who serves first, then start the match. Pickleball Singles can use standard side-out scoring or rally scoring; side-out is selected by default.
 
 For Tennis, use the event-announced 2026 ITF format. Setup supports best of three or five sets, advantage or no-ad games, tie-break or advantage sets, and a 7- or 10-point match tie-break by two in place of the deciding set. The defaults are best of three, advantage games, and a tie-break set at 6–6. In doubles, choose each pair's first server and deuce-court receiver. In Mixed doubles, assign one woman and one man to each team; those labels stay on this device. Before each later set, confirm or change the doubles orders.
@@ -20,10 +20,11 @@ For Squash, setup follows the WSF singles 2025 and doubles 2022 rules. Best of f
 ## Choose a ruleset
 
 - Official Rules are locked in the app and follow the federation source listed in [rules-sources.md](rules-sources.md).
-- Community Rules are deferred to a later release and are not available in V1.0.
+- Community Rules are user-published and always labeled unofficial. Open `/rules` to filter by sport, inspect a rule version, report a problem, or use it in setup. A Google-linked account can create, edit, publish, and unpublish its own rules.
+- After unpublishing a rule, its owner can use **Republish** (or **Terbitkan lagi** in Indonesian) to make the same version public again without editing the settings or creating a new version.
 - Guest custom rules let a guest change the scoring settings supported by the selected sport. They apply only to that guest match, stay in the browser, and are discarded when the match ends.
 
-The app keeps the selected ruleset with the match on the device where it was started. Guest custom rules apply only to that match and stay in the browser.
+The app keeps a snapshot of the selected ruleset with the match on the device where it was started. Editing or unpublishing a Community Rule does not change an existing match. If a selected rule is unpublished, malformed, unavailable, or belongs to another sport, setup blocks the match until another ruleset is chosen.
 
 ## Keep score
 
@@ -39,11 +40,11 @@ Tennis shows points as Love, 15, 30, 40, and Ad; tie-break points appear as numb
 
 ## Guest matches and sync
 
-The browser keeps a local match journal and generates its match and event IDs. If Supabase is configured and the guest session is available, the app syncs the match and event journal atomically, then retries failed syncs with the same IDs. A stale or divergent snapshot from another device is rejected so it cannot silently overwrite the controlling device. Tennis, Padel, Table tennis, and Squash rules remain snapshotted so later federation updates do not change a match already in progress. Apply the sport scoring migrations before enabling those clients with Supabase.
+The browser keeps a local match journal and generates its match and event IDs. If Supabase is configured and the guest session is available, the app syncs the match and event journal atomically, then retries failed syncs with the same IDs. A stale or divergent snapshot is rejected so it cannot silently overwrite the server. Tennis, Padel, Table tennis, and Squash rules remain snapshotted so later federation updates do not change a match already in progress. Apply the sport scoring migrations before enabling those clients with Supabase.
 
 The local copy remains available for up to 12 hours after the last local save. The server copy expires 12 hours after the last accepted server activity, capped at 24 hours from creation. Expired server data becomes inaccessible immediately and is physically deleted by an hourly cleanup job. If the app shows that a match is local or offline, keep the browser data and reconnect before relying on server sync. Clearing the site's browser data can remove the local copy.
 
-One browser tab controls a match at a time. Other tabs for that match are read-only until control is available.
+One browser tab or device controls an active match at a time. Other tabs and devices can load the latest server journal, but remain read-only until they acquire control. The control lease lasts 45 seconds and the editor renews it every 15 seconds. If another device is using the match, choose **Ambil alih match** or **Take over match** to replace its lease explicitly. The takeover first downloads the latest server version, so an unsynced local copy is never merged or written over the server silently. If control is lost, stop scoring and load the server version before continuing.
 
 ## Share a Live Viewer
 
@@ -56,9 +57,11 @@ Anyone who gets the link can view the match until the link expires or the owner 
 
 ## Accounts and history
 
-Guests can play without an account. Choose **Sign in with Google** to link an active guest session and keep eligible match history with the same account. Open **History** to see server-synced matches; a match opens fully only when its local snapshot is still on the same device. Open **Account** to sign out or permanently delete the account and its stored data.
+Guests can play without an account. Guest matches remain local to the browser or device and do not support cross-device resume. Choose **Sign in with Google** to link an active guest session and keep eligible match history with the same account. Open **History** to see server-synced matches, grouped into **Berlangsung** and **Selesai**. An active match can be continued from another browser or device after its journal is downloaded. A completed match opens as read-only. Open **Account** to sign out or permanently delete the account and its stored data.
 
-Community Rules are not available yet. Publishing and moderation will be introduced only after a separate policy and release gate.
+If the local and server versions have the same event sequence but different state, the app shows a conflict instead of choosing a version silently. Use **Gunakan versi server** or **Use server version** to discard the local branch and continue from the server snapshot.
+
+Community Rule reports are reviewed manually by the operator. Reporters can submit a reason, optional details, and optional contact email without Google sign-in; the system rate-limits anonymous reporting and never automatically hides a rule. Use Official Rules for federation-standard play.
 
 ## If something looks wrong
 

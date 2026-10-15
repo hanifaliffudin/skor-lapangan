@@ -124,6 +124,128 @@ describe("Supabase sync serialization", () => {
     expect(JSON.stringify(payload.match)).not.toContain("pointsToWin");
   });
 
+  it("can serialize only events after the last synced sequence", () => {
+    const first = awardRally(journal(), "A", {
+      id: eventId,
+      createdAt: "2026-10-08T00:01:00.000Z",
+    });
+    const second = awardRally(first, "B", {
+      id: "8ef6f2ab-f25a-4d2c-8f30-bb4dc7d474f1",
+      createdAt: "2026-10-08T00:02:00.000Z",
+    });
+
+    const payload = serializeJournalForSync(second, "user-1", false, 1);
+
+    expect(payload.match.last_client_sequence).toBe(2);
+    expect(payload.events).toHaveLength(1);
+    expect(payload.events[0]).toMatchObject({
+      client_sequence: 2,
+      payload: { team: "B" },
+    });
+  });
+
+  it("keeps account team definitions so another device can resume the match", () => {
+    const payload = serializeJournalForSync(journal(), "account-user", false);
+
+    expect(payload.match.definition).toMatchObject({
+      teams: {
+        A: { name: "Team A" },
+        B: { name: "Team B" },
+      },
+    });
+  });
+
+  it("preserves a community ruleset snapshot without player names", () => {
+    const communityJournal = journal();
+    communityJournal.definition.ruleset = {
+      id: "community-rule-1",
+      name: "Club badminton",
+      sport: "badminton",
+      format: "singles",
+      source: "community",
+      version: 3,
+      configuration: {
+        pointsToWin: 15,
+        winBy: 2,
+        maxPoints: 21,
+        bestOf: 3,
+        scoringMode: "rally",
+        serversPerTurn: 1,
+        openingServerNumber: 1,
+      },
+    };
+
+    const payload = serializeJournalForSync(
+      communityJournal,
+      "guest-user",
+      true,
+    );
+
+    expect(payload.match.ruleset_id).toBe("bwf-doubles-3x21-2025");
+    expect(payload.match.definition).toMatchObject({
+      ruleset: {
+        id: "community-rule-1",
+        source: "community",
+        version: 3,
+        configuration: { pointsToWin: 15 },
+      },
+    });
+    expect(JSON.stringify(payload.match)).not.toContain("Private");
+  });
+
+  it("preserves mixed-doubles sport settings in a tennis community snapshot", () => {
+    const communityJournal = journal();
+    communityJournal.definition.sport = "tennis";
+    communityJournal.definition.format = "mixed_doubles";
+    communityJournal.definition.rulesetId = "community-rule-tennis";
+    communityJournal.definition.tennisLocalRoles = {
+      A: ["woman", "man"],
+      B: ["man", "woman"],
+    };
+    communityJournal.definition.ruleset = {
+      id: "community-rule-tennis",
+      name: "Club tennis",
+      sport: "tennis",
+      format: "mixed_doubles",
+      source: "community",
+      version: 2,
+      configuration: {
+        pointsToWin: 1,
+        winBy: 1,
+        maxPoints: null,
+        bestOf: 1,
+        scoringMode: "rally",
+        serversPerTurn: 1,
+        openingServerNumber: 1,
+      },
+      tennisConfiguration: {
+        bestOf: 3,
+        gameScoring: "no_ad",
+        setScoring: "tiebreak",
+        finalSetScoring: "match_tiebreak",
+        matchTieBreakPoints: 10,
+      },
+    };
+
+    const payload = serializeJournalForSync(
+      communityJournal,
+      "guest-user",
+      true,
+    );
+
+    expect(payload.match.definition).toMatchObject({
+      format: "mixed_doubles",
+      ruleset: {
+        source: "community",
+        version: 2,
+        tennisConfiguration: {
+          finalSetScoring: "match_tiebreak",
+          matchTieBreakPoints: 10,
+        },
+      },
+    });
+  });
+
   it("syncs Tennis rules and score state without mixed-doubles labels", () => {
     const official = officialRulesetFor("tennis");
     const tennisJournal: MatchJournal = {
