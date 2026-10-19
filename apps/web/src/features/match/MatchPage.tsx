@@ -324,6 +324,7 @@ export function MatchPage() {
         journal: local,
         controlActive: controlStatus === "active",
       });
+      if (!active) return true;
       if (result.status === "unavailable") {
         trackMatchSignal("remote_unavailable", "detected");
         setRemoteWarning(true);
