@@ -372,7 +372,7 @@ export function MatchPage() {
         succeeded = await poll();
       } catch {
         succeeded = false;
-        setRemoteWarning(true);
+        if (active) setRemoteWarning(true);
       } finally {
         pollInFlight.current = false;
       }
