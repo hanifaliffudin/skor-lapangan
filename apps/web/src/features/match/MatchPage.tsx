@@ -70,7 +70,6 @@ import {
   appendRemoteEvents,
   journalSequence,
   matchHeadHasSameState,
-  journalsHaveSameState,
   readRemoteMatchEventsSince,
   readRemoteMatchHead,
   readRemoteMatch,
@@ -78,6 +77,7 @@ import {
 } from "../../lib/match-remote";
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
+import { createMatchLifecycle } from "./matchLifecycle";
 import { useMatchControl } from "./useMatchControl";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,6 +132,34 @@ export function MatchPage() {
     signInWithGoogle,
     user,
   } = useAuth();
+  const matchLifecycle = useMemo(
+    () =>
+      createMatchLifecycle({
+        loadLocalMatch: loadMatch,
+        readRemoteMatch,
+        readRemoteMatchHead,
+        readRemoteMatchEventsSince,
+        appendRemoteEvents,
+        matchHeadHasSameState,
+        canSyncLocalMatch: canSyncStoredMatch,
+        syncJournal,
+        revokeViewerLink: async (currentMatchId) => {
+          if (!supabase || !user) return { status: "ok" };
+          try {
+            const { error } = await supabase.rpc("revoke_live_viewer_link", {
+              p_match_id: currentMatchId,
+            });
+            return error
+              ? { status: "error", error: error.message }
+              : { status: "ok" };
+          } catch {
+            return { status: "error", error: "VIEWER_REVOKE_FAILED" };
+          }
+        },
+        removeLocalMatch: removeMatch,
+      }),
+    [user],
+  );
   const [journal, setJournal] = useState<MatchJournal | null>(() =>
     matchId ? loadMatch(matchId) : null,
   );
@@ -209,43 +237,55 @@ export function MatchPage() {
     setRemoteLoading(true);
     setRemoteError("");
     setRemoteWarning(false);
-    void readRemoteMatch(matchId).then((result) => {
-      if (!active) return;
-      if (result.status === "error") {
-        trackMatchSignal(
-          result.error === "REMOTE_UNAVAILABLE"
-            ? "remote_unavailable"
-            : "remote_invalid",
-          "detected",
-        );
-        const local = loadMatch(matchId);
-        if (!local) {
-          setRemoteError(result.error);
-        } else if (result.error === "REMOTE_UNAVAILABLE") {
-          setRemoteWarning(true);
-        } else {
-          setRemoteError(result.error);
+    void matchLifecycle
+      .loadRemote({
+        matchId,
+        userId: user.id,
+        isAnonymous,
+      })
+      .then((result) => {
+        if (!active) return;
+        if (result.status === "error") {
+          if (result.error === "REMOTE_UNAVAILABLE") {
+            trackMatchSignal("remote_unavailable", "detected");
+          } else {
+            trackMatchSignal("remote_invalid", "detected");
+          }
+          if (result.journal && result.error === "REMOTE_UNAVAILABLE") {
+            setRemoteWarning(true);
+          } else {
+            setRemoteError(result.error);
+          }
+          setRemoteLoading(false);
+          return;
+        }
+
+        if (result.status === "recoverable_missing") {
+          setRemoteLoading(false);
+          return;
+        }
+
+        if (result.status === "conflict") {
+          setRemoteConflict(result.snapshot);
+          setRemoteLoading(false);
+          return;
+        }
+
+        if (result.action === "replace") {
+          syncedSequence.current = result.snapshot.sequence;
+          setJournal(result.snapshot.journal);
+          saveMatch(result.snapshot.journal, {
+            ownerId: user.id,
+            persistent: true,
+          });
+        } else if (
+          result.journal &&
+          result.snapshot.sequence === journalSequence(result.journal)
+        ) {
+          syncedSequence.current = result.snapshot.sequence;
         }
         setRemoteLoading(false);
-        return;
-      }
-
-      const local = loadMatch(matchId);
-      const remote = result.snapshot;
-      if (!local || remote.sequence > journalSequence(local)) {
-        syncedSequence.current = remote.sequence;
-        setJournal(remote.journal);
-        saveMatch(remote.journal, { ownerId: user.id, persistent: true });
-      } else if (
-        remote.sequence === journalSequence(local) &&
-        !journalsHaveSameState(local, remote.journal)
-      ) {
-        setRemoteConflict(remote);
-      } else if (remote.sequence === journalSequence(local)) {
-        syncedSequence.current = remote.sequence;
-      }
-      setRemoteLoading(false);
-    });
+      });
 
     return () => {
       active = false;
@@ -255,6 +295,7 @@ export function MatchPage() {
     isAnonymous,
     localOnlyRules,
     matchId,
+    matchLifecycle,
     remoteReloadAttempt,
     user,
   ]);
@@ -275,103 +316,38 @@ export function MatchPage() {
     }
 
     const poll = async (): Promise<boolean> => {
-      const headResult = await readRemoteMatchHead(matchId);
-      if (headResult.status === "error") {
-        if (headResult.error === "REMOTE_UNAVAILABLE") {
-          trackMatchSignal("remote_unavailable", "detected");
-          setRemoteWarning(true);
-          return false;
-        }
-        trackMatchSignal("remote_invalid", "detected");
-        setRemoteError(headResult.error);
-        return true;
-      }
-
       setRemoteWarning(false);
       const local = journalRef.current;
       if (!local) return true;
-      const head = headResult.head;
-      const localSequence = journalSequence(local);
-
-      if (head.sequence === localSequence) {
-        if (matchHeadHasSameState(local, head)) return true;
-        const conflictResult = await readRemoteMatch(matchId);
-        if (conflictResult.status === "loaded") {
-          setRemoteConflict(conflictResult.snapshot);
-          if (controlStatus === "active") setSyncError("CONTROL_LOST");
-        } else if (conflictResult.error === "REMOTE_UNAVAILABLE") {
-          trackMatchSignal("remote_unavailable", "detected");
-          setRemoteWarning(true);
-          return false;
-        } else if (conflictResult.error === "INVALID_REMOTE_MATCH") {
-          trackMatchSignal("remote_invalid", "detected");
-          setRemoteError(conflictResult.error);
-        }
-        return true;
-      }
-
-      if (head.sequence < localSequence) return true;
-
-      if (controlStatus === "active") {
-        const conflictResult = await readRemoteMatch(matchId);
-        if (conflictResult.status === "loaded") {
-          trackMatchSignal("control_lost", "detected");
-          setRemoteConflict(conflictResult.snapshot);
-          setSyncError("CONTROL_LOST");
-          return true;
-        }
-        if (conflictResult.error === "REMOTE_UNAVAILABLE") {
-          trackMatchSignal("remote_unavailable", "detected");
-          setRemoteWarning(true);
-          return false;
-        }
-        setRemoteError(conflictResult.error);
-        trackMatchSignal("remote_invalid", "detected");
-        return true;
-      }
-
-      const deltaResult = await readRemoteMatchEventsSince(
+      const result = await matchLifecycle.pollRemote({
         matchId,
-        localSequence,
-      );
-      if (deltaResult.status === "loaded") {
-        const nextJournal = appendRemoteEvents(local, deltaResult.events);
-        if (
-          nextJournal &&
-          journalSequence(nextJournal) === head.sequence &&
-          matchHeadHasSameState(nextJournal, head)
-        ) {
-          syncedSequence.current = head.sequence;
-          setJournal(nextJournal);
-          saveMatch(nextJournal, { ownerId: user.id, persistent: true });
-          return true;
-        }
-      } else if (deltaResult.error === "REMOTE_UNAVAILABLE") {
+        journal: local,
+        controlActive: controlStatus === "active",
+      });
+      if (result.status === "unavailable") {
         trackMatchSignal("remote_unavailable", "detected");
         setRemoteWarning(true);
         return false;
-      } else if (deltaResult.error === "INVALID_REMOTE_MATCH") {
+      }
+      if (result.status === "error") {
         trackMatchSignal("remote_invalid", "detected");
-        setRemoteError(deltaResult.error);
+        setRemoteError(result.error);
         return true;
       }
-
-      const fullResult = await readRemoteMatch(matchId);
-      if (fullResult.status === "loaded") {
-        syncedSequence.current = fullResult.snapshot.sequence;
-        setJournal(fullResult.snapshot.journal);
-        saveMatch(fullResult.snapshot.journal, {
+      if (result.status === "conflict") {
+        if (result.controlLost) trackMatchSignal("control_lost", "detected");
+        setRemoteConflict(result.snapshot);
+        if (result.controlLost) setSyncError("CONTROL_LOST");
+        return true;
+      }
+      if (result.status === "replace") {
+        syncedSequence.current = result.sequence;
+        setJournal(result.journal);
+        saveMatch(result.journal, {
           ownerId: user.id,
           persistent: true,
         });
-        return true;
-      } else if (fullResult.error === "REMOTE_UNAVAILABLE") {
-        trackMatchSignal("remote_unavailable", "detected");
-        setRemoteWarning(true);
-        return false;
       }
-      setRemoteError(fullResult.error);
-      trackMatchSignal("remote_invalid", "detected");
       return true;
     };
     let active = true;
@@ -423,6 +399,7 @@ export function MatchPage() {
     localOnlyRules,
     matchId,
     matchIsActive,
+    matchLifecycle,
     remoteConflict,
     remoteError,
     remoteLoading,
@@ -514,12 +491,7 @@ export function MatchPage() {
   }, [matchId]);
 
   useEffect(() => {
-    if (localOnlyRules) {
-      setSyncState("local");
-      setSyncError("");
-      return;
-    }
-    if (!journal || !user || remoteLoading || remoteConflict || remoteError) {
+    if (!journal || !user) {
       setSyncState("local");
       setSyncError("");
       return;
@@ -529,39 +501,39 @@ export function MatchPage() {
     previousSyncAttempt.current = syncAttempt;
     let active = true;
     const synchronize = async (retrySchemaBlocked = manualRetry) => {
-      if (!navigator.onLine) {
+      const currentMatchId = journal.definition.id;
+      setSyncState("syncing");
+      setSyncError("");
+      const result = await matchLifecycle.synchronize({
+        journal,
+        userId: user.id,
+        isAnonymous,
+        controlToken,
+        afterSequence: syncedSequence.current ?? 0,
+        online: navigator.onLine,
+        localOnlyRules,
+        remoteReady: !remoteLoading && !remoteConflict && !remoteError,
+        matchIsActive: Boolean(matchIsActive),
+        controlStatus,
+        schemaBlocked: schemaBlockedMatches.current.has(currentMatchId),
+        retrySchemaBlocked,
+      });
+      if (!active) return;
+      if (result.status === "offline") {
         setSyncState("offline");
         setSyncError("");
         return;
       }
-      const currentMatchId = journal.definition.id;
-      if (!canSyncStoredMatch(currentMatchId, user.id, isAnonymous)) {
+      if (result.status === "local" || result.status === "skipped") {
         setSyncState("local");
         setSyncError("");
         return;
       }
-      if (matchIsActive && controlStatus !== "active") {
-        setSyncState("local");
-        setSyncError("");
-        return;
-      }
-      if (
-        schemaBlockedMatches.current.has(currentMatchId) &&
-        !retrySchemaBlocked
-      ) {
+      if (result.status === "blocked") {
         setSyncState("error");
+        setSyncError("");
         return;
       }
-      setSyncState("syncing");
-      setSyncError("");
-      const result = await syncJournal(
-        journal,
-        user.id,
-        isAnonymous,
-        controlToken,
-        syncedSequence.current ?? 0,
-      );
-      if (!active) return;
       if (
         result.status === "failed" &&
         isUnsupportedMatchSportError(result.error)
@@ -614,6 +586,7 @@ export function MatchPage() {
     localOnlyRules,
     journal,
     matchIsActive,
+    matchLifecycle,
     remoteConflict,
     remoteError,
     remoteLoading,
@@ -756,29 +729,29 @@ export function MatchPage() {
     setEndingSession(true);
     setEndError("");
     try {
-      if (
-        isComplete &&
-        matchId &&
-        supabase &&
-        user &&
-        !localOnlyRules &&
-        canSyncStoredMatch(matchId, user.id, isAnonymous)
-      ) {
-        if (!navigator.onLine) {
+      if (matchId) {
+        if (isComplete) {
+          setSyncState("syncing");
+          setSyncError("");
+        }
+        const finishResult = await matchLifecycle.finish({
+          matchId,
+          journal,
+          userId: user?.id ?? null,
+          isAnonymous,
+          controlToken,
+          afterSequence: syncedSequence.current ?? 0,
+          isComplete,
+          online: navigator.onLine,
+          localOnlyRules,
+          remoteConfigured: Boolean(supabase),
+        });
+        if (finishResult.status === "offline") {
           setEndError(t("finalScoreSaveFailed"));
           return;
         }
-
-        setSyncState("syncing");
-        setSyncError("");
-        const finalSync = await syncJournal(
-          journal,
-          user.id,
-          isAnonymous,
-          controlToken,
-          syncedSequence.current ?? 0,
-        );
-        if (finalSync.status !== "synced") {
+        if (finishResult.status === "sync_failed") {
+          const finalSync = finishResult.result;
           setSyncState("error");
           setSyncError(
             finalSync.status === "failed" ||
@@ -791,20 +764,15 @@ export function MatchPage() {
           setEndError(t("finalScoreSaveFailed"));
           return;
         }
-        syncedSequence.current = journalSequence(journal);
-        setSyncState("synced");
-      }
-
-      if (matchId && supabase && user) {
-        const { error } = await supabase.rpc("revoke_live_viewer_link", {
-          p_match_id: matchId,
-        });
-        if (error) {
+        if (finishResult.status === "revoke_failed") {
           setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
           return;
         }
+        if (finishResult.synced) {
+          syncedSequence.current = journalSequence(journal);
+          setSyncState("synced");
+        }
       }
-      if (matchId) removeMatch(matchId);
       navigate(returnPath);
     } catch {
       setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
