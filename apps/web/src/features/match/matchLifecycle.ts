@@ -94,6 +94,40 @@ export type FinishResult =
   | { status: "sync_failed"; result: SyncResult }
   | { status: "revoke_failed"; error: string };
 
+export interface MatchLifecycleWatchInput {
+  matchId: string;
+  getJournal: () => MatchJournal | null;
+  controlActive: () => boolean;
+  onResult: (result: PollRemoteResult) => void;
+  onFailure: (error: unknown) => void;
+}
+
+export interface MatchLifecycleRuntime {
+  setTimeout: (callback: () => void, delay: number) => unknown;
+  clearTimeout: (handle: unknown) => void;
+  isHidden: () => boolean;
+  onVisible: (callback: () => void) => () => void;
+  random: () => number;
+}
+
+const browserRuntime: MatchLifecycleRuntime = {
+  setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay),
+  clearTimeout: (handle) =>
+    globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
+  isHidden: () =>
+    typeof document !== "undefined" && document.visibilityState === "hidden",
+  onVisible: (callback) => {
+    if (typeof document === "undefined") return () => undefined;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") callback();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  },
+  random: () => Math.random(),
+};
+
 export interface MatchLifecycle {
   loadRemote(input: {
     matchId: string;
@@ -105,6 +139,7 @@ export interface MatchLifecycle {
     journal: MatchJournal;
     controlActive: boolean;
   }): Promise<PollRemoteResult>;
+  watchRemote(input: MatchLifecycleWatchInput): () => void;
   synchronize(input: {
     journal: MatchJournal;
     userId: string;
@@ -135,6 +170,7 @@ export interface MatchLifecycle {
 
 export function createMatchLifecycle(
   adapters: MatchLifecycleAdapters,
+  runtime: MatchLifecycleRuntime = browserRuntime,
 ): MatchLifecycle {
   return {
     async loadRemote({ matchId, userId, isAnonymous }) {
@@ -254,6 +290,61 @@ export function createMatchLifecycle(
         : fullResult.error === "REMOTE_UNAVAILABLE"
           ? { status: "unavailable" }
           : { status: "error", error: fullResult.error };
+    },
+    watchRemote({ matchId, getJournal, controlActive, onResult, onFailure }) {
+      let active = true;
+      let running = false;
+      let failures = 0;
+      let timeoutHandle: unknown = null;
+      const baseDelay = 10_000;
+      const maxDelay = 60_000;
+      const jitter = () => Math.floor(runtime.random() * 1_500);
+      const schedule = (delay: number) => {
+        if (!active) return;
+        if (timeoutHandle !== null) runtime.clearTimeout(timeoutHandle);
+        timeoutHandle = runtime.setTimeout(run, delay);
+      };
+      const run = async () => {
+        if (!active) return;
+        if (runtime.isHidden() || running) {
+          schedule(baseDelay + jitter());
+          return;
+        }
+        running = true;
+        let succeeded = true;
+        try {
+          const journal = getJournal();
+          if (journal) {
+            const result = await this.pollRemote({
+              matchId,
+              journal,
+              controlActive: controlActive(),
+            });
+            if (!active) return;
+            onResult(result);
+            succeeded = result.status !== "unavailable";
+          }
+        } catch (error) {
+          succeeded = false;
+          if (active) onFailure(error);
+        } finally {
+          running = false;
+        }
+        if (!active) return;
+        failures = succeeded ? 0 : Math.min(failures + 1, 3);
+        const backoff = succeeded
+          ? baseDelay
+          : Math.min(baseDelay * 2 ** failures, maxDelay);
+        schedule(backoff + jitter());
+      };
+      const removeVisibilityListener = runtime.onVisible(() => schedule(0));
+      schedule(baseDelay + jitter());
+
+      return () => {
+        active = false;
+        if (timeoutHandle !== null) runtime.clearTimeout(timeoutHandle);
+        removeVisibilityListener();
+      };
     },
     async synchronize({
       journal,

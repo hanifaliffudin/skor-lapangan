@@ -187,8 +187,6 @@ export function MatchPage() {
   const schemaBlockedMatches = useRef(new Set<string>());
   const previousSyncAttempt = useRef(0);
   const syncedSequence = useRef<number | null>(null);
-  const pollInFlight = useRef(false);
-  const pollFailureCount = useRef(0);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [setOrdersOpen, setSetOrdersOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
@@ -315,85 +313,39 @@ export function MatchPage() {
       return;
     }
 
-    const poll = async (): Promise<boolean> => {
-      setRemoteWarning(false);
-      const local = journalRef.current;
-      if (!local) return true;
-      const result = await matchLifecycle.pollRemote({
-        matchId,
-        journal: local,
-        controlActive: controlStatus === "active",
-      });
-      if (!active) return true;
-      if (result.status === "unavailable") {
-        trackMatchSignal("remote_unavailable", "detected");
-        setRemoteWarning(true);
-        return false;
-      }
-      if (result.status === "error") {
-        trackMatchSignal("remote_invalid", "detected");
-        setRemoteError(result.error);
-        return true;
-      }
-      if (result.status === "conflict") {
-        if (result.controlLost) trackMatchSignal("control_lost", "detected");
-        setRemoteConflict(result.snapshot);
-        if (result.controlLost) setSyncError("CONTROL_LOST");
-        return true;
-      }
-      if (result.status === "replace") {
-        syncedSequence.current = result.sequence;
-        setJournal(result.journal);
-        saveMatch(result.journal, {
-          ownerId: user.id,
-          persistent: true,
-        });
-      }
-      return true;
-    };
-    let active = true;
-    let timeoutId: number | null = null;
-    const baseDelay = 10_000;
-    const jitter = () => Math.floor(Math.random() * 1_500);
-    const schedule = (delay: number) => {
-      if (!active) return;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(run, delay);
-    };
-    const run = async () => {
-      if (!active) return;
-      if (document.visibilityState === "hidden" || pollInFlight.current) {
-        schedule(baseDelay + jitter());
-        return;
-      }
-      pollInFlight.current = true;
-      let succeeded = true;
-      try {
-        succeeded = await poll();
-      } catch {
-        succeeded = false;
-        if (active) setRemoteWarning(true);
-      } finally {
-        pollInFlight.current = false;
-      }
-      pollFailureCount.current = succeeded
-        ? 0
-        : Math.min(pollFailureCount.current + 1, 3);
-      const backoff = succeeded
-        ? baseDelay
-        : Math.min(baseDelay * 2 ** pollFailureCount.current, 60_000);
-      schedule(backoff + jitter());
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") schedule(0);
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    schedule(baseDelay + jitter());
-    return () => {
-      active = false;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    return matchLifecycle.watchRemote({
+      matchId,
+      getJournal: () => journalRef.current,
+      controlActive: () => controlStatus === "active",
+      onResult: (result) => {
+        setRemoteWarning(false);
+        if (result.status === "unavailable") {
+          trackMatchSignal("remote_unavailable", "detected");
+          setRemoteWarning(true);
+          return;
+        }
+        if (result.status === "error") {
+          trackMatchSignal("remote_invalid", "detected");
+          setRemoteError(result.error);
+          return;
+        }
+        if (result.status === "conflict") {
+          if (result.controlLost) trackMatchSignal("control_lost", "detected");
+          setRemoteConflict(result.snapshot);
+          if (result.controlLost) setSyncError("CONTROL_LOST");
+          return;
+        }
+        if (result.status === "replace") {
+          syncedSequence.current = result.sequence;
+          setJournal(result.journal);
+          saveMatch(result.journal, {
+            ownerId: user.id,
+            persistent: true,
+          });
+        }
+      },
+      onFailure: () => setRemoteWarning(true),
+    });
   }, [
     controlStatus,
     isAnonymous,

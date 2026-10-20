@@ -239,7 +239,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
       {showHeaderAuthError ? (
         <div className="mx-auto flex w-full max-w-[1120px] justify-end px-[clamp(18px,4vw,40px)] pb-3 pt-3 max-[560px]:px-[14px]">
           <div
-            className="grid w-full max-w-[440px] gap-2 rounded-md border border-[#b83c38] bg-surface p-[10px_12px] text-[13px] text-[#8a211f] [overflow-wrap:anywhere]"
+            className="grid w-full max-w-[440px] gap-2 rounded-md border border-[#b83c38] bg-surface p-[10px_12px] text-[13px] text-[#8a211f] wrap-anywhere"
             role="alert"
           >
             {authError ? <span>{errorMessage}</span> : null}

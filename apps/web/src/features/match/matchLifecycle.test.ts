@@ -179,4 +179,86 @@ describe("Match lifecycle", () => {
     ).resolves.toEqual({ status: "sync_failed", result: syncResult });
     expect(removeLocalMatch).not.toHaveBeenCalled();
   });
+
+  it("owns polling cadence and stops after cleanup", async () => {
+    vi.useFakeTimers();
+    const pollRemote = vi.fn().mockResolvedValue({ status: "unchanged" });
+    const onResult = vi.fn();
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => journal()),
+      readRemoteMatch: vi.fn(),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(),
+      syncJournal: vi.fn(),
+      revokeViewerLink: vi.fn(),
+      removeLocalMatch: vi.fn(),
+    });
+    const lifecycleWithPolling = {
+      ...lifecycle,
+      pollRemote,
+    };
+    const stop = lifecycleWithPolling.watchRemote({
+      matchId,
+      getJournal: () => journal(),
+      controlActive: () => false,
+      onResult,
+      onFailure: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(pollRemote).toHaveBeenCalledTimes(1);
+    expect(onResult).toHaveBeenCalledWith({ status: "unchanged" });
+    stop();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(pollRemote).toHaveBeenCalledTimes(1);
+
+    random.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("backs off after a polling failure", async () => {
+    vi.useFakeTimers();
+    const pollRemote = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValue({ status: "unchanged" });
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => journal()),
+      readRemoteMatch: vi.fn(),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(),
+      syncJournal: vi.fn(),
+      revokeViewerLink: vi.fn(),
+      removeLocalMatch: vi.fn(),
+    });
+    const lifecycleWithPolling = {
+      ...lifecycle,
+      pollRemote,
+    };
+    const stop = lifecycleWithPolling.watchRemote({
+      matchId,
+      getJournal: () => journal(),
+      controlActive: () => false,
+      onResult: vi.fn(),
+      onFailure: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(pollRemote).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(pollRemote).toHaveBeenCalledTimes(2);
+
+    stop();
+    random.mockRestore();
+    vi.useRealTimers();
+  });
 });

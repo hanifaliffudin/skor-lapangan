@@ -23,3 +23,7 @@ _Avoid_: Spectator mode, public match
 **Club Session**:
 An organizer-led open-play session that groups a roster, courts, a queue, and the Matches played during that session.
 _Avoid_: Event, tournament
+
+**Club Session Match**:
+A Match planned within a Club Session, with its players, court, and queue position chosen before scoring begins.
+_Avoid_: queued game, fixture

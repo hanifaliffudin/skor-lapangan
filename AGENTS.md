@@ -16,3 +16,17 @@ If the mode is unresolved, ask during/after and end the response; wait for the a
 
 To update antislop later, refresh `antislop.md` and the selected skill folders from the same antislop release.
 <!-- antislop:end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a multi-context repo. Use `GLOSSARY-MAP.md` to locate context glossaries; repository-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.

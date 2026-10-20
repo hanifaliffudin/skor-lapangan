@@ -14,40 +14,17 @@ import { SelectControl } from "@/components/ui/select-control";
 import { useAuth } from "../../lib/auth";
 import { fillMessage, localizedPath, useLocale } from "../../lib/i18n";
 import { saveDraft } from "../../lib/session";
-import { supabase } from "../../lib/supabase";
-
-type SessionRow = {
-  id: string;
-  name: string;
-  session_date: string;
-  status: string;
-  created_at: string;
-};
-type PlayerRow = {
-  id: string;
-  display_name: string;
-  sort_order: number;
-  is_active: boolean;
-};
-type CourtRow = {
-  id: string;
-  name: string;
-  sort_order: number;
-  is_active: boolean;
-};
-type SessionMatchRow = {
-  id: string;
-  match_id: string;
-  linked_match_id: string | null;
-  court_id: string;
-  team_a_player_1: string;
-  team_a_player_2: string;
-  team_b_player_1: string;
-  team_b_player_2: string;
-  queue_order: number;
-  started_at: string | null;
-};
-type MatchResultRow = { id: string; status: string; winner: string | null };
+import {
+  createClubSessionManagement,
+  derivePlayerRecords,
+  type ClubSessionCourt,
+  type ClubSessionMatch,
+  type ClubSessionMatchResult,
+  type ClubSessionPlayer,
+  type ClubSessionSummary,
+} from "./clubSessionManagement";
+import { clubSessionMatchAction } from "./clubSessionMatchHandoff";
+import { createClubSessionSupabaseAdapter } from "./clubSessionSupabaseAdapter";
 
 const fieldClass =
   "grid gap-2 text-sm font-bold text-ink [&_input]:mt-0 [&_input]:font-medium";
@@ -71,12 +48,14 @@ export function ClubSessionsPage() {
     user,
   } = useAuth();
   const isAccount = Boolean(user && !isAnonymous);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [session, setSession] = useState<SessionRow | null>(null);
-  const [players, setPlayers] = useState<PlayerRow[]>([]);
-  const [courts, setCourts] = useState<CourtRow[]>([]);
-  const [queue, setQueue] = useState<SessionMatchRow[]>([]);
-  const [results, setResults] = useState<Record<string, MatchResultRow>>({});
+  const [sessions, setSessions] = useState<ClubSessionSummary[]>([]);
+  const [session, setSession] = useState<ClubSessionSummary | null>(null);
+  const [players, setPlayers] = useState<ClubSessionPlayer[]>([]);
+  const [courts, setCourts] = useState<ClubSessionCourt[]>([]);
+  const [queue, setQueue] = useState<ClubSessionMatch[]>([]);
+  const [results, setResults] = useState<
+    Record<string, ClubSessionMatchResult>
+  >({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [deletePrompt, setDeletePrompt] = useState(false);
@@ -89,6 +68,13 @@ export function ClubSessionsPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<
     [string, string, string, string]
   >(["", "", "", ""]);
+  const management = useMemo(
+    () =>
+      createClubSessionManagement(
+        createClubSessionSupabaseAdapter(user?.id ?? null),
+      ),
+    [user?.id],
+  );
 
   const activePlayers = useMemo(
     () => players.filter((player) => player.is_active),
@@ -99,113 +85,60 @@ export function ClubSessionsPage() {
     [courts],
   );
 
-  const loadData = useCallback(async () => {
-    if (!supabase || !user || !isAccount) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    if (!sessionId) {
-      const { data, error: loadError } = await supabase
-        .from("club_sessions")
-        .select("id,name,session_date,status,created_at")
-        .order("session_date", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (loadError) {
-        setError(t("clubSessionLoadError"));
-        setSessions([]);
-      } else {
-        setSessions(data ?? []);
+  const loadData = useCallback(
+    async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+      if (!user || !isAccount) {
+        setLoading(false);
+        return;
       }
-      setSession(null);
-      setPlayers([]);
-      setCourts([]);
-      setQueue([]);
-      setResults({});
+      if (showLoading) setLoading(true);
+      setError("");
+      if (!sessionId) {
+        try {
+          setSessions(await management.listSessions());
+        } catch {
+          setError(t("clubSessionLoadError"));
+          setSessions([]);
+        }
+        setSession(null);
+        setPlayers([]);
+        setCourts([]);
+        setQueue([]);
+        setResults({});
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const detail = await management.loadSession(sessionId);
+        setSession(detail.session);
+        setPlayers(detail.players);
+        setCourts(detail.courts);
+        setQueue(detail.queue);
+        setResults(detail.results);
+        setSelectedCourt((current) =>
+          detail.courts.some((court) => court.is_active && court.id === current)
+            ? current
+            : (detail.courts.find((court) => court.is_active)?.id ?? ""),
+        );
+      } catch {
+        setError(t("clubSessionLoadError"));
+        setSession(null);
+        setPlayers([]);
+        setCourts([]);
+        setQueue([]);
+        setResults({});
+        setLoading(false);
+        return;
+      }
       setLoading(false);
-      return;
-    }
-
-    const [sessionResult, playerResult, courtResult, queueResult] =
-      await Promise.all([
-        supabase
-          .from("club_sessions")
-          .select("id,name,session_date,status,created_at")
-          .eq("id", sessionId)
-          .maybeSingle(),
-        supabase
-          .from("club_session_players")
-          .select("id,display_name,sort_order,is_active")
-          .eq("session_id", sessionId)
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("club_session_courts")
-          .select("id,name,sort_order,is_active")
-          .eq("session_id", sessionId)
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: true }),
-        supabase
-          .from("club_session_matches")
-          .select(
-            "id,match_id,linked_match_id,court_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2,queue_order,started_at",
-          )
-          .eq("session_id", sessionId)
-          .order("queue_order", { ascending: true })
-          .order("created_at", { ascending: true }),
-      ]);
-
-    if (
-      sessionResult.error ||
-      playerResult.error ||
-      courtResult.error ||
-      queueResult.error ||
-      !sessionResult.data
-    ) {
-      setError(t("clubSessionLoadError"));
-      setSession(null);
-      setPlayers([]);
-      setCourts([]);
-      setQueue([]);
-      setResults({});
-      setLoading(false);
-      return;
-    }
-
-    const loadedQueue = queueResult.data ?? [];
-    const linkedIds = loadedQueue
-      .map((entry) => entry.linked_match_id)
-      .filter((id): id is string => Boolean(id));
-    let loadedResults: Record<string, MatchResultRow> = {};
-    if (linkedIds.length) {
-      const { data: matchRows } = await supabase
-        .from("matches")
-        .select("id,status,winner")
-        .in("id", linkedIds);
-      loadedResults = Object.fromEntries(
-        (matchRows ?? []).map((match) => [match.id, match]),
-      );
-    }
-
-    setSession(sessionResult.data);
-    setPlayers(playerResult.data ?? []);
-    setCourts(courtResult.data ?? []);
-    setQueue(loadedQueue);
-    setResults(loadedResults);
-    setSelectedCourt((current) =>
-      (courtResult.data ?? []).some(
-        (court) => court.is_active && court.id === current,
-      )
-        ? current
-        : (courtResult.data?.find((court) => court.is_active)?.id ?? ""),
-    );
-    setLoading(false);
-  }, [isAccount, sessionId, t, user]);
+    },
+    [isAccount, management, sessionId, t, user],
+  );
 
   useEffect(() => {
     setDeletePrompt(false);
-    void loadData();
+    void loadData({ showLoading: true });
   }, [loadData]);
 
   useEffect(() => {
@@ -216,74 +149,66 @@ export function ClubSessionsPage() {
 
   async function createSession(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !user || !isAccount || busy) return;
+    if (!user || !isAccount || busy) return;
     setBusy(true);
     setError("");
-    const { data, error: createError } = await supabase
-      .from("club_sessions")
-      .insert({
-        owner_id: user.id,
-        name: sessionName.trim(),
-        session_date: sessionDate,
-      })
-      .select("id")
-      .single();
-    setBusy(false);
-    if (createError || !data) {
+    try {
+      const { id } = await management.createSession({
+        name: sessionName,
+        sessionDate,
+      });
+      setSessionName("");
+      setSessionDate(today());
+      navigate(localizedPath(`/sessions/${id}`, locale));
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    setSessionName("");
-    setSessionDate(today());
-    navigate(localizedPath(`/sessions/${data.id}`, locale));
   }
 
   async function addPlayer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !user || !session || busy) return;
+    if (!user || !session || busy) return;
     const displayName = playerName.trim();
     if (!displayName) return;
     setBusy(true);
     setError("");
-    const { error: insertError } = await supabase
-      .from("club_session_players")
-      .insert({
-        session_id: session.id,
-        owner_id: user.id,
-        display_name: displayName,
-        sort_order: players.length,
+    try {
+      await management.addPlayer({
+        sessionId: session.id,
+        displayName,
+        currentPlayerCount: players.length,
       });
-    setBusy(false);
-    if (insertError) {
+      setPlayerName("");
+      await loadData();
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    setPlayerName("");
-    await loadData();
   }
 
   async function addCourt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !user || !session || busy) return;
+    if (!user || !session || busy) return;
     const name = courtName.trim();
     if (!name) return;
     setBusy(true);
     setError("");
-    const { error: insertError } = await supabase
-      .from("club_session_courts")
-      .insert({
-        session_id: session.id,
-        owner_id: user.id,
+    try {
+      await management.addCourt({
+        sessionId: session.id,
         name,
-        sort_order: courts.length,
+        currentCourtCount: courts.length,
       });
-    setBusy(false);
-    if (insertError) {
+      setCourtName("");
+      await loadData();
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    setCourtName("");
-    await loadData();
   }
 
   async function setRosterStatus(
@@ -291,133 +216,125 @@ export function ClubSessionsPage() {
     id: string,
     isActive: boolean,
   ) {
-    if (!supabase || !session || busy) return;
+    if (!session || busy) return;
     setBusy(true);
     setError("");
-    const table =
-      kind === "player" ? "club_session_players" : "club_session_courts";
-    const { error: updateError } = await supabase
-      .from(table)
-      .update({ is_active: isActive })
-      .eq("id", id)
-      .eq("session_id", session.id);
-    setBusy(false);
-    if (updateError) {
+    try {
+      if (kind === "player") {
+        await management.setPlayerActive({
+          sessionId: session.id,
+          playerId: id,
+          isActive,
+        });
+      } else {
+        await management.setCourtActive({
+          sessionId: session.id,
+          courtId: id,
+          isActive,
+        });
+      }
+      await loadData();
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    await loadData();
   }
 
   async function addQueuedMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !user || !session || busy) return;
-    if (
-      !selectedCourt ||
-      selectedPlayers.some((id) => !id) ||
-      new Set(selectedPlayers).size !== 4
-    ) {
-      setError(t("clubSessionAssignmentError"));
-      return;
-    }
+    if (!user || !session || busy) return;
     setBusy(true);
     setError("");
-    const { error: insertError } = await supabase
-      .from("club_session_matches")
-      .insert({
-        session_id: session.id,
-        owner_id: user.id,
-        match_id: crypto.randomUUID(),
-        court_id: selectedCourt,
-        team_a_player_1: selectedPlayers[0],
-        team_a_player_2: selectedPlayers[1],
-        team_b_player_1: selectedPlayers[2],
-        team_b_player_2: selectedPlayers[3],
-        queue_order:
-          queue.reduce(
-            (highest, entry) => Math.max(highest, entry.queue_order),
-            -1,
-          ) + 1,
+    try {
+      await management.addQueuedMatch({
+        session,
+        players,
+        courts,
+        queue,
+        courtId: selectedCourt,
+        playerIds: selectedPlayers,
       });
-    setBusy(false);
-    if (insertError) {
-      setError(t("clubSessionSaveError"));
-      return;
+      setSelectedPlayers(["", "", "", ""]);
+      await loadData();
+    } catch (error) {
+      setError(
+        error instanceof Error &&
+          error.message === "CLUB_SESSION_ASSIGNMENT_INVALID"
+          ? t("clubSessionAssignmentError")
+          : t("clubSessionSaveError"),
+      );
+    } finally {
+      setBusy(false);
     }
-    setSelectedPlayers(["", "", "", ""]);
-    await loadData();
   }
 
   async function removeQueuedMatch(id: string) {
-    if (!supabase || !session || busy) return;
+    if (!session || busy) return;
     setBusy(true);
-    const { error: deleteError } = await supabase
-      .from("club_session_matches")
-      .delete()
-      .eq("id", id)
-      .eq("session_id", session.id)
-      .is("started_at", null);
-    setBusy(false);
-    if (deleteError) {
+    try {
+      await management.removeQueuedMatch({
+        sessionId: session.id,
+        queueId: id,
+      });
+      await loadData();
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    await loadData();
   }
 
   async function toggleSessionStatus() {
-    if (!supabase || !session || busy) return;
+    if (!session || busy) return;
     setBusy(true);
-    const nextStatus = session.status === "active" ? "completed" : "active";
-    const { error: updateError } = await supabase
-      .from("club_sessions")
-      .update({ status: nextStatus })
-      .eq("id", session.id);
-    setBusy(false);
-    if (updateError) {
+    try {
+      await management.toggleStatus(session);
+      await loadData();
+    } catch {
       setError(t("clubSessionSaveError"));
-      return;
+    } finally {
+      setBusy(false);
     }
-    await loadData();
   }
 
   async function deleteSession() {
-    if (!supabase || !session || busy) return;
+    if (!session || busy) return;
     setBusy(true);
     setError("");
-    const { error: deleteError } = await supabase
-      .from("club_sessions")
-      .delete()
-      .eq("id", session.id);
-    setBusy(false);
-    if (deleteError) {
+    try {
+      await management.deleteSession(session.id);
+      navigate(localizedPath("/sessions", locale));
+    } catch {
       setError(t("clubSessionSaveError"));
       setDeletePrompt(false);
-      return;
+    } finally {
+      setBusy(false);
     }
-    navigate(localizedPath("/sessions", locale));
   }
 
-  function startMatch(entry: SessionMatchRow) {
+  function startMatch(entry: ClubSessionMatch) {
     if (!session) return;
-    const linkedResult = entry.linked_match_id
-      ? results[entry.linked_match_id]
-      : null;
-    if (linkedResult || entry.started_at) {
-      if (entry.linked_match_id) {
-        navigate(
-          localizedPath(
-            `/match/${entry.linked_match_id}?clubSessionId=${session.id}`,
-            locale,
-          ),
-        );
-        return;
-      }
+    const action = clubSessionMatchAction({
+      sessionStatus: session.status,
+      entry,
+    });
+    if (action.type === "open") {
+      navigate(
+        localizedPath(
+          `/match/${action.matchId}?clubSessionId=${session.id}`,
+          locale,
+        ),
+      );
+      return;
+    }
+    if (action.type === "blocked") {
+      return;
     }
     saveDraft({ sport: "badminton", format: "doubles", mode: "casual" });
     navigate(
       localizedPath(
-        `/setup?clubSessionId=${session.id}&clubMatchId=${entry.match_id}`,
+        `/setup?clubSessionId=${session.id}&clubMatchId=${action.matchId}`,
         locale,
       ),
     );
@@ -432,32 +349,7 @@ export function ClubSessionsPage() {
     [courts],
   );
   const playerRecords = useMemo(() => {
-    const records = new Map<
-      string,
-      { played: number; won: number; lost: number }
-    >();
-    for (const player of players)
-      records.set(player.id, { played: 0, won: 0, lost: 0 });
-    for (const entry of queue) {
-      if (!entry.linked_match_id) continue;
-      const result = results[entry.linked_match_id];
-      if (!result || result.status !== "complete" || !result.winner) continue;
-      const sideA = [entry.team_a_player_1, entry.team_a_player_2];
-      const sideB = [entry.team_b_player_1, entry.team_b_player_2];
-      for (const playerId of sideA) {
-        const record = records.get(playerId);
-        if (!record) continue;
-        record.played += 1;
-        result.winner === "A" ? (record.won += 1) : (record.lost += 1);
-      }
-      for (const playerId of sideB) {
-        const record = records.get(playerId);
-        if (!record) continue;
-        record.played += 1;
-        result.winner === "B" ? (record.won += 1) : (record.lost += 1);
-      }
-    }
-    return records;
+    return derivePlayerRecords(players, queue, results);
   }, [players, queue, results]);
 
   return (
@@ -859,7 +751,15 @@ export function ClubSessionsPage() {
                                 {t("clubSessionSelectPlayer")}
                               </option>
                               {activePlayers.map((player) => (
-                                <option key={player.id} value={player.id}>
+                                <option
+                                  key={player.id}
+                                  value={player.id}
+                                  disabled={selectedPlayers.some(
+                                    (id, selectedIndex) =>
+                                      selectedIndex !== index &&
+                                      id === player.id,
+                                  )}
+                                >
                                   {player.display_name}
                                 </option>
                               ))}

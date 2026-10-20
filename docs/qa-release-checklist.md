@@ -15,6 +15,7 @@ The latest engineering evidence run from 2026-10-15 is recorded in [qa-evidence-
 - [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Extend the Community Rules checks for all six sports, v2 validation, version locking, reports, and denied direct reads. Never run test setup against production data.
 - [ ] Review `supabase/tests/atomic_match_sync.test.sql` in the same disposable database. Verify first write, idempotent retry, stale snapshot rejection, divergent snapshot rejection, and rollback when an event fails.
 - [ ] Review `supabase/tests/cross_device_match_control.test.sql` and `supabase/tests/match_event_integrity.test.sql` in the same disposable database. Verify journal reads, initial lease, held lease, takeover, old-token rejection, complete read-only behavior, lease cleanup, duplicate-event rejection, sequence/sport validation, and journal completeness.
+- [ ] Review `supabase/tests/club_sessions.test.sql` in the same disposable database. Verify owner-only RLS, four-player/court queue assignment, planned-match attachment, session deletion cascade, and preservation of account match journals.
 - [ ] `git diff --check` passes and no secret key appears in the browser bundle or repository.
 
 ## Match setup and scoring
@@ -111,3 +112,4 @@ The latest engineering evidence run from 2026-10-15 is recorded in [qa-evidence-
 - [ ] Verify all Community Rules migrations, including `20261014100000_community_rules_all_sports.sql`, are applied in filename order. Confirm safe RPC reads work and direct table reads remain denied.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.
 - [ ] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests.
+- [ ] On Preview, verify Club Sessions with a disposable Google account: create/delete a session, isolate two owners, add/deactivate/reactivate players and courts, start/resume a queued match, recover after score sync, and confirm mobile, keyboard, loading, empty, and error states.

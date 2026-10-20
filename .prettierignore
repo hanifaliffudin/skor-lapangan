@@ -7,6 +7,11 @@ coverage
 apps/web/public/google1e47e11c0010212d.html
 supabase/.temp/
 
+# Local Codex-generated presentation artifacts are not release sources.
+.chart-data-*/
+.codex-finalizer/
+artifacts/*.pptx
+
 # Repository and skill instructions use their own formatting conventions.
 AGENTS.md
 antislop.md

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
   officialRulesetFor,
@@ -33,6 +33,8 @@ import {
   type SetupDraft,
 } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
+import { createClubSessionManagement } from "../club-sessions/clubSessionManagement";
+import { createClubSessionSupabaseAdapter } from "../club-sessions/clubSessionSupabaseAdapter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,6 +95,13 @@ export function SetupPage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
+  const clubSessionManagement = useMemo(
+    () =>
+      createClubSessionManagement(
+        createClubSessionSupabaseAdapter(user?.id ?? null),
+      ),
+    [user?.id],
+  );
 
   useEffect(() => {
     document.title = t("setupPageTitle");
@@ -729,12 +738,12 @@ export function SetupPage() {
         setRuleError(t("clubSessionSignInBody"));
         return;
       }
-      const { error: startError } = await supabase
-        .from("club_session_matches")
-        .update({ started_at: new Date().toISOString() })
-        .eq("match_id", clubMatchId)
-        .eq("session_id", clubSessionId);
-      if (startError) {
+      try {
+        await clubSessionManagement.markMatchStarted({
+          matchId: clubMatchId,
+          sessionId: clubSessionId,
+        });
+      } catch {
         setRuleError(t("clubSessionSaveError"));
         return;
       }

@@ -12,3 +12,8 @@ test-results
 .vercel
 .pnpm-store
 supabase/.temp
+
+# Local Codex-generated analysis and presentation artifacts.
+.chart-data-*/
+.codex-finalizer/
+artifacts/*.pptx
