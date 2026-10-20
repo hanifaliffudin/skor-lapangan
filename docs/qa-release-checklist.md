@@ -2,21 +2,21 @@
 
 Use this checklist before a public release and again after a scoring, sync, or database change. Record the version, environment, browser/device, tester, date, and result in the release notes or issue tracker. Do not mark a check complete without evidence.
 
-The latest engineering evidence run from 2026-10-15 is recorded in [qa-evidence-v1.0-2026-10-15.md](qa-evidence-v1.0-2026-10-15.md). The earlier runs remain available in [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md) and [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). None is a production release sign-off; disposable database tests, real-device checks, legal review, and owner approval remain open even though the production deployment responded successfully.
+The latest engineering evidence run from 2026-10-20 is recorded in [qa-evidence-v1.0-2026-10-20.md](qa-evidence-v1.0-2026-10-20.md). The earlier runs remain available in [qa-evidence-v1.0-2026-10-15.md](qa-evidence-v1.0-2026-10-15.md), [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md), and [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). None is a production release sign-off; disposable database tests, real-device checks, legal review, and owner approval remain open even though the production deployment responded successfully.
 
 ## Automated checks
 
-- [ ] `pnpm test` passes. This builds the scoring package and runs the scoring-core and web tests.
-- [ ] `pnpm typecheck` passes.
-- [ ] `pnpm build` passes.
-- [ ] `pnpm exec prettier --check .` passes.
-- [ ] `pnpm test:coverage` passes with the configured scoring-core and web thresholds.
-- [ ] `pnpm test:e2e` passes against a local preview or dev server; use the Chrome smoke flow as a manual fallback when the host cannot launch a headless browser.
+- [x] `pnpm test` passes. This builds the scoring package and runs the scoring-core and web tests.
+- [x] `pnpm typecheck` passes.
+- [x] `pnpm build` passes.
+- [x] `pnpm exec prettier --check .` passes.
+- [x] `pnpm test:coverage` passes with the configured scoring-core and web thresholds.
+- [x] `pnpm test:e2e` passes against a local preview or dev server; use the Chrome smoke flow as a manual fallback when the host cannot launch a headless browser.
 - [ ] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Extend the Community Rules checks for all six sports, v2 validation, version locking, reports, and denied direct reads. Never run test setup against production data.
 - [ ] Review `supabase/tests/atomic_match_sync.test.sql` in the same disposable database. Verify first write, idempotent retry, stale snapshot rejection, divergent snapshot rejection, and rollback when an event fails.
 - [ ] Review `supabase/tests/cross_device_match_control.test.sql` and `supabase/tests/match_event_integrity.test.sql` in the same disposable database. Verify journal reads, initial lease, held lease, takeover, old-token rejection, complete read-only behavior, lease cleanup, duplicate-event rejection, sequence/sport validation, and journal completeness.
 - [ ] Review `supabase/tests/club_sessions.test.sql` in the same disposable database. Verify owner-only RLS, four-player/court queue assignment, planned-match attachment, session deletion cascade, and preservation of account match journals.
-- [ ] `git diff --check` passes and no secret key appears in the browser bundle or repository.
+- [x] `git diff --check` passes. The browser-bundle secret review remains part of the production sign-off.
 
 ## Match setup and scoring
 

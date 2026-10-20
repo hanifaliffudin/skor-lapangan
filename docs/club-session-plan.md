@@ -1,6 +1,6 @@
 # Club Sessions and Tournament Mode
 
-Status: the Badminton doubles MVP is implemented in application code. The Supabase migration is not yet applied, and the feature is not deployed or approved for production.
+Status: the Badminton doubles MVP is implemented, the Supabase migration is applied through `20261015120000_club_sessions`, and the production deployment is live. Pilot validation and owner/legal approval remain open.
 
 ## Product hypothesis
 
@@ -40,7 +40,7 @@ Player names are personal data. They are private to the organizer's account in t
 - [x] Derive played/won/lost counts without ranking, and exclude results that are incomplete or not yet synced.
 - [x] Complete, reopen, or delete a session without deleting its match journals.
 - [x] Add account-only RLS and account-deletion cascade in the migration.
-- [ ] Apply the migration in Supabase before deploying code that queries these tables.
+- [x] Apply the migration in Supabase before deploying code that queries these tables.
 - [ ] Verify RLS isolation, deletion, sync recovery, accessibility, mobile court-side use, and pending/error states in Preview.
 - [ ] Run a small club pilot and have the owner/legal reviewer approve the privacy notice before production.
 
