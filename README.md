@@ -75,16 +75,17 @@ Import the repository with its root directory unchanged. `vercel.json` builds th
 
 ## Documentation
 
+- [Project overview](docs/project-overview.md) for stakeholder, junior developer, engineer, and operator reading paths
 - [Changelog](CHANGELOG.md)
 - [Product roadmap](docs/product-roadmap.md)
 - [V1.0 implementation specification](docs/v1-implementation-spec.md)
 - [Player guide](docs/user-guide.md)
 - [QA and release checklist](docs/qa-release-checklist.md)
-- [Latest QA evidence](docs/qa-evidence-v1.0-2026-10-15.md)
+- [Latest QA evidence](docs/qa-evidence-smart-rotation-2026-10-23.md)
 - [Operations runbook](docs/operations-runbook.md)
 - [Official rules sources](docs/rules-sources.md)
 - [Supabase setup](docs/supabase-setup.md)
-- [Architecture decisions](docs/adr/0001-local-first-stack.md) and [atomic sync ADR](docs/adr/0002-atomic-match-sync.md)
+- [Architecture decisions](docs/adr/0001-local-first-stack.md), [atomic sync ADR](docs/adr/0002-atomic-match-sync.md), and [offline continuity ADR](docs/adr/0003-offline-match-continuity.md)
 - [Legal and owner release gate](docs/legal-release-gate.md)
 
 Public-facing drafts that need owner and legal review before publication:

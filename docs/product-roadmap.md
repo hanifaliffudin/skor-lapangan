@@ -24,7 +24,7 @@ The sequence after V1.1 is a proposal, not a promise. Preview availability is no
 
 ## Club Sessions and tournament-lite
 
-Status: Badminton doubles MVP implemented in application code; rollout is blocked on applying the Supabase migration and Preview validation.
+Status: Badminton doubles MVP is implemented and the Smart Rotation migration is applied in Supabase Preview. Rollout still needs authenticated Preview validation, a club pilot, and the privacy/owner release gate.
 
 A club organizer can create a private session, manage its player list and courts, manually queue matches, and follow played/won/lost records in roster order. The first version reuses the existing match setup and scoring flow. Automatic rotations and tournament brackets remain out of scope until the club workflow has been validated.
 
