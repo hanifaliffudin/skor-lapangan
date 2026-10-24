@@ -4,12 +4,19 @@ import {
   canSyncStoredMatch,
   loadDraft,
   loadMatch,
+  loadMatchAsync,
   getStoredMatchInfo,
+  getStoredMatchInfoAsync,
+  hasActiveOrPendingMatches,
+  listPendingMatchesAsync,
   removeMatch,
+  removeMatchAsync,
   removeAllStoredMatches,
   saveDraft,
   saveMatch,
+  saveMatchAsync,
 } from "./session";
+import { matchStore } from "./matchStore";
 
 describe("guest session storage", () => {
   beforeEach(() => window.sessionStorage.clear());
@@ -92,9 +99,14 @@ describe("guest session storage", () => {
     ).toMatchObject({ journal, expiresAt: expect.any(String) });
     expect(loadMatch(journal.definition.id)).toEqual(journal);
     saveMatch(journal, { ownerId: "account-id", persistent: true });
-    expect(getStoredMatchInfo(journal.definition.id)).toEqual({
+    expect(getStoredMatchInfo(journal.definition.id)).toMatchObject({
       ownerId: "account-id",
       persistent: true,
+      sync: {
+        status: "local",
+        lastServerSequence: 0,
+        pendingFromSequence: null,
+      },
     });
     expect(canSyncStoredMatch(journal.definition.id, "guest-id", true)).toBe(
       false,
@@ -107,6 +119,223 @@ describe("guest session storage", () => {
     );
     removeMatch(journal.definition.id);
     expect(loadMatch(journal.definition.id)).toBeNull();
+  });
+
+  it("migrates a legacy Match without changing its UUID or event UUIDs", async () => {
+    const journal: MatchJournal = {
+      definition: {
+        id: "legacy-match",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: {
+            name: "Team A",
+            players: [
+              { id: "a-1", name: "A1" },
+              { id: "a-2", name: "A2" },
+            ],
+          },
+          B: {
+            name: "Team B",
+            players: [
+              { id: "b-1", name: "B1" },
+              { id: "b-2", name: "B2" },
+            ],
+          },
+        },
+      },
+      events: [
+        {
+          id: "legacy-event",
+          matchId: "legacy-match",
+          clientSequence: 1,
+          type: "rally_awarded",
+          team: "A",
+          createdAt: "2026-10-09T10:01:00.000Z",
+        },
+      ],
+    };
+    window.localStorage.setItem(
+      "skor-lapangan:match:legacy-match",
+      JSON.stringify({
+        schemaVersion: 1,
+        journal,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    );
+
+    await expect(loadMatchAsync("legacy-match")).resolves.toEqual(journal);
+    expect(loadMatch("legacy-match")).toEqual(journal);
+    if (typeof indexedDB === "undefined") {
+      expect(
+        window.localStorage.getItem("skor-lapangan:match:legacy-match"),
+      ).toEqual(expect.any(String));
+    } else {
+      expect(
+        window.localStorage.getItem("skor-lapangan:match:legacy-match"),
+      ).toBeNull();
+    }
+    await expect(matchStore.get("legacy-match")).resolves.toMatchObject({
+      matchId: "legacy-match",
+      journal,
+    });
+  });
+
+  it("keeps a legacy Match when durable migration fails", async () => {
+    const legacyKey = "skor-lapangan:match:migration-failure";
+    const journal = {
+      definition: {
+        id: "migration-failure",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: { name: "Team A", players: [{ id: "a-1", name: "A1" }] },
+          B: { name: "Team B", players: [{ id: "b-1", name: "B1" }] },
+        },
+      },
+      events: [],
+    } as unknown as MatchJournal;
+    const legacyValue = JSON.stringify({ schemaVersion: 1, journal });
+    window.localStorage.setItem(legacyKey, legacyValue);
+    const put = vi
+      .spyOn(matchStore, "put")
+      .mockRejectedValue(new Error("quota"));
+
+    await expect(loadMatchAsync("migration-failure")).rejects.toThrow("quota");
+    expect(window.localStorage.getItem(legacyKey)).toBe(legacyValue);
+    put.mockRestore();
+  });
+
+  it("does not expose a Match until an async save succeeds", async () => {
+    const journal = {
+      definition: {
+        id: "async-save",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: { name: "Team A", players: [{ id: "a-1", name: "A1" }] },
+          B: { name: "Team B", players: [{ id: "b-1", name: "B1" }] },
+        },
+      },
+      events: [],
+    } as unknown as MatchJournal;
+
+    await expect(saveMatchAsync(journal)).resolves.toBe(true);
+    await expect(loadMatchAsync("async-save")).resolves.toEqual(journal);
+  });
+
+  it("persists pending sync metadata across an async reload", async () => {
+    const journal = {
+      definition: {
+        id: "pending-sync",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: { name: "Team A", players: [{ id: "a-1", name: "A1" }] },
+          B: { name: "Team B", players: [{ id: "b-1", name: "B1" }] },
+        },
+      },
+      events: [],
+    } as unknown as MatchJournal;
+
+    await expect(
+      saveMatchAsync(journal, {
+        sync: {
+          status: "pending",
+          lastServerSequence: 3,
+          pendingFromSequence: 4,
+          updatedAt: "2026-10-09T10:01:00.000Z",
+        },
+      }),
+    ).resolves.toBe(true);
+
+    expect(await getStoredMatchInfoAsync("pending-sync")).toMatchObject({
+      sync: {
+        status: "pending",
+        lastServerSequence: 3,
+        pendingFromSequence: 4,
+      },
+    });
+  });
+
+  it("lists pending matches for an automatic reconnect retry", async () => {
+    const journal = {
+      definition: {
+        id: "pending-retry",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: { name: "Team A", players: [{ id: "a-1", name: "A1" }] },
+          B: { name: "Team B", players: [{ id: "b-1", name: "B1" }] },
+        },
+      },
+      events: [],
+    } as unknown as MatchJournal;
+
+    await saveMatchAsync(journal, {
+      ownerId: "account-user",
+      persistent: true,
+      sync: {
+        status: "pending",
+        lastServerSequence: 2,
+        pendingFromSequence: 3,
+        updatedAt: "2026-10-09T10:01:00.000Z",
+      },
+    });
+
+    await expect(listPendingMatchesAsync()).resolves.toEqual([
+      {
+        journal,
+        info: expect.objectContaining({
+          ownerId: "account-user",
+          persistent: true,
+          sync: expect.objectContaining({ status: "pending" }),
+        }),
+      },
+    ]);
+  });
+
+  it("blocks a PWA update while a local Match is still active", async () => {
+    const journal = {
+      definition: {
+        id: "pwa-active-match",
+        sport: "badminton",
+        rulesetId: "bwf-doubles-3x21-2025",
+        mode: "casual",
+        createdAt: "2026-10-09T10:00:00.000Z",
+        initialServingTeam: "A",
+        initialServingPlayer: 0,
+        teams: {
+          A: { name: "Team A", players: [{ id: "a-1", name: "A1" }] },
+          B: { name: "Team B", players: [{ id: "b-1", name: "B1" }] },
+        },
+      },
+      events: [],
+    } as unknown as MatchJournal;
+
+    await expect(saveMatchAsync(journal)).resolves.toBe(true);
+    await expect(hasActiveOrPendingMatches()).resolves.toBe(true);
+    await expect(removeMatchAsync(journal.definition.id)).resolves.toBe(true);
   });
 
   it("restores a same-browser match until its 12-hour expiry", () => {

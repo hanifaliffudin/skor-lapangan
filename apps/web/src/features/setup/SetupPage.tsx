@@ -30,6 +30,7 @@ import {
   loadDraft,
   saveDraft,
   saveMatch,
+  saveMatchAsync,
   type SetupDraft,
 } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
@@ -112,6 +113,7 @@ export function SetupPage() {
     Boolean(clubMatchId),
   );
   const [clubSetupReady, setClubSetupReady] = useState(!clubMatchId);
+  const [savingMatch, setSavingMatch] = useState(false);
   const [format, setFormat] = useState<MatchFormat>(draft?.format ?? "doubles");
   const [firstServer, setFirstServer] = useState("A-0");
   const [officialScoringMode, setOfficialScoringMode] =
@@ -749,11 +751,31 @@ export function SetupPage() {
       }
     }
     const journal: MatchJournal = { definition, events: [] };
-    saveMatch(journal, {
+    const storageOptions = {
       persistent:
         ruleSource !== "guest_custom" && Boolean(user && !isAnonymous),
       ...(user?.id ? { ownerId: user.id } : {}),
-    });
+    };
+    if (typeof indexedDB === "undefined") {
+      if (!saveMatch(journal, storageOptions)) {
+        setRuleError(t("matchStorageError"));
+        return;
+      }
+      navigate(
+        localizedPath(
+          `/match/${id}${clubSessionId ? `?clubSessionId=${clubSessionId}` : ""}`,
+          locale,
+        ),
+      );
+      return;
+    }
+    setSavingMatch(true);
+    const saved = await saveMatchAsync(journal, storageOptions);
+    if (!saved) {
+      setSavingMatch(false);
+      setRuleError(t("matchStorageError"));
+      return;
+    }
     navigate(
       localizedPath(
         `/match/${id}${clubSessionId ? `?clubSessionId=${clubSessionId}` : ""}`,
@@ -1037,9 +1059,10 @@ export function SetupPage() {
           <Button
             className={styles.primaryButton}
             type="submit"
-            disabled={clubSetupLoading || !clubSetupReady}
+            disabled={clubSetupLoading || !clubSetupReady || savingMatch}
           >
-            {t("startMatch")} <span aria-hidden="true">→</span>
+            {savingMatch ? t("working") : t("startMatch")}{" "}
+            <span aria-hidden="true">→</span>
           </Button>
           {ruleError ? (
             <p className={styles.formError} role="alert">

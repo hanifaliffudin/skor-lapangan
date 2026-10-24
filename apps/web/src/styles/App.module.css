@@ -845,6 +845,119 @@
   text-align: center;
 }
 
+.displayShell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.displayMain {
+  width: min(1600px, 100%);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(18px, 4vw, 56px);
+  display: grid;
+  align-content: center;
+  gap: clamp(16px, 3vw, 34px);
+}
+
+.displayToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.displayToolbar strong {
+  display: block;
+  color: var(--surface);
+  font-size: clamp(20px, 3vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.displayEyebrow {
+  margin: 0 0 4px;
+  color: var(--lime);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.displayMeta {
+  margin: 0;
+  color: #e1e5ea;
+  font-size: clamp(13px, 1.6vw, 20px);
+  line-height: 1.45;
+}
+
+.displayScoreboard {
+  gap: clamp(12px, 2vw, 28px);
+}
+
+.displayScoreboard .scoreCard {
+  padding: clamp(14px, 3vw, 36px);
+  border-color: var(--surface);
+  background: var(--surface);
+}
+
+.displayScoreboard .scoreCard[data-serving="true"] {
+  border-color: var(--lime);
+  box-shadow: inset 0 8px 0 var(--lime);
+}
+
+.displayScore {
+  display: block;
+  padding: clamp(18px, 4vw, 48px) 0;
+  color: var(--ink);
+  font-size: clamp(76px, 18vw, 240px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 950;
+  line-height: 0.82;
+  text-align: center;
+}
+
+.displayCourt {
+  display: grid;
+  justify-items: center;
+}
+
+.displayCourt .courtPanel {
+  margin: 0;
+}
+
+.displayCourt .court {
+  width: min(420px, 34vw);
+}
+
+@media (max-width: 680px) {
+  .displayMain {
+    align-content: start;
+    padding: 18px;
+  }
+
+  .displayToolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .displayToolbar button {
+    width: 100%;
+  }
+
+  .displayScoreboard {
+    grid-template-columns: 1fr;
+  }
+
+  .displayCourt .court {
+    width: min(300px, 72vw);
+  }
+}
+
 .rulesMain {
   width: min(920px, 100%);
   margin: 0 auto;

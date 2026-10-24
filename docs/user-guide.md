@@ -59,7 +59,7 @@ Anyone who gets the link can view the match until the link expires or the owner 
 
 Guests can play without an account. Guest matches remain local to the browser or device and do not support cross-device resume. Choose **Sign in with Google** to link an active guest session and keep eligible match history with the same account. Open **History** to see server-synced matches, grouped into **Berlangsung** and **Selesai**. An active match can be continued from another browser or device after its journal is downloaded. A completed match opens as read-only. Open **Account** to sign out or permanently delete the account and its stored data.
 
-If the local and server versions have the same event sequence but different state, the app shows a conflict instead of choosing a version silently. Use **Gunakan versi server** or **Use server version** to discard the local branch and continue from the server snapshot.
+If the local and server versions have the same event sequence but different state, the app shows a conflict instead of choosing a version silently. Use **Gunakan versi server** or **Use server version** to discard the local branch and continue from the server snapshot, or choose **Simpan sebagai Match baru** / **Save as a new Match** to preserve the device version under a new Match ID without changing the server Match.
 
 Community Rule reports are reviewed manually by the operator. Reporters can submit a reason, optional details, and optional contact email without Google sign-in; the system rate-limits anonymous reporting and never automatically hides a rule. Use Official Rules for federation-standard play.
 

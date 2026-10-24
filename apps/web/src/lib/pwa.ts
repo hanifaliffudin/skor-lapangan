@@ -1,6 +1,7 @@
 import { registerSW } from "virtual:pwa-register";
 
 type PwaUpdate = (reloadPage?: boolean) => Promise<void>;
+export type PwaUpdateResult = "applied" | "deferred" | "unavailable";
 
 const updateListeners = new Set<() => void>();
 let updateAvailable = false;
@@ -16,8 +17,18 @@ export function subscribeToPwaUpdate(listener: () => void): () => void {
   return () => updateListeners.delete(listener);
 }
 
-export function applyPwaUpdate(): Promise<void> | undefined {
-  return applyUpdate?.(true);
+export async function applyPwaUpdate(): Promise<PwaUpdateResult> {
+  if (!applyUpdate) return "unavailable";
+
+  try {
+    const { hasActiveOrPendingMatches } = await import("./session");
+    if (await hasActiveOrPendingMatches()) return "deferred";
+  } catch {
+    return "deferred";
+  }
+
+  await applyUpdate(true);
+  return "applied";
 }
 
 applyUpdate = registerSW({

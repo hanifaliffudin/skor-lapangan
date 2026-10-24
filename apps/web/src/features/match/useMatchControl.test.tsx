@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createStorageLocalControlStore } from "../../lib/localControl";
 import { useMatchControl } from "./useMatchControl";
 
 const originalLocks = Object.getOwnPropertyDescriptor(navigator, "locks");
@@ -92,10 +93,32 @@ describe("useMatchControl", () => {
     expect(result.current.canControl).toBe(true);
   });
 
-  it("allows control in browsers without the Web Locks API", () => {
+  it("allows control in browsers without the Web Locks API", async () => {
     setLockManager(undefined);
-    const { result } = renderHook(() => useMatchControl("match-3"));
+    const { result, unmount } = renderHook(() => useMatchControl("match-3"));
 
-    expect(result.current.canControl).toBe(true);
+    await waitFor(() => expect(result.current.canControl).toBe(true));
+    unmount();
+  });
+
+  it("waits for a durable local Control and recovers after release", async () => {
+    setLockManager(undefined);
+    const store = createStorageLocalControlStore(window.localStorage);
+    await store.claim("match-4", "other-tab", Date.now());
+
+    const { result, unmount } = renderHook(() => useMatchControl("match-4"));
+    await waitFor(() => expect(result.current.status).toBe("waiting"));
+    expect(result.current.canControl).toBe(false);
+
+    await act(async () => {
+      await store.release("match-4", "other-tab");
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "skor-lapangan:control:match-4",
+        }),
+      );
+    });
+    await waitFor(() => expect(result.current.canControl).toBe(true));
+    unmount();
   });
 });

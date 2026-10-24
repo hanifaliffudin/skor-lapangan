@@ -52,29 +52,24 @@ select ok(
 );
 select ok(
   (select is_published
-   from public.community_rules
-   where id = '00000000-0000-4000-8000-000000000203'),
+   from public.read_community_rule('00000000-0000-4000-8000-000000000203')),
   'republished rule is public again'
 );
 select is(
   (select current_version
-   from public.community_rules
-   where id = '00000000-0000-4000-8000-000000000203'),
+   from public.read_community_rule('00000000-0000-4000-8000-000000000203')),
   1,
   'republishing does not increment the version'
 );
 select is(
   (select count(*)::integer
-   from public.community_rule_versions
-   where rule_id = '00000000-0000-4000-8000-000000000203'),
+   from public.read_community_rule_version('00000000-0000-4000-8000-000000000203', 1)),
   1,
   'republishing does not create a new version row'
 );
 select is(
   (select configuration -> 'scoring' ->> 'pointsToWin'
-   from public.community_rule_versions
-   where rule_id = '00000000-0000-4000-8000-000000000203'
-     and version = 1),
+   from public.read_community_rule_version('00000000-0000-4000-8000-000000000203', 1)),
   '15',
   'republishing keeps the existing configuration'
 );

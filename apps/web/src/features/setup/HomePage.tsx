@@ -16,9 +16,11 @@ import { PwaUpdateNotice } from "../../components/PwaUpdateNotice";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
 import {
+  getStoredMatchInfo,
   listGuestMatches,
+  listStoredMatchesAsync,
   loadDraft,
-  removeMatch,
+  removeMatchAsync,
   saveDraft,
 } from "../../lib/session";
 import { applySeoMetadata, homeSchema } from "../../lib/seo";
@@ -48,11 +50,40 @@ export function HomePage() {
   const [savedMatches, setSavedMatches] = useState<MatchJournal[]>(() =>
     listGuestMatches(),
   );
+  const [pendingMatchIds, setPendingMatchIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
-  const activeMatches = savedMatches.filter(
-    (journal) => deriveJournal(journal).state.status === "active",
+  const resumableMatches = savedMatches.filter(
+    (journal) =>
+      deriveJournal(journal).state.status === "active" ||
+      pendingMatchIds.has(journal.definition.id),
   );
+
+  useEffect(() => {
+    let active = true;
+    void listStoredMatchesAsync()
+      .then((matches) => {
+        if (!active) return;
+        setSavedMatches(matches);
+        setPendingMatchIds(
+          new Set(
+            matches
+              .filter(
+                (match) =>
+                  getStoredMatchInfo(match.definition.id)?.sync.status ===
+                  "pending",
+              )
+              .map((match) => match.definition.id),
+          ),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showDeleteToast) return;
@@ -77,8 +108,9 @@ export function HomePage() {
     navigate(localizedPath("/setup", locale));
   }
 
-  function confirmDeleteMatch(matchId: string) {
-    removeMatch(matchId);
+  async function confirmDeleteMatch(matchId: string) {
+    const removed = await removeMatchAsync(matchId);
+    if (!removed) return;
     setSavedMatches((matches) =>
       matches.filter((match) => match.definition.id !== matchId),
     );
@@ -97,18 +129,21 @@ export function HomePage() {
           <p>{t("intro")}</p>
         </section>
 
-        {activeMatches.length > 0 ? (
+        {resumableMatches.length > 0 ? (
           <section
             className={styles.resumeSection}
             aria-labelledby="resume-title"
           >
             <div>
-              <h2 id="resume-title">{t("resumeTitle")}</h2>
-              <p>{t(isAccount ? "resumeBodyAccount" : "resumeBody")}</p>
+              <h2 id="resume-title">{t("localMatchesTitle")}</h2>
+              <p>
+                {t(isAccount ? "localMatchesBodyAccount" : "localMatchesBody")}
+              </p>
             </div>
             <div className={styles.resumeList}>
-              {activeMatches.map((journal) => {
+              {resumableMatches.map((journal) => {
                 const state = deriveJournal(journal).state;
+                const isPending = pendingMatchIds.has(journal.definition.id);
                 const serverName =
                   journal.definition.teams[state.servingTeam].players[
                     state.currentServer
@@ -124,6 +159,11 @@ export function HomePage() {
                       {t(journal.definition.sport)} ·{" "}
                       {t(journal.definition.format ?? "doubles")}
                     </span>
+                    {isPending ? (
+                      <span className={styles.resumeMatchServer}>
+                        {t("syncPending")}
+                      </span>
+                    ) : null}
                     <div
                       className={styles.resumeMatchScore}
                       role="group"
@@ -137,15 +177,21 @@ export function HomePage() {
                       </strong>
                       <span>{t("teamB")}</span>
                     </div>
-                    <span className={styles.resumeMatchServer}>
-                      <span
-                        className={styles.resumeServerIndicator}
-                        aria-hidden="true"
-                      />
-                      <span className={styles.resumeMatchServerName}>
-                        {t("server")}: {serverName}
+                    {!isPending ? (
+                      <span className={styles.resumeMatchServer}>
+                        <span
+                          className={styles.resumeServerIndicator}
+                          aria-hidden="true"
+                        />
+                        <span className={styles.resumeMatchServerName}>
+                          {t("server")}: {serverName}
+                        </span>
                       </span>
-                    </span>
+                    ) : (
+                      <span className={styles.resumeMatchServerName}>
+                        {t("pendingSyncBody")}
+                      </span>
+                    )}
                     <div className={styles.resumeMatchActions}>
                       <Button
                         variant="default"
@@ -160,7 +206,7 @@ export function HomePage() {
                           )
                         }
                       >
-                        {t("resumeMatch")}
+                        {t(isPending ? "openMatch" : "resumeMatch")}
                       </Button>
                       <Button
                         variant="outline"

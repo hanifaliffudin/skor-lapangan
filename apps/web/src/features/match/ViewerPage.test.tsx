@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
-import { ViewerPage } from "./ViewerPage";
+import { DisplayModePage, ViewerPage } from "./ViewerPage";
 
 const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
 
@@ -166,6 +166,35 @@ describe("live viewer", () => {
     expect(rpcMock).toHaveBeenCalledWith("read_live_viewer", {
       p_token: "secret-capability",
     });
+  });
+
+  it("renders a large display mode with a fullscreen control", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "badminton",
+          status: "active",
+          current_state: viewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/display/secret-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/display/:token" element={<DisplayModePage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Display mode")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Full screen" })).toBeVisible();
+    expect(screen.getByText("7")).toBeVisible();
   });
 
   it("shows the selected format and one generic player per side", async () => {
@@ -350,5 +379,124 @@ describe("live viewer", () => {
     );
 
     expect(await screen.findByText("Viewer link unavailable")).toBeVisible();
+  });
+
+  it("keeps the last server snapshot and marks it stale when the viewer goes offline", async () => {
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "badminton",
+          status: "active",
+          current_state: viewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/view/offline-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Live · Badminton/)).toBeVisible();
+    window.dispatchEvent(new Event("offline"));
+
+    expect(
+      await screen.findByText(/stale|last synced|terakhir tersinkron/i),
+    ).toBeVisible();
+    expect(screen.getByText("7")).toBeVisible();
+    expect(screen.getByText("4")).toBeVisible();
+    expect(screen.queryByText(/Live · Badminton/)).not.toBeInTheDocument();
+  });
+
+  it("refreshes from the server after connectivity returns", async () => {
+    rpcMock
+      .mockResolvedValueOnce({
+        data: [
+          {
+            sport: "badminton",
+            status: "active",
+            current_state: viewerState,
+            updated_at: "2026-10-09T10:00:00.000Z",
+            expires_at: "2026-10-09T22:00:00.000Z",
+          },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            sport: "badminton",
+            status: "active",
+            current_state: { ...viewerState, points: { A: 8, B: 4 } },
+            updated_at: "2026-10-09T10:01:00.000Z",
+            expires_at: "2026-10-09T22:00:00.000Z",
+          },
+        ],
+        error: null,
+      });
+
+    render(
+      <MemoryRouter initialEntries={["/view/reconnect-capability"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("7")).toBeVisible();
+    window.dispatchEvent(new Event("offline"));
+    expect(
+      await screen.findByText(/stale|last synced|terakhir tersinkron/i),
+    ).toBeVisible();
+
+    window.dispatchEvent(new Event("online"));
+
+    await waitFor(() => expect(rpcMock).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("8")).toBeVisible();
+    expect(screen.getByText(/Live · Badminton/)).toBeVisible();
+  });
+
+  it("renders the server snapshot instead of a different pending local value", async () => {
+    window.localStorage.setItem(
+      "skor-lapangan:match:server-match-uuid",
+      JSON.stringify({ points: { A: 99, B: 98 }, status: "pending" }),
+    );
+    rpcMock.mockResolvedValue({
+      data: [
+        {
+          sport: "badminton",
+          status: "active",
+          current_state: viewerState,
+          updated_at: "2026-10-09T10:00:00.000Z",
+          expires_at: "2026-10-09T22:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/view/server-authority"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/view/:token" element={<ViewerPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("7")).toBeVisible();
+    expect(screen.getByText("4")).toBeVisible();
+    expect(screen.queryByText("99")).not.toBeInTheDocument();
+    expect(screen.queryByText("98")).not.toBeInTheDocument();
   });
 });

@@ -17,10 +17,15 @@ import { saveDraft } from "../../lib/session";
 import {
   createClubSessionManagement,
   derivePlayerRecords,
+  deriveStandings,
   type ClubSessionCourt,
+  type ClubSessionAvailability,
+  type ClubSessionGender,
   type ClubSessionMatch,
   type ClubSessionMatchResult,
   type ClubSessionPlayer,
+  type ClubSessionPairingMode,
+  type ClubSessionSmartRotationPlan,
   type ClubSessionSummary,
 } from "./clubSessionManagement";
 import { clubSessionMatchAction } from "./clubSessionMatchHandoff";
@@ -60,14 +65,26 @@ export function ClubSessionsPage() {
   const [busy, setBusy] = useState(false);
   const [deletePrompt, setDeletePrompt] = useState(false);
   const [error, setError] = useState("");
+  const [offline, setOffline] = useState(
+    () => typeof navigator !== "undefined" && !navigator.onLine,
+  );
   const [sessionName, setSessionName] = useState("");
   const [sessionDate, setSessionDate] = useState(today);
+  const [pairingMode, setPairingMode] =
+    useState<ClubSessionPairingMode>("open");
   const [playerName, setPlayerName] = useState("");
+  const [playerGender, setPlayerGender] =
+    useState<ClubSessionGender>("unspecified");
+  const [playerSkillLevel, setPlayerSkillLevel] = useState("3");
   const [courtName, setCourtName] = useState("");
   const [selectedCourt, setSelectedCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState<
     [string, string, string, string]
   >(["", "", "", ""]);
+  const [mixedFallbackPrompt, setMixedFallbackPrompt] = useState(false);
+  const [manualFallbackPrompt, setManualFallbackPrompt] = useState(false);
+  const [rotationPreview, setRotationPreview] =
+    useState<ClubSessionSmartRotationPlan | null>(null);
   const management = useMemo(
     () =>
       createClubSessionManagement(
@@ -91,6 +108,12 @@ export function ClubSessionsPage() {
         setLoading(false);
         return;
       }
+      setRotationPreview(null);
+      if (offline) {
+        setLoading(false);
+        setError("");
+        return;
+      }
       if (showLoading) setLoading(true);
       setError("");
       if (!sessionId) {
@@ -112,6 +135,7 @@ export function ClubSessionsPage() {
       try {
         const detail = await management.loadSession(sessionId);
         setSession(detail.session);
+        setPairingMode(detail.session.pairing_mode ?? "open");
         setPlayers(detail.players);
         setCourts(detail.courts);
         setQueue(detail.queue);
@@ -133,13 +157,24 @@ export function ClubSessionsPage() {
       }
       setLoading(false);
     },
-    [isAccount, management, sessionId, t, user],
+    [isAccount, management, offline, sessionId, t, user],
   );
 
   useEffect(() => {
     setDeletePrompt(false);
     void loadData({ showLoading: true });
   }, [loadData]);
+
+  useEffect(() => {
+    const handleOffline = () => setOffline(true);
+    const handleOnline = () => setOffline(false);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, []);
 
   useEffect(() => {
     document.title = session
@@ -149,13 +184,14 @@ export function ClubSessionsPage() {
 
   async function createSession(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !isAccount || busy) return;
+    if (!user || !isAccount || busy || offline) return;
     setBusy(true);
     setError("");
     try {
       const { id } = await management.createSession({
         name: sessionName,
         sessionDate,
+        pairingMode,
       });
       setSessionName("");
       setSessionDate(today());
@@ -169,7 +205,7 @@ export function ClubSessionsPage() {
 
   async function addPlayer(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !session || busy) return;
+    if (!user || !session || busy || offline) return;
     const displayName = playerName.trim();
     if (!displayName) return;
     setBusy(true);
@@ -179,6 +215,8 @@ export function ClubSessionsPage() {
         sessionId: session.id,
         displayName,
         currentPlayerCount: players.length,
+        gender: playerGender,
+        skillLevel: Number(playerSkillLevel),
       });
       setPlayerName("");
       await loadData();
@@ -189,9 +227,35 @@ export function ClubSessionsPage() {
     }
   }
 
+  async function updatePlayerProfile(
+    playerId: string,
+    profile: {
+      gender?: ClubSessionGender;
+      skillLevel?: number;
+      availability?: ClubSessionAvailability;
+      avoidPlayerIds?: string[];
+    },
+  ) {
+    if (!session || busy || offline) return;
+    setBusy(true);
+    setError("");
+    try {
+      await management.updatePlayerProfile({
+        sessionId: session.id,
+        playerId,
+        ...profile,
+      });
+      await loadData();
+    } catch {
+      setError(t("clubSessionSaveProfileError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addCourt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user || !session || busy) return;
+    if (!user || !session || busy || offline) return;
     const name = courtName.trim();
     if (!name) return;
     setBusy(true);
@@ -216,7 +280,7 @@ export function ClubSessionsPage() {
     id: string,
     isActive: boolean,
   ) {
-    if (!session || busy) return;
+    if (!session || busy || offline) return;
     setBusy(true);
     setError("");
     try {
@@ -241,9 +305,12 @@ export function ClubSessionsPage() {
     }
   }
 
-  async function addQueuedMatch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!user || !session || busy) return;
+  async function addQueuedMatch(
+    event?: FormEvent<HTMLFormElement>,
+    allowOpenFallback = false,
+  ) {
+    event?.preventDefault();
+    if (!user || !session || busy || offline) return;
     setBusy(true);
     setError("");
     try {
@@ -254,23 +321,108 @@ export function ClubSessionsPage() {
         queue,
         courtId: selectedCourt,
         playerIds: selectedPlayers,
+        allowOpenFallback,
       });
       setSelectedPlayers(["", "", "", ""]);
+      setManualFallbackPrompt(false);
       await loadData();
     } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      if (code === "CLUB_SESSION_MIXED_ASSIGNMENT_INVALID") {
+        setManualFallbackPrompt(true);
+      }
       setError(
-        error instanceof Error &&
-          error.message === "CLUB_SESSION_ASSIGNMENT_INVALID"
+        code === "CLUB_SESSION_ASSIGNMENT_INVALID"
           ? t("clubSessionAssignmentError")
-          : t("clubSessionSaveError"),
+          : code === "CLUB_SESSION_MIXED_ASSIGNMENT_INVALID"
+            ? t("clubSessionMixedManualFallbackRequired")
+            : t("clubSessionSaveError"),
       );
     } finally {
       setBusy(false);
     }
   }
 
+  async function previewNextCourts(allowOpenFallback = false) {
+    if (!user || !session || busy || offline) return;
+    setBusy(true);
+    setError("");
+    try {
+      const plan = management.planSmartRotation({
+        session,
+        players,
+        courts,
+        queue,
+        results,
+        allowOpenFallback,
+      });
+      if (plan.reason === "MIXED_FALLBACK_REQUIRED") {
+        setMixedFallbackPrompt(true);
+      } else {
+        setMixedFallbackPrompt(false);
+      }
+      if (!plan.matches.length) {
+        setError(
+          plan.reason === "NO_FREE_COURT"
+            ? t("clubSessionNoFreeCourt")
+            : plan.reason === "MIXED_FALLBACK_REQUIRED"
+              ? t("clubSessionMixedFallbackRequired")
+              : t("clubSessionRotationRequirements"),
+        );
+        return;
+      }
+      setRotationPreview(plan);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      setError(
+        code === "CLUB_SESSION_SCHEDULE_EXISTS"
+          ? t("clubSessionScheduleExists")
+          : code === "CLUB_SESSION_SCHEDULE_REQUIREMENTS"
+            ? t("clubSessionScheduleRequirements")
+            : t("clubSessionSaveError"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmSmartRotation() {
+    if (!user || !session || !rotationPreview || busy || offline) return;
+    setBusy(true);
+    setError("");
+    try {
+      await management.queueSmartRotationPlan({
+        session,
+        queue,
+        plan: rotationPreview,
+      });
+      setRotationPreview(null);
+      setMixedFallbackPrompt(false);
+      await loadData();
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "CLUB_SESSION_ROTATION_STALE"
+      ) {
+        setRotationPreview(null);
+        await loadData();
+        setError(t("clubSessionRotationStale"));
+      } else {
+        setError(t("clubSessionSaveError"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function rejectSmartRotation() {
+    setRotationPreview(null);
+    setMixedFallbackPrompt(false);
+    setError(t("clubSessionRotationRejected"));
+  }
+
   async function removeQueuedMatch(id: string) {
-    if (!session || busy) return;
+    if (!session || busy || offline) return;
     setBusy(true);
     try {
       await management.removeQueuedMatch({
@@ -286,7 +438,7 @@ export function ClubSessionsPage() {
   }
 
   async function toggleSessionStatus() {
-    if (!session || busy) return;
+    if (!session || busy || offline) return;
     setBusy(true);
     try {
       await management.toggleStatus(session);
@@ -299,7 +451,7 @@ export function ClubSessionsPage() {
   }
 
   async function deleteSession() {
-    if (!session || busy) return;
+    if (!session || busy || offline) return;
     setBusy(true);
     setError("");
     try {
@@ -319,6 +471,7 @@ export function ClubSessionsPage() {
       sessionStatus: session.status,
       entry,
     });
+    if (offline && action.type !== "open") return;
     if (action.type === "open") {
       navigate(
         localizedPath(
@@ -351,6 +504,11 @@ export function ClubSessionsPage() {
   const playerRecords = useMemo(() => {
     return derivePlayerRecords(players, queue, results);
   }, [players, queue, results]);
+  const standings = useMemo(
+    () => deriveStandings(players, queue, results),
+    [players, queue, results],
+  );
+  const hasCompletedResults = standings.some((standing) => standing.played > 0);
 
   return (
     <div className="min-h-screen min-h-dvh bg-paper pb-14 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
@@ -383,7 +541,7 @@ export function ClubSessionsPage() {
                 variant="outline"
                 className="min-h-11"
                 type="button"
-                disabled={busy}
+                disabled={busy || offline}
                 onClick={() => void toggleSessionStatus()}
               >
                 {session.status === "active"
@@ -394,7 +552,7 @@ export function ClubSessionsPage() {
                 variant="destructive"
                 className="min-h-11"
                 type="button"
-                disabled={busy}
+                disabled={busy || offline}
                 onClick={() => setDeletePrompt((open) => !open)}
               >
                 {t("clubSessionDelete")}
@@ -402,6 +560,16 @@ export function ClubSessionsPage() {
             </div>
           ) : null}
         </header>
+
+        {offline ? (
+          <div
+            className="mb-5 rounded-lg border-2 border-line-strong bg-surface p-4 text-sm font-semibold leading-6 text-ink"
+            role="status"
+            aria-live="polite"
+          >
+            {t("clubSessionOffline")}
+          </div>
+        ) : null}
 
         {authLoading || loading ? (
           <div
@@ -421,6 +589,7 @@ export function ClubSessionsPage() {
             <Button
               type="button"
               className="min-h-11"
+              disabled={offline}
               onClick={() => void signInWithGoogle()}
             >
               {t("signInWithGoogle")}
@@ -461,7 +630,7 @@ export function ClubSessionsPage() {
                       variant="destructive"
                       className="min-h-11"
                       type="button"
-                      disabled={busy}
+                      disabled={busy || offline}
                       onClick={() => void deleteSession()}
                     >
                       {t("clubSessionDeleteConfirmAction")}
@@ -476,14 +645,6 @@ export function ClubSessionsPage() {
                       {t("cancel")}
                     </Button>
                   </div>
-                </div>
-              ) : null}
-              {error ? (
-                <div
-                  className="mb-5 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-4 text-sm font-semibold text-destructive"
-                  role="alert"
-                >
-                  {error}
                 </div>
               ) : null}
               <div className="mb-6 grid gap-3 sm:grid-cols-3">
@@ -537,24 +698,65 @@ export function ClubSessionsPage() {
                       </div>
                     </div>
                     <form
-                      className="mb-4 flex flex-col gap-2 sm:flex-row"
+                      className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_7rem_auto]"
                       onSubmit={(event) => void addPlayer(event)}
                     >
-                      <Label className="sr-only" htmlFor="club-player-name">
-                        {t("clubSessionPlayerName")}
+                      <Label className={fieldClass} htmlFor="club-player-name">
+                        <span>{t("clubSessionPlayerName")}</span>
+                        <Input
+                          id="club-player-name"
+                          value={playerName}
+                          maxLength={30}
+                          placeholder={t("clubSessionPlayerPlaceholder")}
+                          onChange={(event) =>
+                            setPlayerName(event.target.value)
+                          }
+                          required
+                        />
                       </Label>
-                      <Input
-                        id="club-player-name"
-                        value={playerName}
-                        maxLength={30}
-                        placeholder={t("clubSessionPlayerPlaceholder")}
-                        onChange={(event) => setPlayerName(event.target.value)}
-                        required
-                      />
+                      <Label className={fieldClass}>
+                        <span>{t("clubSessionPlayerGender")}</span>
+                        <SelectControl
+                          value={playerGender}
+                          onChange={(event) =>
+                            setPlayerGender(
+                              event.target.value as ClubSessionGender,
+                            )
+                          }
+                        >
+                          <option value="man">
+                            {t("clubSessionGenderMan")}
+                          </option>
+                          <option value="woman">
+                            {t("clubSessionGenderWoman")}
+                          </option>
+                          <option value="other">
+                            {t("clubSessionGenderOther")}
+                          </option>
+                          <option value="unspecified">
+                            {t("clubSessionGenderUnspecified")}
+                          </option>
+                        </SelectControl>
+                      </Label>
+                      <Label className={fieldClass}>
+                        <span>{t("clubSessionSkillLevel")}</span>
+                        <SelectControl
+                          value={playerSkillLevel}
+                          onChange={(event) =>
+                            setPlayerSkillLevel(event.target.value)
+                          }
+                        >
+                          {[1, 2, 3, 4, 5].map((level) => (
+                            <option key={level} value={level}>
+                              {level}
+                            </option>
+                          ))}
+                        </SelectControl>
+                      </Label>
                       <Button
-                        className="min-h-11 sm:min-w-28"
+                        className="min-h-11 self-end sm:min-w-28"
                         type="submit"
-                        disabled={busy}
+                        disabled={busy || offline}
                       >
                         {t("clubSessionAddPlayer")}
                       </Button>
@@ -585,12 +787,134 @@ export function ClubSessionsPage() {
                                 })}
                               </p>
                             </div>
+                            <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-3">
+                              <Label className="grid gap-1 text-xs font-bold text-text-muted">
+                                <span>{t("clubSessionPlayerGender")}</span>
+                                <SelectControl
+                                  value={player.gender ?? "unspecified"}
+                                  disabled={busy || offline}
+                                  aria-label={`${t("clubSessionPlayerGender")}: ${player.display_name}`}
+                                  onChange={(event) =>
+                                    void updatePlayerProfile(player.id, {
+                                      gender: event.target
+                                        .value as ClubSessionGender,
+                                    })
+                                  }
+                                >
+                                  <option value="man">
+                                    {t("clubSessionGenderMan")}
+                                  </option>
+                                  <option value="woman">
+                                    {t("clubSessionGenderWoman")}
+                                  </option>
+                                  <option value="other">
+                                    {t("clubSessionGenderOther")}
+                                  </option>
+                                  <option value="unspecified">
+                                    {t("clubSessionGenderUnspecified")}
+                                  </option>
+                                </SelectControl>
+                              </Label>
+                              <Label className="grid gap-1 text-xs font-bold text-text-muted">
+                                <span>{t("clubSessionSkillLevel")}</span>
+                                <SelectControl
+                                  value={String(player.skill_level ?? 3)}
+                                  disabled={busy || offline}
+                                  aria-label={`${t("clubSessionSkillLevel")}: ${player.display_name}`}
+                                  onChange={(event) =>
+                                    void updatePlayerProfile(player.id, {
+                                      skillLevel: Number(event.target.value),
+                                    })
+                                  }
+                                >
+                                  {[1, 2, 3, 4, 5].map((level) => (
+                                    <option key={level} value={level}>
+                                      {level}
+                                    </option>
+                                  ))}
+                                </SelectControl>
+                              </Label>
+                              <Label className="grid gap-1 text-xs font-bold text-text-muted">
+                                <span>{t("clubSessionAvailability")}</span>
+                                <SelectControl
+                                  value={player.availability ?? "available"}
+                                  disabled={busy || offline}
+                                  aria-label={`${t("clubSessionAvailability")}: ${player.display_name}`}
+                                  onChange={(event) =>
+                                    void updatePlayerProfile(player.id, {
+                                      availability: event.target
+                                        .value as ClubSessionAvailability,
+                                    })
+                                  }
+                                >
+                                  <option value="available">
+                                    {t("clubSessionAvailable")}
+                                  </option>
+                                  <option value="late">
+                                    {t("clubSessionLate")}
+                                  </option>
+                                  <option value="resting">
+                                    {t("clubSessionResting")}
+                                  </option>
+                                  <option value="unavailable">
+                                    {t("clubSessionUnavailable")}
+                                  </option>
+                                </SelectControl>
+                              </Label>
+                            </div>
+                            <details className="w-full rounded-lg border border-line bg-paper px-3 py-2">
+                              <summary className="min-h-11 cursor-pointer content-center text-sm font-bold text-ink">
+                                {t("clubSessionRotationPreferences")}
+                              </summary>
+                              <p className="mb-2 mt-1 text-xs leading-5 text-text-muted">
+                                {t("clubSessionAvoidPlayersBody")}
+                              </p>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {players
+                                  .filter((other) => other.id !== player.id)
+                                  .map((other) => {
+                                    const checked = (
+                                      player.avoid_player_ids ?? []
+                                    ).includes(other.id);
+                                    return (
+                                      <label
+                                        className="flex min-h-11 items-center gap-2 text-sm font-semibold text-ink"
+                                        key={other.id}
+                                      >
+                                        <input
+                                          className="size-5 accent-cobalt"
+                                          type="checkbox"
+                                          checked={checked}
+                                          disabled={busy || offline}
+                                          onChange={(event) => {
+                                            const next = new Set(
+                                              player.avoid_player_ids ?? [],
+                                            );
+                                            if (event.target.checked) {
+                                              next.add(other.id);
+                                            } else {
+                                              next.delete(other.id);
+                                            }
+                                            void updatePlayerProfile(
+                                              player.id,
+                                              {
+                                                avoidPlayerIds: [...next],
+                                              },
+                                            );
+                                          }}
+                                        />
+                                        <span>{other.display_name}</span>
+                                      </label>
+                                    );
+                                  })}
+                              </div>
+                            </details>
                             <Button
                               variant="outline"
                               size="sm"
                               className="min-h-11"
                               type="button"
-                              disabled={busy}
+                              disabled={busy || offline}
                               onClick={() =>
                                 void setRosterStatus(
                                   "player",
@@ -642,7 +966,7 @@ export function ClubSessionsPage() {
                       <Button
                         className="min-h-11 sm:min-w-28"
                         type="submit"
-                        disabled={busy}
+                        disabled={busy || offline}
                       >
                         {t("clubSessionAddCourt")}
                       </Button>
@@ -659,7 +983,7 @@ export function ClubSessionsPage() {
                             size="xs"
                             className="min-h-11 px-2"
                             type="button"
-                            disabled={busy}
+                            disabled={busy || offline}
                             onClick={() =>
                               void setRosterStatus(
                                 "court",
@@ -681,6 +1005,54 @@ export function ClubSessionsPage() {
                       ) : null}
                     </div>
                   </section>
+
+                  <section
+                    className={sectionClass}
+                    aria-labelledby="club-standings-title"
+                  >
+                    <div className="mb-4">
+                      <h2
+                        id="club-standings-title"
+                        className="m-0 text-xl font-extrabold text-ink"
+                      >
+                        {t("clubSessionStandingsTitle")}
+                      </h2>
+                      <p className="mb-0 mt-1 text-sm leading-6 text-text-muted">
+                        {t("clubSessionStandingsBody")}
+                      </p>
+                    </div>
+                    {hasCompletedResults ? (
+                      <ol className="m-0 grid list-none gap-2 p-0">
+                        {standings.map((standing) => (
+                          <li
+                            key={standing.playerId}
+                            className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-line bg-paper px-3 py-3"
+                          >
+                            <span className="text-center text-sm font-black text-cobalt-dark">
+                              {standing.rank}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="m-0 truncate font-extrabold text-ink">
+                                {playerById.get(standing.playerId) ?? "—"}
+                              </p>
+                              <p className="m-0 mt-1 text-xs font-semibold text-text-muted">
+                                {standing.played}{" "}
+                                {t("clubSessionStandingRecord")} ·{" "}
+                                {standing.won}–{standing.lost}
+                              </p>
+                            </div>
+                            <span className="text-right text-sm font-black tabular-nums text-ink">
+                              {standing.winRate}%
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : (
+                      <p className="m-0 rounded-lg bg-paper p-4 text-sm leading-6 text-text-muted">
+                        {t("clubSessionStandingEmpty")}
+                      </p>
+                    )}
+                  </section>
                 </div>
 
                 <div className="grid gap-5">
@@ -688,15 +1060,155 @@ export function ClubSessionsPage() {
                     className={sectionClass}
                     aria-labelledby="club-queue-title"
                   >
-                    <h2
-                      id="club-queue-title"
-                      className="m-0 text-xl font-extrabold text-ink"
-                    >
-                      {t("clubSessionQueueTitle")}
-                    </h2>
-                    <p className="mb-4 mt-1 text-sm leading-6 text-text-muted">
-                      {t("clubSessionQueueBody")}
-                    </p>
+                    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <h2
+                          id="club-queue-title"
+                          className="m-0 text-xl font-extrabold text-ink"
+                        >
+                          {t("clubSessionQueueTitle")}
+                        </h2>
+                        <p className="mb-0 mt-1 text-sm leading-6 text-text-muted">
+                          {t("clubSessionQueueBody")}
+                        </p>
+                      </div>
+                      {session.status === "active" ? (
+                        <Button
+                          variant="outline"
+                          className="min-h-11"
+                          type="button"
+                          disabled={
+                            busy ||
+                            offline ||
+                            activePlayers.length < 4 ||
+                            activeCourts.length === 0
+                          }
+                          onClick={() => void previewNextCourts()}
+                        >
+                          {t("clubSessionFillNextCourts")}
+                        </Button>
+                      ) : null}
+                    </div>
+                    {session.status === "active" ? (
+                      <p className="mb-4 rounded-lg border border-line bg-paper p-3 text-xs leading-5 text-text-muted">
+                        {t("clubSessionSmartRotationBody")}
+                      </p>
+                    ) : null}
+                    {mixedFallbackPrompt ? (
+                      <div
+                        className="mb-4 grid gap-3 rounded-lg border-2 border-orange-700 bg-paper p-3 text-sm leading-6 text-ink"
+                        role="alert"
+                      >
+                        <p className="m-0">
+                          {t("clubSessionMixedFallbackRequired")}
+                        </p>
+                        <Button
+                          variant="outline"
+                          className="min-h-11 justify-self-start"
+                          type="button"
+                          disabled={busy || offline}
+                          onClick={() => void previewNextCourts(true)}
+                        >
+                          {t("clubSessionUseOpenFallback")}
+                        </Button>
+                      </div>
+                    ) : null}
+                    {rotationPreview ? (
+                      <div
+                        className="mb-4 grid gap-3 rounded-lg border-2 border-cobalt bg-paper p-3"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <div>
+                          <h3 className="m-0 text-base font-extrabold text-ink">
+                            {t("clubSessionRotationPreviewTitle")}
+                          </h3>
+                          <p className="mb-0 mt-1 text-sm leading-6 text-text-muted">
+                            {t("clubSessionRotationPreviewBody")}
+                          </p>
+                          <p className="mb-0 mt-2 text-xs leading-5 text-text-muted">
+                            {t("clubSessionRotationWhy")}
+                          </p>
+                        </div>
+                        <ol className="m-0 grid list-none gap-2 p-0">
+                          {rotationPreview.matches.map((match, index) => (
+                            <li
+                              className="grid gap-1 rounded-lg border border-line px-3 py-2"
+                              key={`${match.courtId}-${index}`}
+                            >
+                              <span className="text-xs font-extrabold uppercase tracking-wide text-text-muted">
+                                {courtById.get(match.courtId) ??
+                                  t("clubSessionCourtName")}
+                                {match.isOpenFallback
+                                  ? ` · ${t("clubSessionOpenFallback")}`
+                                  : ""}
+                              </span>
+                              <span className="text-sm font-bold text-ink">
+                                {match.playerIds
+                                  .map(
+                                    (playerId) =>
+                                      playerById.get(playerId) ?? playerId,
+                                  )
+                                  .join(" · ")}
+                              </span>
+                              {match.explanation ? (
+                                <div className="grid gap-1 text-xs leading-5 text-text-muted">
+                                  <span>
+                                    {fillMessage(
+                                      t("clubSessionRotationPlayed"),
+                                      {
+                                        players: match.playerIds
+                                          .map(
+                                            (playerId, playerIndex) =>
+                                              `${playerById.get(playerId) ?? playerId} ${match.explanation!.playerCounts[playerIndex]}`,
+                                          )
+                                          .join(" · "),
+                                      },
+                                    )}
+                                  </span>
+                                  <span>
+                                    {fillMessage(
+                                      t("clubSessionRotationFairnessGap"),
+                                      {
+                                        count: match.explanation.fairnessGap,
+                                      },
+                                    )}
+                                    {" · "}
+                                    {fillMessage(
+                                      t("clubSessionRotationTieBreakers"),
+                                      {
+                                        avoid: match.explanation.avoidPenalty,
+                                        repeat: match.explanation.repeatPenalty,
+                                        skill: match.explanation.skillGap,
+                                      },
+                                    )}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ol>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            className="min-h-11"
+                            type="button"
+                            disabled={busy || offline}
+                            onClick={() => void confirmSmartRotation()}
+                          >
+                            {t("clubSessionConfirmRotation")}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="min-h-11"
+                            type="button"
+                            disabled={busy}
+                            onClick={rejectSmartRotation}
+                          >
+                            {t("clubSessionRejectRotation")}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                     {session.status === "active" ? (
                       <form
                         className="grid gap-3 rounded-lg border border-line bg-paper p-3"
@@ -735,6 +1247,7 @@ export function ClubSessionsPage() {
                             </span>
                             <SelectControl
                               value={selected}
+                              disabled={offline}
                               onChange={(event) =>
                                 setSelectedPlayers(
                                   (current) =>
@@ -771,6 +1284,7 @@ export function ClubSessionsPage() {
                           type="submit"
                           disabled={
                             busy ||
+                            offline ||
                             activePlayers.length < 4 ||
                             !activeCourts.length
                           }
@@ -781,6 +1295,27 @@ export function ClubSessionsPage() {
                           <p className="m-0 text-xs leading-5 text-text-muted">
                             {t("clubSessionQueueRequirements")}
                           </p>
+                        ) : null}
+                        {manualFallbackPrompt ? (
+                          <div
+                            className="grid gap-2 rounded-lg border-2 border-orange-700 p-3 text-sm leading-6 text-ink"
+                            role="alert"
+                          >
+                            <p className="m-0">
+                              {t("clubSessionMixedManualFallbackRequired")}
+                            </p>
+                            <Button
+                              variant="outline"
+                              className="min-h-11 justify-self-start"
+                              type="button"
+                              disabled={busy || offline}
+                              onClick={() =>
+                                void addQueuedMatch(undefined, true)
+                              }
+                            >
+                              {t("clubSessionUseOpenFallback")}
+                            </Button>
+                          </div>
                         ) : null}
                       </form>
                     ) : (
@@ -811,13 +1346,18 @@ export function ClubSessionsPage() {
                                 {courtById.get(entry.court_id) ??
                                   t("clubSessionCourtName")}
                               </span>
+                              {entry.is_open_fallback ? (
+                                <span className="rounded-full border border-orange-700 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-orange-800">
+                                  {t("clubSessionOpenFallback")}
+                                </span>
+                              ) : null}
                               {!entry.started_at ? (
                                 <Button
                                   variant="ghost"
                                   size="xs"
                                   className="min-h-11 px-2 text-text-muted"
                                   type="button"
-                                  disabled={busy}
+                                  disabled={busy || offline}
                                   onClick={() =>
                                     void removeQueuedMatch(entry.id)
                                   }
@@ -855,8 +1395,9 @@ export function ClubSessionsPage() {
                                 className="min-h-11"
                                 type="button"
                                 disabled={
-                                  session.status !== "active" &&
-                                  !entry.started_at
+                                  (session.status !== "active" &&
+                                    !entry.started_at) ||
+                                  (offline && !entry.linked_match_id)
                                 }
                                 onClick={() => startMatch(entry)}
                               >
@@ -958,7 +1499,29 @@ export function ClubSessionsPage() {
                       required
                     />
                   </Label>
-                  <Button className="min-h-11" type="submit" disabled={busy}>
+                  <Label className={fieldClass}>
+                    <span>{t("clubSessionPairingMode")}</span>
+                    <SelectControl
+                      value={pairingMode}
+                      onChange={(event) =>
+                        setPairingMode(
+                          event.target.value as ClubSessionPairingMode,
+                        )
+                      }
+                    >
+                      <option value="open">
+                        {t("clubSessionOpenDoubles")}
+                      </option>
+                      <option value="mixed">
+                        {t("clubSessionMixedDoubles")}
+                      </option>
+                    </SelectControl>
+                  </Label>
+                  <Button
+                    className="min-h-11"
+                    type="submit"
+                    disabled={busy || offline}
+                  >
                     {t("clubSessionCreateAction")}
                   </Button>
                 </form>

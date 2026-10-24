@@ -165,8 +165,14 @@ const messages = {
     installOnIosInstructions:
       "Di Safari, ketuk Bagikan, lalu pilih Tambahkan ke Layar Utama.",
     pwaUpdateReady: "Pembaruan aplikasi tersedia.",
+    pwaUpdateDeferred:
+      "Selesaikan pertandingan aktif atau sinkronisasi tertunda sebelum memperbarui aplikasi.",
     pwaUpdateButton: "Perbarui aplikasi",
-    resumeTitle: "Pertandingan aktif di perangkat ini",
+    localMatchesTitle: "Pertandingan di perangkat ini",
+    localMatchesBody:
+      "Lanjutkan pertandingan aktif atau buka hasil yang menunggu sinkronisasi.",
+    localMatchesBodyAccount:
+      "Lanjutkan pertandingan aktif atau buka hasil lokal yang menunggu sinkronisasi.",
     resumeBody: "Lanjutkan pertandingan tamu yang belum selesai.",
     resumeBodyAccount:
       "Lanjutkan pertandingan yang tersimpan di perangkat ini.",
@@ -175,6 +181,7 @@ const messages = {
     guestHistoryPrompt:
       "Masuk dengan Google untuk menyimpan riwayat dan melanjutkan pertandingan di perangkat lain.",
     resumeMatch: "Lanjutkan",
+    openMatch: "Buka hasil",
     deleteMatch: "Hapus",
     deleteMatchPromptGroup: "Konfirmasi hapus pertandingan",
     deleteMatchConfirm:
@@ -242,6 +249,10 @@ const messages = {
     closeSessionFailure: "Pertandingan belum ditutup. Coba lagi.",
     finalScoreSaveFailed:
       "Skor akhir belum tersimpan. Tetap di halaman ini dan coba lagi.",
+    matchStorageError: "Penyimpanan pertandingan gagal di perangkat.",
+    matchStorageErrorTitle: "Pertandingan belum tersimpan",
+    matchStorageErrorBody:
+      "Periksa ruang penyimpanan di perangkat lalu coba lagi.",
     missingTitle: "Pertandingan tidak ditemukan",
     missingBody: "Sesi mungkin sudah ditutup atau data tab telah dibersihkan.",
     newMatch: "Mulai pertandingan baru",
@@ -325,9 +336,14 @@ const messages = {
       "Pilot ini mendukung sesi badminton ganda dengan pengelola tunggal.",
     clubSessionName: "Nama sesi",
     clubSessionDate: "Tanggal",
+    clubSessionPairingMode: "Mode pasangan",
+    clubSessionOpenDoubles: "Ganda open",
+    clubSessionMixedDoubles: "Ganda campuran",
     clubSessionCreateAction: "Buat papan sesi",
     clubSessionLoadError:
       "Sesi tidak dapat dimuat. Periksa koneksi, lalu coba lagi.",
+    clubSessionOffline:
+      "Pengelolaan sesi klub memerlukan koneksi internet. Pertandingan lokal tetap dapat dilanjutkan di perangkat ini.",
     clubSessionNotFound: "Sesi tidak tersedia",
     clubSessionNotFoundBody:
       "Sesi mungkin sudah dihapus atau Anda tidak memiliki akses ke sesi ini.",
@@ -344,15 +360,37 @@ const messages = {
     clubSessionPlayers: "Pemain aktif",
     clubSessionRosterTitle: "Daftar pemain",
     clubSessionRosterBody:
-      "Urutan ini dipertahankan; statistik tidak membuat peringkat.",
+      "Urutan ini dipertahankan. Peringkat otomatis dihitung dari pertandingan selesai.",
     clubSessionPlayerName: "Nama pemain",
     clubSessionPlayerPlaceholder: "Nama panggilan",
+    clubSessionPlayerGender: "Gender",
+    clubSessionGenderMan: "Pria",
+    clubSessionGenderWoman: "Wanita",
+    clubSessionGenderOther: "Lainnya",
+    clubSessionGenderUnspecified: "Tidak ditentukan",
+    clubSessionSkillLevel: "Level 1–5",
+    clubSessionAvailability: "Kehadiran",
+    clubSessionAvailable: "Siap main",
+    clubSessionLate: "Terlambat",
+    clubSessionResting: "Istirahat",
+    clubSessionUnavailable: "Tidak tersedia",
+    clubSessionRotationPreferences: "Preferensi rotasi",
+    clubSessionAvoidPlayersBody:
+      "Tandai pemain yang sebaiknya tidak dipasangkan. Preferensi ini tetap dapat diatasi saat kondisi lapangan terbatas.",
     clubSessionAddPlayer: "Tambah pemain",
     clubSessionRosterEmpty:
       "Tambahkan empat pemain untuk mulai membuat antrean.",
     clubSessionDeactivate: "Nonaktifkan",
     clubSessionReactivate: "Aktifkan",
     clubSessionRecord: "Main {played} · Menang {won} · Kalah {lost}",
+    clubSessionStandingsTitle: "Klasemen sesi",
+    clubSessionStandingsBody:
+      "Jumlah menang menjadi urutan utama; win rate menjadi pembanding berikutnya.",
+    clubSessionStandingPlayer: "Pemain",
+    clubSessionStandingRecord: "M · M · K",
+    clubSessionStandingWinRate: "Win rate",
+    clubSessionStandingEmpty:
+      "Klasemen akan terisi setelah pertandingan selesai dan tersinkron.",
     clubSessionCourtsTitle: "Lapangan",
     clubSessionCourtName: "Lapangan",
     clubSessionCourtPlaceholder: "Contoh: Lapangan 1",
@@ -361,12 +399,49 @@ const messages = {
       "Tambahkan setidaknya satu lapangan untuk membuat antrean.",
     clubSessionQueueTitle: "Antrean pertandingan",
     clubSessionQueueBody:
-      "Pilih satu lapangan dan empat pemain. Sisi A dan B mengikuti urutan pilihan.",
+      "Pilih satu lapangan dan empat pemain, atau isi lapangan berikutnya dengan Smart Rotation.",
     clubSessionSelectCourt: "Pilih lapangan",
     clubSessionSelectPlayer: "Pilih pemain",
     clubSessionTeamAPlayer: "Tim A · Pemain {number}",
     clubSessionTeamBPlayer: "Tim B · Pemain {number}",
     clubSessionAddToQueue: "Tambah ke antrean",
+    clubSessionGenerateSchedule: "Buat jadwal otomatis",
+    clubSessionGenerateScheduleBody:
+      "Rotasi ganda memakai pemain dan lapangan aktif, lalu menambahkan antrean siap dimainkan.",
+    clubSessionScheduleExists:
+      "Jadwal sudah dibuat. Tambahkan pertandingan manual jika ingin memperpanjangnya.",
+    clubSessionScheduleRequirements:
+      "Jadwal otomatis membutuhkan minimal empat pemain aktif dan satu lapangan aktif.",
+    clubSessionFillNextCourts: "Isi lapangan berikutnya",
+    clubSessionSmartRotationBody:
+      "Rotasi memilih pemain dengan jumlah match paling sedikit, waktu tunggu terlama, dan pasangan yang lebih bervariasi.",
+    clubSessionRotationPreviewTitle: "Usulan rotasi berikutnya",
+    clubSessionRotationPreviewBody:
+      "Tinjau pemain yang dipilih sebelum menambahkannya ke antrean.",
+    clubSessionRotationWhy:
+      "Dasar pemilihan: jumlah match paling sedikit. Jika seri, rotasi memprioritaskan waktu tunggu, variasi pasangan/lawan, lalu keseimbangan skill.",
+    clubSessionRotationPlayed: "Riwayat match saat ini: {players}",
+    clubSessionRotationFairnessGap: "Gap pada usulan ini: {count} match",
+    clubSessionRotationTieBreakers:
+      "Preferensi dihindari: {avoid} · Pengulangan pasangan/lawan: {repeat} · Gap skill: {skill}",
+    clubSessionConfirmRotation: "Konfirmasi rotasi",
+    clubSessionRejectRotation: "Tolak usulan",
+    clubSessionRotationRejected:
+      "Usulan rotasi ditolak. Tidak ada antrean yang ditambahkan.",
+    clubSessionRotationStale:
+      "Data sesi berubah sejak usulan dibuat. Usulan dibatalkan; buat preview baru untuk melihat kondisi terbaru.",
+    clubSessionNoFreeCourt:
+      "Belum ada lapangan kosong. Selesaikan atau mulai antrean yang ada terlebih dahulu.",
+    clubSessionRotationRequirements:
+      "Rotasi membutuhkan minimal empat pemain yang siap bermain.",
+    clubSessionMixedFallbackRequired:
+      "Belum ada kombinasi ganda campuran yang valid untuk pemain yang siap. Anda dapat memakai ganda open untuk rotasi ini.",
+    clubSessionMixedManualFallbackRequired:
+      "Penugasan ini bukan ganda campuran yang valid. Konfirmasi jika ingin memakainya sebagai ganda open.",
+    clubSessionUseOpenFallback: "Pakai ganda open kali ini",
+    clubSessionOpenFallback: "Fallback open",
+    clubSessionSaveProfileError:
+      "Profil pemain belum tersimpan. Periksa koneksi lalu coba lagi.",
     clubSessionQueueRequirements:
       "Perlu empat pemain aktif dan satu lapangan aktif.",
     clubSessionAssignmentError: "Pilih lapangan dan empat pemain yang berbeda.",
@@ -433,7 +508,10 @@ const messages = {
     syncSaved: "Skor tersimpan",
     syncLocal: "Tersimpan di perangkat ini",
     syncing: "Menyimpan skor…",
+    syncPending: "Menunggu sinkronisasi",
     syncOffline: "Offline · perubahan tersimpan di perangkat",
+    pendingSyncBody:
+      "Hasil akhir tersimpan di perangkat dan akan dikirim saat koneksi kembali.",
     syncError: "Gagal menyinkronkan · data masih tersimpan di perangkat",
     syncConflict:
       "Versi skor di server lebih baru atau berbeda. Lanjutkan dari perangkat utama.",
@@ -454,9 +532,14 @@ const messages = {
     matchControlLost: "Kontrol pertandingan berpindah ke perangkat lain.",
     matchReadOnly: "Pertandingan ini hanya bisa dilihat.",
     takeOverMatch: "Ambil alih pertandingan",
-    matchRemoteConflict:
-      "Versi server dan versi perangkat ini berbeda. Pilih versi server untuk melanjutkan.",
+    matchRemoteConflict: "Versi server dan versi perangkat ini berbeda.",
+    matchConflictBody:
+      "Pilih hasil yang ingin dipertahankan. Aplikasi tidak menggabungkan skor secara otomatis.",
+    localVersion: "Perangkat ini",
+    serverVersion: "Server",
     useServerVersion: "Gunakan versi server",
+    saveLocalAsNewMatch: "Simpan sebagai Match baru",
+    recovering: "Menyimpan pilihan...",
     matchControlError: "Tidak bisa mengambil kontrol pertandingan ini.",
     retryControl: "Coba lagi",
     liveViewer: "Live Viewer",
@@ -483,8 +566,14 @@ const messages = {
     viewerUnavailable: "Tautan viewer tidak tersedia",
     viewerUnavailableBody:
       "Tautan mungkin dicabut, kedaluwarsa, atau tidak valid.",
-    viewerStale: "Terakhir tersinkron",
+    viewerStale: "Stale · terakhir tersinkron",
     viewerRefresh: "Muat ulang skor",
+    viewerDisplayMode: "Mode display",
+    viewerDisplayModeBody:
+      "Buka tampilan besar ini di TV atau proyektor. Kontrol skor tetap dari perangkat pemain.",
+    viewerOpenDisplay: "Buka mode display",
+    viewerFullscreen: "Layar penuh",
+    viewerExitFullscreen: "Keluar layar penuh",
     viewerLive: "Live",
     updatedAt: "diperbarui",
     score: "Skor",
@@ -750,8 +839,14 @@ const messages = {
     installOnIosInstructions:
       "In Safari, tap Share, then choose Add to Home Screen.",
     pwaUpdateReady: "An app update is ready.",
+    pwaUpdateDeferred:
+      "Finish active matches or complete pending sync before updating.",
     pwaUpdateButton: "Update app",
-    resumeTitle: "Active matches on this device",
+    localMatchesTitle: "Matches on this device",
+    localMatchesBody:
+      "Resume an active match or open a result waiting to sync.",
+    localMatchesBodyAccount:
+      "Resume an active match or open a local result waiting to sync.",
     resumeBody: "Continue an unfinished guest match.",
     resumeBodyAccount: "Continue a match saved on this device.",
     accountNote:
@@ -759,6 +854,7 @@ const messages = {
     guestHistoryPrompt:
       "Sign in with Google to keep match history and continue on another device.",
     resumeMatch: "Resume",
+    openMatch: "Open result",
     deleteMatch: "Delete",
     deleteMatchPromptGroup: "Confirm match deletion",
     deleteMatchConfirm:
@@ -826,6 +922,9 @@ const messages = {
     closeSessionFailure: "The match was not closed. Try again.",
     finalScoreSaveFailed:
       "The final score was not saved. Stay on this page and try again.",
+    matchStorageError: "Match storage failed on this device.",
+    matchStorageErrorTitle: "Match not saved",
+    matchStorageErrorBody: "Check available device storage and try again.",
     missingTitle: "Match not found",
     missingBody:
       "The session may have ended or this tab's data may have been cleared.",
@@ -910,9 +1009,14 @@ const messages = {
       "This pilot supports badminton doubles with one organizer.",
     clubSessionName: "Session name",
     clubSessionDate: "Date",
+    clubSessionPairingMode: "Pairing mode",
+    clubSessionOpenDoubles: "Open doubles",
+    clubSessionMixedDoubles: "Mixed doubles",
     clubSessionCreateAction: "Create session board",
     clubSessionLoadError:
       "Could not load the session. Check your connection and try again.",
+    clubSessionOffline:
+      "Club session management needs an internet connection. Local matches can still be continued on this device.",
     clubSessionNotFound: "Session unavailable",
     clubSessionNotFoundBody:
       "This session may have been deleted, or you may not have access to it.",
@@ -929,14 +1033,36 @@ const messages = {
     clubSessionPlayers: "Active players",
     clubSessionRosterTitle: "Player roster",
     clubSessionRosterBody:
-      "Roster order stays fixed; player records do not create a ranking.",
+      "Roster order stays fixed. Automatic standings use completed synced matches.",
     clubSessionPlayerName: "Player name",
     clubSessionPlayerPlaceholder: "Display name",
+    clubSessionPlayerGender: "Gender",
+    clubSessionGenderMan: "Man",
+    clubSessionGenderWoman: "Woman",
+    clubSessionGenderOther: "Other",
+    clubSessionGenderUnspecified: "Not specified",
+    clubSessionSkillLevel: "Skill 1–5",
+    clubSessionAvailability: "Availability",
+    clubSessionAvailable: "Ready to play",
+    clubSessionLate: "Late",
+    clubSessionResting: "Resting",
+    clubSessionUnavailable: "Unavailable",
+    clubSessionRotationPreferences: "Rotation preferences",
+    clubSessionAvoidPlayersBody:
+      "Mark players who should not be paired together. The preference can be overridden when court capacity is limited.",
     clubSessionAddPlayer: "Add player",
     clubSessionRosterEmpty: "Add four players to start building the queue.",
     clubSessionDeactivate: "Deactivate",
     clubSessionReactivate: "Reactivate",
     clubSessionRecord: "Played {played} · Won {won} · Lost {lost}",
+    clubSessionStandingsTitle: "Session standings",
+    clubSessionStandingsBody:
+      "More wins rank higher; win rate is the next tie-breaker.",
+    clubSessionStandingPlayer: "Player",
+    clubSessionStandingRecord: "P · W · L",
+    clubSessionStandingWinRate: "Win rate",
+    clubSessionStandingEmpty:
+      "Standings appear after completed matches sync to the server.",
     clubSessionCourtsTitle: "Courts",
     clubSessionCourtName: "Court",
     clubSessionCourtPlaceholder: "For example: Court 1",
@@ -944,12 +1070,49 @@ const messages = {
     clubSessionCourtsEmpty: "Add at least one court to create a queue entry.",
     clubSessionQueueTitle: "Match queue",
     clubSessionQueueBody:
-      "Choose a court and four players. Side A and B follow the selection order.",
+      "Choose a court and four players, or fill the next courts with Smart Rotation.",
     clubSessionSelectCourt: "Select a court",
     clubSessionSelectPlayer: "Select a player",
     clubSessionTeamAPlayer: "Team A · Player {number}",
     clubSessionTeamBPlayer: "Team B · Player {number}",
     clubSessionAddToQueue: "Add to queue",
+    clubSessionGenerateSchedule: "Generate schedule",
+    clubSessionGenerateScheduleBody:
+      "A doubles rotation uses active players and courts, then adds a ready-to-play queue.",
+    clubSessionScheduleExists:
+      "A schedule already exists. Add manual matches if you want to extend it.",
+    clubSessionScheduleRequirements:
+      "Automatic scheduling needs at least four active players and one active court.",
+    clubSessionFillNextCourts: "Fill next courts",
+    clubSessionSmartRotationBody:
+      "Rotation chooses players with the fewest matches, the longest wait, and more varied pairings.",
+    clubSessionRotationPreviewTitle: "Next rotation proposal",
+    clubSessionRotationPreviewBody:
+      "Review the selected players before adding them to the queue.",
+    clubSessionRotationWhy:
+      "Selection basis: the fewest current matches. Ties favor longer waits, varied pairings/opponents, then skill balance.",
+    clubSessionRotationPlayed: "Current match history: {players}",
+    clubSessionRotationFairnessGap: "Proposal gap: {count} matches",
+    clubSessionRotationTieBreakers:
+      "Avoid preference penalty: {avoid} · Repeated partner/opponent penalty: {repeat} · Skill gap: {skill}",
+    clubSessionConfirmRotation: "Confirm rotation",
+    clubSessionRejectRotation: "Reject proposal",
+    clubSessionRotationRejected:
+      "Rotation proposal rejected. No queue entry was added.",
+    clubSessionRotationStale:
+      "The session data changed after this proposal was created. The proposal was cancelled; create a new preview to use the latest state.",
+    clubSessionNoFreeCourt:
+      "There is no free court yet. Start or finish the current queue entries first.",
+    clubSessionRotationRequirements:
+      "Rotation needs at least four players who are ready to play.",
+    clubSessionMixedFallbackRequired:
+      "There is no valid mixed-doubles combination among the players ready to play. You can use open doubles for this rotation.",
+    clubSessionMixedManualFallbackRequired:
+      "This assignment is not a valid mixed-doubles combination. Confirm if you want to use it as open doubles.",
+    clubSessionUseOpenFallback: "Use open doubles this time",
+    clubSessionOpenFallback: "Open fallback",
+    clubSessionSaveProfileError:
+      "The player profile was not saved. Check the connection and try again.",
     clubSessionQueueRequirements:
       "Four active players and one active court are required.",
     clubSessionAssignmentError: "Choose a court and four different players.",
@@ -1016,7 +1179,10 @@ const messages = {
     syncSaved: "Score saved",
     syncLocal: "Saved on this device",
     syncing: "Saving score…",
+    syncPending: "Pending sync",
     syncOffline: "Offline · changes are saved on this device",
+    pendingSyncBody:
+      "The final result is saved on this device and will be sent when the connection returns.",
     syncError: "Could not sync · this match is still saved on this device",
     syncConflict:
       "The server has a newer or different score. Continue from the controlling device.",
@@ -1036,9 +1202,14 @@ const messages = {
     matchControlLost: "Control of this match moved to another device.",
     matchReadOnly: "This match is read-only.",
     takeOverMatch: "Take over match",
-    matchRemoteConflict:
-      "The server version and this device version differ. Choose the server version to continue.",
+    matchRemoteConflict: "The server version and this device version differ.",
+    matchConflictBody:
+      "Choose which result to keep. The app will not merge the scores automatically.",
+    localVersion: "This device",
+    serverVersion: "Server",
     useServerVersion: "Use server version",
+    saveLocalAsNewMatch: "Save as a new Match",
+    recovering: "Saving choice...",
     matchControlError: "Could not acquire control of this match.",
     retryControl: "Try again",
     liveViewer: "Live Viewer",
@@ -1063,8 +1234,14 @@ const messages = {
     viewerUnavailable: "Viewer link unavailable",
     viewerUnavailableBody:
       "The link may have been revoked, expired, or be invalid.",
-    viewerStale: "Last synced",
+    viewerStale: "Stale · last synced",
     viewerRefresh: "Refresh score",
+    viewerDisplayMode: "Display mode",
+    viewerDisplayModeBody:
+      "Open this large view on a TV or projector. Score control stays on the player device.",
+    viewerOpenDisplay: "Open display mode",
+    viewerFullscreen: "Full screen",
+    viewerExitFullscreen: "Exit full screen",
     viewerLive: "Live",
     updatedAt: "updated",
     score: "Score",

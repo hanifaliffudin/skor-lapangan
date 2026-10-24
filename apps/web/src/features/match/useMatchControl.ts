@@ -5,6 +5,11 @@ import {
   renewMatchControl,
 } from "../../lib/sync";
 import { supabase } from "../../lib/supabase";
+import {
+  createTabControlIdentity,
+  localControlLeaseMs,
+  localControlStore,
+} from "../../lib/localControl";
 
 export type MatchControlStatus =
   "disabled" | "waiting" | "active" | "held" | "lost" | "error";
@@ -24,27 +29,108 @@ export function useMatchControl(
 ) {
   const enabled = options.enabled ?? true;
   const serverEnabled = Boolean(options.server && supabase);
-  const [localStatus, setLocalStatus] = useState<MatchControlStatus>(() =>
-    !enabled
-      ? "disabled"
-      : typeof navigator !== "undefined" && navigator.locks
-        ? "waiting"
-        : "active",
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === "undefined" || navigator.onLine,
   );
-  const [serverStatus, setServerStatus] = useState<MatchControlStatus>(
-    serverEnabled ? "waiting" : "active",
+  const [localStatus, setLocalStatus] = useState<MatchControlStatus>(() =>
+    enabled ? "waiting" : "disabled",
+  );
+  const [serverStatus, setServerStatus] = useState<MatchControlStatus>(() =>
+    serverEnabled && isOnline ? "waiting" : "active",
   );
   const [attempt, setAttempt] = useState(0);
   const controlToken = useRef<string>(createControlToken());
+  const localOwnerId = useRef<string>(createTabControlIdentity());
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (serverEnabled) setServerStatus("waiting");
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      if (serverEnabled) setServerStatus("active");
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [serverEnabled]);
 
   useEffect(() => {
     if (!enabled) {
       setLocalStatus("disabled");
       return;
     }
-    if (!matchId || !navigator.locks) {
+    if (!matchId) {
       setLocalStatus("active");
       return;
+    }
+
+    if (!navigator.locks) {
+      let active = true;
+      let leaseHeld = false;
+      let retryHandle: number | null = null;
+
+      const claim = async () => {
+        const result = await localControlStore.claim(
+          matchId,
+          localOwnerId.current,
+        );
+        if (!active) {
+          if (result === "acquired") {
+            void localControlStore.release(matchId, localOwnerId.current);
+          }
+          return;
+        }
+        leaseHeld = result === "acquired";
+        setLocalStatus(
+          result === "acquired"
+            ? "active"
+            : result === "held"
+              ? "waiting"
+              : "error",
+        );
+      };
+
+      const renew = async () => {
+        if (!leaseHeld) {
+          await claim();
+          return;
+        }
+        const renewed = await localControlStore.renew(
+          matchId,
+          localOwnerId.current,
+        );
+        if (!renewed && active) {
+          leaseHeld = false;
+          setLocalStatus("waiting");
+          await claim();
+        }
+      };
+
+      void claim();
+      retryHandle = window.setInterval(
+        () => void renew(),
+        Math.max(1_000, Math.floor(localControlLeaseMs / 2)),
+      );
+      const handleStorage = (event: StorageEvent) => {
+        if (event.key === `skor-lapangan:control:${matchId}`) {
+          void claim();
+        }
+      };
+      window.addEventListener("storage", handleStorage);
+
+      return () => {
+        active = false;
+        if (retryHandle !== null) window.clearInterval(retryHandle);
+        window.removeEventListener("storage", handleStorage);
+        if (leaseHeld) {
+          void localControlStore.release(matchId, localOwnerId.current);
+        }
+      };
     }
 
     let active = true;
@@ -90,15 +176,21 @@ export function useMatchControl(
   useEffect(() => {
     if (!enabled) {
       setServerStatus("disabled");
-    } else if (!serverEnabled) {
+    } else if (!serverEnabled || !isOnline) {
       setServerStatus("active");
     } else if (localStatus === "active") {
       setServerStatus("waiting");
     }
-  }, [enabled, localStatus, serverEnabled]);
+  }, [enabled, isOnline, localStatus, serverEnabled]);
 
   useEffect(() => {
-    if (!enabled || !serverEnabled || !matchId || localStatus !== "active") {
+    if (
+      !enabled ||
+      !serverEnabled ||
+      !isOnline ||
+      !matchId ||
+      localStatus !== "active"
+    ) {
       if (!enabled) setServerStatus("disabled");
       return;
     }
@@ -123,12 +215,13 @@ export function useMatchControl(
     return () => {
       active = false;
     };
-  }, [attempt, enabled, localStatus, matchId, serverEnabled]);
+  }, [attempt, enabled, isOnline, localStatus, matchId, serverEnabled]);
 
   useEffect(() => {
     if (
       !enabled ||
       !serverEnabled ||
+      !isOnline ||
       !matchId ||
       localStatus !== "active" ||
       serverStatus !== "active"
@@ -144,19 +237,16 @@ export function useMatchControl(
       });
     };
     const intervalId = window.setInterval(heartbeat, 15_000);
-    const handleOnline = () => heartbeat(true);
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") heartbeat(true);
     };
-    window.addEventListener("online", handleOnline);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("online", handleOnline);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [enabled, localStatus, matchId, serverEnabled, serverStatus]);
+  }, [enabled, isOnline, localStatus, matchId, serverEnabled, serverStatus]);
 
   useEffect(() => {
     return () => {

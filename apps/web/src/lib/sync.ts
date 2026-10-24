@@ -7,6 +7,11 @@ import {
   type RulesetSnapshot,
 } from "@skor-lapangan/scoring-core";
 import type { Database, Json } from "./database.types";
+import {
+  canSyncStoredMatch,
+  listPendingMatchesAsync,
+  saveMatchAsync,
+} from "./session";
 import { supabase } from "./supabase";
 
 type MatchInsert = Database["public"]["Tables"]["matches"]["Insert"];
@@ -242,6 +247,45 @@ export function syncJournal(
   return enqueueMatchSync(journal.definition.id, () =>
     syncJournalNow(journal, userId, isGuest, controlToken, afterSequence),
   );
+}
+
+export async function syncPendingMatches(
+  userId: string,
+  isAnonymous: boolean,
+): Promise<number> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return 0;
+
+  let syncedCount = 0;
+  for (const { journal, info } of await listPendingMatchesAsync()) {
+    if (!canSyncStoredMatch(journal.definition.id, userId, isAnonymous)) {
+      continue;
+    }
+
+    const result = await syncJournal(
+      journal,
+      userId,
+      isAnonymous,
+      null,
+      info.sync.lastServerSequence,
+    );
+    if (result.status !== "synced") continue;
+
+    const lastSequence =
+      journal.events.at(-1)?.clientSequence ?? info.sync.lastServerSequence;
+    const saved = await saveMatchAsync(journal, {
+      ownerId: info.ownerId ?? userId,
+      persistent: info.persistent,
+      sync: {
+        status: "local",
+        lastServerSequence: lastSequence,
+        pendingFromSequence: null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    if (saved) syncedCount += 1;
+  }
+
+  return syncedCount;
 }
 
 export async function acquireMatchControl(

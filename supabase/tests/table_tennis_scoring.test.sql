@@ -106,6 +106,10 @@ select ok(
   'the score projection keeps indexes and excludes local data'
 );
 
+update public.matches
+set last_client_sequence = 1
+where id = '00000000-0000-4000-8000-000000000801';
+
 insert into public.match_events (
   id, match_id, owner_id, client_sequence, event_type, payload, created_at
 ) values (
@@ -140,6 +144,19 @@ select ok(
 );
 reset role;
 
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', tests.get_supabase_uid('table_tennis_guest'),
+    'role', 'authenticated',
+    'is_anonymous', false,
+    'app_metadata', json_build_object(
+      'provider', 'google',
+      'providers', json_build_array('google')
+    )
+  )::text,
+  true
+);
 select throws_ok(
   $$insert into public.matches (
       id, owner_id, sport, ruleset_id, mode, definition, status, current_state,

@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(22);
 
 select tests.rls_enabled('public', 'club_sessions');
 select tests.rls_enabled('public', 'club_session_players');
@@ -26,6 +26,31 @@ values
   ('00000000-0000-4000-8000-000000001013', '00000000-0000-4000-8000-000000001001', tests.get_supabase_uid('club_owner'), 'Three', 2),
   ('00000000-0000-4000-8000-000000001014', '00000000-0000-4000-8000-000000001001', tests.get_supabase_uid('club_owner'), 'Four', 3);
 
+select is(
+  (select pairing_mode from public.club_sessions limit 1),
+  'open',
+  'new sessions default to open pairing'
+);
+select is(
+  (select gender from public.club_session_players order by sort_order limit 1),
+  null,
+  'new players leave gender unspecified'
+);
+select is(
+  (select skill_level from public.club_session_players order by sort_order limit 1),
+  3::smallint,
+  'new players default to skill level three'
+);
+select is(
+  (select availability from public.club_session_players order by sort_order limit 1),
+  'available',
+  'new players default to available'
+);
+select is(
+  (select avoid_player_ids from public.club_session_players order by sort_order limit 1),
+  '{}'::uuid[],
+  'new players default to no avoid preferences'
+);
 insert into public.club_session_courts
   (id, session_id, owner_id, name, sort_order)
 values (
@@ -58,6 +83,12 @@ insert into public.club_session_matches (
   '00000000-0000-4000-8000-000000001013',
   '00000000-0000-4000-8000-000000001014',
   0
+);
+
+select is(
+  (select is_open_fallback from public.club_session_matches limit 1),
+  false,
+  'queue entries default to non-fallback doubles'
 );
 
 select is(
@@ -97,7 +128,7 @@ insert into public.matches (
   'badminton',
   'bwf-doubles-3x21-2025',
   'casual',
-  '{"id":"00000000-0000-4000-8000-000000001041"}'::jsonb,
+  '{"id":"00000000-0000-4000-8000-000000001041","ruleset":{"source":"official"}}'::jsonb,
   'active',
   '{"matchId":"00000000-0000-4000-8000-000000001041","status":"active"}'::jsonb,
   now()

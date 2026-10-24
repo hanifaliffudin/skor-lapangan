@@ -170,6 +170,7 @@ select set_config(
   )::text,
   true
 );
+set local role service_role;
 select is(
   (select status || ':' || reason || ':' || reporter_contact
    from public.community_rule_reports
@@ -177,6 +178,7 @@ select is(
   'open:rights:reporter@example.test',
   'guest reports include a moderation state, reason, and optional contact'
 );
+reset role;
 select lives_ok(
   $$select public.report_community_rule_v2(
       '00000000-0000-4000-8000-000000000402', 'incorrect', '', null)$$,
@@ -194,6 +196,7 @@ select throws_ok(
   'RATE_LIMIT: community_rule_report',
   'a fourth report in the hourly window is rejected'
 );
+set local role service_role;
 update public.community_rule_reports
 set status = 'actioned',
     resolution = 'removed',
@@ -214,6 +217,7 @@ select ok(
    where id = current_setting('test.guardrail_report_id')::uuid),
   'the retained report no longer references the deleted rule'
 );
+set local role postgres;
 select is(
   (select count(*)::integer
    from cron.job where jobname = 'purge-expired-guest-data'),
@@ -221,5 +225,6 @@ select is(
   'the hourly guest-data cleanup job is installed once'
 );
 
+reset role;
 select * from finish();
 rollback;

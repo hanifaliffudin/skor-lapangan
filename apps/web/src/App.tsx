@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { authReturnPathKey, useAuth } from "./lib/auth";
 import { localeFromPath, useLocale } from "./lib/i18n";
+import { syncPendingMatches } from "./lib/sync";
 
 const HomePage = lazy(() =>
   import("./features/setup/HomePage").then(({ HomePage: page }) => ({
@@ -26,6 +27,11 @@ const MatchPage = lazy(() =>
 );
 const ViewerPage = lazy(() =>
   import("./features/match/ViewerPage").then(({ ViewerPage: page }) => ({
+    default: page,
+  })),
+);
+const DisplayModePage = lazy(() =>
+  import("./features/match/ViewerPage").then(({ DisplayModePage: page }) => ({
     default: page,
   })),
 );
@@ -102,6 +108,18 @@ export function App() {
     if (returnPath !== currentPath) navigate(returnPath, { replace: true });
   }, [isAnonymous, location.pathname, location.search, navigate, user]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const retryPendingMatches = () => {
+      void syncPendingMatches(user.id, isAnonymous).catch(() => undefined);
+    };
+
+    retryPendingMatches();
+    window.addEventListener("online", retryPendingMatches);
+    return () => window.removeEventListener("online", retryPendingMatches);
+  }, [isAnonymous, user?.id]);
+
   return (
     <Suspense fallback={<RouteLoading />}>
       <Routes>
@@ -113,6 +131,8 @@ export function App() {
         <Route path="/id/match/:matchId" element={<MatchPage />} />
         <Route path="/view/:token" element={<ViewerPage />} />
         <Route path="/id/view/:token" element={<ViewerPage />} />
+        <Route path="/display/:token" element={<DisplayModePage />} />
+        <Route path="/id/display/:token" element={<DisplayModePage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/id/account" element={<AccountPage />} />
         <Route path="/history" element={<MatchHistoryPage />} />

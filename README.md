@@ -22,6 +22,9 @@ V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, P
 - Guest matches with client-generated UUIDs, local-first scoring, rate-limited atomic server sync, and a 12-hour inactivity expiry capped at 24 hours. Stale or divergent snapshots are rejected; expired records are cleaned hourly.
 - Google account history that can hydrate active or completed matches on another browser or device. Active matches use a single-editor lease with explicit takeover; other devices stay read-only until they acquire control.
 - Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
+- Club Sessions for organizer-owned badminton open play: player/court roster, manual queueing, Smart Rotation for fair next-court assignments, and ranked standings.
+- A large TV/projector Display Mode opened from the scorekeeper screen, while the scorekeeper keeps control from a phone and Live Viewer stays read-only.
+- Durable PWA offline scoring in IndexedDB, with pending match sync retried at startup, on reconnect, and when a match is reopened.
 - Locked Official Rules, published Community Rules, and guest-only custom rules. Community Rules are versioned and snapshotted into each match.
 - One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
 - English by default, with Indonesian available.
@@ -64,7 +67,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all twenty-seven migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions migration before deploying that feature. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all twenty-eight migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions and Smart Rotation migrations before deploying that feature. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 

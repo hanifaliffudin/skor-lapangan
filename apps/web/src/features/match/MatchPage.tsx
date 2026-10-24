@@ -53,9 +53,12 @@ import { trackMatchSignal } from "../../lib/analytics";
 import {
   canSyncStoredMatch,
   getStoredMatchInfo,
+  getStoredMatchInfoAsync,
   loadMatch,
+  loadMatchAsync,
   removeMatch,
-  saveMatch,
+  removeMatchAsync,
+  saveMatchAsync,
 } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
 import { isLocalOnlyRulesJournal, syncJournal } from "../../lib/sync";
@@ -77,6 +80,7 @@ import {
 } from "../../lib/match-remote";
 import { Court } from "./Court";
 import { OverrideDialog } from "./OverrideDialog";
+import { forkMatchAsNew } from "./matchRecovery";
 import { createMatchLifecycle } from "./matchLifecycle";
 import { useMatchControl } from "./useMatchControl";
 import { Button } from "@/components/ui/button";
@@ -165,6 +169,10 @@ export function MatchPage() {
   );
   const journalRef = useRef(journal);
   journalRef.current = journal;
+  const [localLoading, setLocalLoading] = useState(Boolean(matchId));
+  const [localPersistenceError, setLocalPersistenceError] = useState(false);
+  const savingMatchRef = useRef(false);
+  const failedJournalRef = useRef<MatchJournal | null>(null);
   const [remoteLoading, setRemoteLoading] = useState(
     Boolean(matchId && supabase),
   );
@@ -172,10 +180,14 @@ export function MatchPage() {
   const [remoteWarning, setRemoteWarning] = useState(false);
   const [remoteConflict, setRemoteConflict] =
     useState<RemoteMatchSnapshot | null>(null);
+  const [conflictRecoveryAction, setConflictRecoveryAction] = useState<
+    "server" | "local" | null
+  >(null);
   const [remoteReloadAttempt, setRemoteReloadAttempt] = useState(0);
   const [syncState, setSyncState] = useState<
-    "local" | "syncing" | "synced" | "offline" | "error"
+    "local" | "syncing" | "synced" | "offline" | "pending" | "error"
   >("local");
+  const [pendingSync, setPendingSync] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [syncAttempt, setSyncAttempt] = useState(0);
   const [viewerUrl, setViewerUrl] = useState("");
@@ -218,6 +230,32 @@ export function MatchPage() {
     enabled: Boolean(matchIsActive && !remoteLoading && !remoteConflict),
     server: Boolean(supabase && user && !localOnlyRules),
   });
+
+  useEffect(() => {
+    if (!matchId) {
+      setLocalLoading(false);
+      return;
+    }
+
+    let active = true;
+    void loadMatchAsync(matchId)
+      .then(async (stored) => {
+        if (!active) return;
+        const storedMatchInfo = await getStoredMatchInfoAsync(matchId);
+        setJournal((current) => current ?? stored);
+        setPendingSync(storedMatchInfo?.sync.status === "pending");
+        setLocalLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setLocalLoading(false);
+        setLocalPersistenceError(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [matchId]);
 
   useEffect(() => {
     if (!matchId || !supabase || isAnonymous || localOnlyRules) {
@@ -272,9 +310,11 @@ export function MatchPage() {
         if (result.action === "replace") {
           syncedSequence.current = result.snapshot.sequence;
           setJournal(result.snapshot.journal);
-          saveMatch(result.snapshot.journal, {
+          void saveMatchAsync(result.snapshot.journal, {
             ownerId: user.id,
             persistent: true,
+          }).then((saved) => {
+            if (!saved) setLocalPersistenceError(true);
           });
         } else if (
           result.journal &&
@@ -338,9 +378,11 @@ export function MatchPage() {
         if (result.status === "replace") {
           syncedSequence.current = result.sequence;
           setJournal(result.journal);
-          saveMatch(result.journal, {
+          void saveMatchAsync(result.journal, {
             ownerId: user.id,
             persistent: true,
+          }).then((saved) => {
+            if (!saved) setLocalPersistenceError(true);
           });
         }
       },
@@ -436,7 +478,7 @@ export function MatchPage() {
     if (!matchId) return;
     const handleStorage = (event: StorageEvent) => {
       if (event.key === `skor-lapangan:match:${matchId}`) {
-        setJournal(loadMatch(matchId));
+        void loadMatchAsync(matchId).then((stored) => setJournal(stored));
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -445,7 +487,7 @@ export function MatchPage() {
 
   useEffect(() => {
     if (!journal || !user) {
-      setSyncState("local");
+      setSyncState(pendingSync ? "pending" : "local");
       setSyncError("");
       return;
     }
@@ -453,32 +495,23 @@ export function MatchPage() {
     const manualRetry = syncAttempt !== previousSyncAttempt.current;
     previousSyncAttempt.current = syncAttempt;
     let active = true;
-    const synchronize = async (retrySchemaBlocked = manualRetry) => {
+    const handleSyncResult = (
+      result: Awaited<ReturnType<typeof matchLifecycle.synchronize>>,
+    ) => {
       const currentMatchId = journal.definition.id;
-      setSyncState("syncing");
-      setSyncError("");
-      const result = await matchLifecycle.synchronize({
-        journal,
-        userId: user.id,
-        isAnonymous,
-        controlToken,
-        afterSequence: syncedSequence.current ?? 0,
-        online: navigator.onLine,
-        localOnlyRules,
-        remoteReady: !remoteLoading && !remoteConflict && !remoteError,
-        matchIsActive: Boolean(matchIsActive),
-        controlStatus,
-        schemaBlocked: schemaBlockedMatches.current.has(currentMatchId),
-        retrySchemaBlocked,
-      });
       if (!active) return;
       if (result.status === "offline") {
-        setSyncState("offline");
+        if (pendingSync || !matchIsActive) {
+          setPendingSync(true);
+          setSyncState("pending");
+        } else {
+          setSyncState("offline");
+        }
         setSyncError("");
         return;
       }
       if (result.status === "local" || result.status === "skipped") {
-        setSyncState("local");
+        setSyncState(pendingSync ? "pending" : "local");
         setSyncError("");
         return;
       }
@@ -495,6 +528,8 @@ export function MatchPage() {
       } else if (result.status === "synced") {
         schemaBlockedMatches.current.delete(currentMatchId);
         syncedSequence.current = journalSequence(journal);
+        setPendingSync(false);
+        void persistSyncMetadata(journal, "local");
       }
       setSyncState(
         result.status === "synced"
@@ -504,7 +539,9 @@ export function MatchPage() {
               result.status === "control_lost" ||
               result.status === "control_held"
             ? "error"
-            : "local",
+            : pendingSync
+              ? "pending"
+              : "local",
       );
       setSyncError(
         result.status === "failed" ||
@@ -519,18 +556,48 @@ export function MatchPage() {
         result.status === "control_lost" ||
         result.status === "control_held"
       ) {
+        if (result.status === "conflict") {
+          setRemoteReloadAttempt((current) => current + 1);
+        }
         trackMatchSignal(
           result.status === "conflict" ? "sync_conflict" : "control_lost",
           "detected",
         );
       }
     };
-    const handleOnline = () => void synchronize(true);
-    void synchronize(manualRetry);
-    window.addEventListener("online", handleOnline);
+    const stopWatchingSync = matchLifecycle.watchSync({
+      getInput: () => ({
+        journal,
+        userId: user.id,
+        isAnonymous,
+        controlToken,
+        afterSequence: syncedSequence.current ?? 0,
+        online: navigator.onLine,
+        localOnlyRules,
+        remoteReady: !remoteLoading && !remoteConflict && !remoteError,
+        matchIsActive: Boolean(matchIsActive),
+        controlStatus,
+        schemaBlocked: schemaBlockedMatches.current.has(journal.definition.id),
+        retrySchemaBlocked: manualRetry,
+      }),
+      onStart: () => {
+        setSyncState("syncing");
+        setSyncError("");
+      },
+      onResult: handleSyncResult,
+      onFailure: () => {
+        if (!active) return;
+        setSyncState("error");
+        setSyncError("");
+      },
+      shouldRetry: (result) =>
+        result.status === "control_held" ||
+        (result.status === "failed" &&
+          !isUnsupportedMatchSportError(result.error)),
+    });
     return () => {
       active = false;
-      window.removeEventListener("online", handleOnline);
+      stopWatchingSync();
     };
   }, [
     controlStatus,
@@ -543,11 +610,13 @@ export function MatchPage() {
     remoteConflict,
     remoteError,
     remoteLoading,
+    pendingSync,
     syncAttempt,
     user,
   ]);
 
-  function commit(next: MatchJournal) {
+  async function commit(next: MatchJournal) {
+    if (savingMatchRef.current) return;
     const nextView = deriveJournal(next);
     if (
       !next.finalState &&
@@ -569,21 +638,33 @@ export function MatchPage() {
         finalState: nextView.state,
       };
     }
-    setJournal(next);
+    savingMatchRef.current = true;
+    failedJournalRef.current = next;
+    setLocalPersistenceError(false);
     const storedMatchInfo = matchId ? getStoredMatchInfo(matchId) : null;
     const accountOwnerId = user && !isAnonymous ? user.id : null;
     const localOwnerId =
       storedMatchInfo?.persistent && storedMatchInfo.ownerId
         ? storedMatchInfo.ownerId
         : (accountOwnerId ?? user?.id);
-    saveMatch(next, {
+    const saved = await saveMatchAsync(next, {
       persistent:
         next.definition.ruleset?.source !== "guest_custom" &&
         (Boolean(accountOwnerId) || Boolean(storedMatchInfo?.persistent)),
       ...(next.definition.ruleset?.source !== "guest_custom" && localOwnerId
         ? { ownerId: localOwnerId }
         : {}),
+      ...(storedMatchInfo?.sync ? { sync: storedMatchInfo.sync } : {}),
     });
+    savingMatchRef.current = false;
+    if (!saved) {
+      setLocalPersistenceError(true);
+      setSyncState("error");
+      setSyncError("LOCAL_PERSISTENCE_FAILED");
+      return;
+    }
+    failedJournalRef.current = null;
+    setJournal(next);
   }
 
   function rally(team: TeamId) {
@@ -639,6 +720,43 @@ export function MatchPage() {
     } catch {
       setShareMessage("");
     }
+  }
+
+  async function persistSyncMetadata(
+    matchToSave: MatchJournal,
+    status: "local" | "pending",
+  ): Promise<boolean> {
+    if (!matchId) return false;
+    const storedMatchInfo = getStoredMatchInfo(matchId);
+    const accountOwnerId = user && !isAnonymous ? user.id : null;
+    const localOwnerId =
+      storedMatchInfo?.persistent && storedMatchInfo.ownerId
+        ? storedMatchInfo.ownerId
+        : (accountOwnerId ?? user?.id);
+    const lastServerSequence =
+      status === "local"
+        ? journalSequence(matchToSave)
+        : (syncedSequence.current ??
+          storedMatchInfo?.sync.lastServerSequence ??
+          0);
+    const saved = await saveMatchAsync(matchToSave, {
+      persistent:
+        matchToSave.definition.ruleset?.source !== "guest_custom" &&
+        (Boolean(accountOwnerId) || Boolean(storedMatchInfo?.persistent)),
+      ...(matchToSave.definition.ruleset?.source !== "guest_custom" &&
+      localOwnerId
+        ? { ownerId: localOwnerId }
+        : {}),
+      sync: {
+        status,
+        lastServerSequence,
+        pendingFromSequence:
+          status === "pending" ? Math.max(1, lastServerSequence + 1) : null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    if (!saved) setLocalPersistenceError(true);
+    return saved;
   }
 
   async function revokeViewerLink() {
@@ -705,6 +823,7 @@ export function MatchPage() {
         }
         if (finishResult.status === "sync_failed") {
           const finalSync = finishResult.result;
+          const saved = await persistSyncMetadata(journal, "pending");
           setSyncState("error");
           setSyncError(
             finalSync.status === "failed" ||
@@ -714,11 +833,31 @@ export function MatchPage() {
               ? finalSync.error
               : "FINAL_SCORE_NOT_SAVED",
           );
-          setEndError(t("finalScoreSaveFailed"));
+          if (saved) {
+            setPendingSync(true);
+            setEndOpen(false);
+            setEndError("");
+          } else {
+            setEndError(t("finalScoreSaveFailed"));
+          }
           return;
         }
         if (finishResult.status === "revoke_failed") {
           setEndError(t(isComplete ? "endFailure" : "closeSessionFailure"));
+          return;
+        }
+        if (finishResult.pendingSync) {
+          const saved = await persistSyncMetadata(journal, "pending");
+          if (!saved) {
+            setSyncState("error");
+            setSyncError("LOCAL_PERSISTENCE_FAILED");
+            setEndError(t("finalScoreSaveFailed"));
+            return;
+          }
+          setPendingSync(true);
+          setSyncState("pending");
+          setSyncError("");
+          setEndOpen(false);
           return;
         }
         if (finishResult.synced) {
@@ -755,21 +894,155 @@ export function MatchPage() {
     }
   }
 
-  function useServerVersion() {
-    if (!remoteConflict || !user) return;
-    syncedSequence.current = journalSequence(remoteConflict.journal);
-    setJournal(remoteConflict.journal);
-    saveMatch(remoteConflict.journal, { ownerId: user.id, persistent: true });
+  async function retryLocalStorage() {
+    const failedJournal = failedJournalRef.current;
+    if (failedJournal) {
+      await commit(failedJournal);
+      return;
+    }
+    if (!matchId) return;
+    setLocalLoading(true);
+    try {
+      const stored = await loadMatchAsync(matchId);
+      setJournal(stored);
+      setLocalPersistenceError(false);
+    } catch {
+      setLocalPersistenceError(true);
+    } finally {
+      setLocalLoading(false);
+    }
+  }
+
+  async function useServerVersion() {
+    if (!remoteConflict || !user || conflictRecoveryAction) return;
+    const conflict = remoteConflict;
+    setConflictRecoveryAction("server");
+    const saved = await saveMatchAsync(conflict.journal, {
+      ownerId: user.id,
+      persistent: true,
+      sync: {
+        status: "local",
+        lastServerSequence: conflict.sequence,
+        pendingFromSequence: null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    if (!saved) {
+      setLocalPersistenceError(true);
+      setSyncState("error");
+      setSyncError("LOCAL_PERSISTENCE_FAILED");
+      setConflictRecoveryAction(null);
+      return;
+    }
+    syncedSequence.current = conflict.sequence;
+    setJournal(conflict.journal);
     setRemoteConflict(null);
+    setPendingSync(false);
+    setSyncState("synced");
+    setSyncError("");
+    setConflictRecoveryAction(null);
+  }
+
+  async function saveLocalAsNewMatch() {
+    if (
+      !remoteConflict ||
+      !journal ||
+      !user ||
+      !matchId ||
+      conflictRecoveryAction
+    ) {
+      return;
+    }
+    const conflict = remoteConflict;
+    const localInfo = getStoredMatchInfo(matchId);
+    const fork = forkMatchAsNew(journal);
+    const forkIsComplete = deriveJournal(fork).state.status === "complete";
+    const persistent =
+      fork.definition.ruleset?.source !== "guest_custom" &&
+      (Boolean(user && !isAnonymous) || Boolean(localInfo?.persistent));
+    const ownerId =
+      localInfo?.persistent && localInfo.ownerId ? localInfo.ownerId : user.id;
+    setConflictRecoveryAction("local");
+
+    const savedFork = await saveMatchAsync(fork, {
+      persistent,
+      ...(ownerId ? { ownerId } : {}),
+      sync: {
+        status: forkIsComplete ? "pending" : "local",
+        lastServerSequence: 0,
+        pendingFromSequence: forkIsComplete ? 1 : null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    if (!savedFork) {
+      setLocalPersistenceError(true);
+      setSyncState("error");
+      setSyncError("LOCAL_PERSISTENCE_FAILED");
+      setConflictRecoveryAction(null);
+      return;
+    }
+
+    const savedServerVersion = await saveMatchAsync(conflict.journal, {
+      ownerId: user.id,
+      persistent: true,
+      sync: {
+        status: "local",
+        lastServerSequence: conflict.sequence,
+        pendingFromSequence: null,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    if (!savedServerVersion) {
+      await removeMatchAsync(fork.definition.id);
+      setLocalPersistenceError(true);
+      setSyncState("error");
+      setSyncError("LOCAL_PERSISTENCE_FAILED");
+      setConflictRecoveryAction(null);
+      return;
+    }
+
+    await removeMatchAsync(matchId);
+    setRemoteConflict(null);
+    setPendingSync(false);
+    setSyncError("");
+    navigate(localizedPath(`/match/${fork.definition.id}`, locale));
   }
 
   if (!journal || !view) {
-    if (authLoading || remoteLoading) {
+    if (authLoading || remoteLoading || localLoading) {
       return (
         <div className="min-h-screen min-h-dvh bg-paper">
           <AppHeader />
           <main className={styles.emptyState}>
             <p role="status">{t("loadingMatch")}</p>
+          </main>
+        </div>
+      );
+    }
+    if (localPersistenceError) {
+      return (
+        <div className="min-h-screen min-h-dvh bg-paper">
+          <AppHeader />
+          <main className={styles.emptyState}>
+            <h1>{t("matchStorageErrorTitle")}</h1>
+            <p>{t("matchStorageErrorBody")}</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Button
+                variant="outline"
+                type="button"
+                className="min-h-11"
+                onClick={() => void retryLocalStorage()}
+              >
+                {t("retryMatchLoad")}
+              </Button>
+              <Button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => navigate(returnPath)}
+              >
+                {t("backToHome")}
+              </Button>
+            </div>
           </main>
         </div>
       );
@@ -844,6 +1117,7 @@ export function MatchPage() {
     !remoteConflict &&
     !remoteLoading &&
     !remoteError &&
+    !localPersistenceError &&
     !takeoverPending;
   const canEndActiveMatch =
     !authLoading &&
@@ -854,7 +1128,20 @@ export function MatchPage() {
     !remoteLoading &&
     !remoteError &&
     !takeoverPending;
-  const matchStatusNotice = remoteLoading ? (
+  const matchStatusNotice = localPersistenceError ? (
+    <div className={styles.matchStatusBanner} data-state="error" role="alert">
+      <span>{t("matchStorageError")}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        className={styles.controlButton}
+        type="button"
+        onClick={() => void retryLocalStorage()}
+      >
+        {t("retrySync")}
+      </Button>
+    </div>
+  ) : remoteLoading ? (
     <div
       className={styles.matchStatusBanner}
       data-state="loading"
@@ -868,16 +1155,55 @@ export function MatchPage() {
       data-state="conflict"
       role="alert"
     >
-      <span>{t("matchRemoteConflict")}</span>
-      <Button
-        variant="outline"
-        size="sm"
-        className={styles.controlButton}
-        type="button"
-        onClick={useServerVersion}
-      >
-        {t("useServerVersion")}
-      </Button>
+      <div className="min-w-0 flex-1">
+        <strong className="block">{t("matchRemoteConflict")}</strong>
+        <span className="mt-1 block font-normal">{t("matchConflictBody")}</span>
+        <div className="mt-2 grid max-w-[420px] grid-cols-2 gap-2 text-sm font-normal max-[560px]:grid-cols-1">
+          <span>
+            <strong className="mr-1">{t("localVersion")}:</strong>
+            {pointLabel(state, "A", locale)}:{pointLabel(state, "B", locale)}
+          </span>
+          <span>
+            <strong className="mr-1">{t("serverVersion")}:</strong>
+            {pointLabel(
+              deriveJournal(remoteConflict.journal).state,
+              "A",
+              locale,
+            )}
+            :
+            {pointLabel(
+              deriveJournal(remoteConflict.journal).state,
+              "B",
+              locale,
+            )}
+          </span>
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-wrap justify-end gap-2 max-[560px]:w-full">
+        <Button
+          variant="outline"
+          size="sm"
+          className="min-h-11"
+          type="button"
+          disabled={Boolean(conflictRecoveryAction)}
+          onClick={() => void useServerVersion()}
+        >
+          {conflictRecoveryAction === "server"
+            ? t("recovering")
+            : t("useServerVersion")}
+        </Button>
+        <Button
+          size="sm"
+          className="min-h-11"
+          type="button"
+          disabled={Boolean(conflictRecoveryAction)}
+          onClick={() => void saveLocalAsNewMatch()}
+        >
+          {conflictRecoveryAction === "local"
+            ? t("recovering")
+            : t("saveLocalAsNewMatch")}
+        </Button>
+      </div>
     </div>
   ) : remoteError ? (
     <div className={styles.matchStatusBanner} data-state="error" role="alert">
@@ -908,6 +1234,14 @@ export function MatchPage() {
       >
         {t("retryMatchLoad")}
       </Button>
+    </div>
+  ) : pendingSync ? (
+    <div
+      className={styles.matchStatusBanner}
+      data-state="pending"
+      role="status"
+    >
+      <span>{t("pendingSyncBody")}</span>
     </div>
   ) : displayedControlStatus !== "active" ? (
     <div
@@ -1047,14 +1381,17 @@ export function MatchPage() {
                 ? "syncSaved"
                 : syncState === "syncing"
                   ? "syncing"
-                  : syncState === "offline"
-                    ? "syncOffline"
-                    : "syncError",
+                  : syncState === "pending"
+                    ? "syncPending"
+                    : syncState === "offline"
+                      ? "syncOffline"
+                      : "syncError",
           )}
           {syncError &&
           (isRateLimitError(syncError) ||
             isUnsupportedMatchSportError(syncError) ||
             isSyncConflictError(syncError) ||
+            syncError === "LOCAL_PERSISTENCE_FAILED" ||
             controlLost ||
             controlHeld) ? (
             <span className={styles.syncErrorDetail}>
@@ -1066,7 +1403,9 @@ export function MatchPage() {
                     ? t("matchControlLost")
                     : controlHeld
                       ? t("matchControlHeld")
-                      : t("syncUnsupportedSport")}
+                      : syncError === "LOCAL_PERSISTENCE_FAILED"
+                        ? t("matchStorageError")
+                        : t("syncUnsupportedSport")}
             </span>
           ) : null}
         </p>
@@ -1076,7 +1415,11 @@ export function MatchPage() {
             size="sm"
             className={styles.syncRetryButton}
             type="button"
-            onClick={() => setSyncAttempt((current) => current + 1)}
+            onClick={() =>
+              syncError === "LOCAL_PERSISTENCE_FAILED"
+                ? void retryLocalStorage()
+                : setSyncAttempt((current) => current + 1)
+            }
           >
             {t("retrySync")}
           </Button>
@@ -1109,6 +1452,7 @@ export function MatchPage() {
             <strong>
               {t("winner")}: {definition.teams[state.winner!].name}
             </strong>
+            {pendingSync ? <small>{t("pendingSyncBody")}</small> : null}
           </section>
         ) : null}
 
@@ -1459,6 +1803,14 @@ export function MatchPage() {
                   >
                     {t("shareLink")}
                   </Button>
+                  <a
+                    className={styles.secondaryButton}
+                    href={viewerUrl.replace("/view/", "/display/")}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("viewerOpenDisplay")}
+                  </a>
                   <div className={styles.ruleQr} aria-label={t("qrCode")}>
                     <Suspense fallback={null}>
                       <QRCodeSVG

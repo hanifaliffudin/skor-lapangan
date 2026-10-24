@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
 import { useAuth } from "../../lib/auth";
 import { localizedPath, useLocale } from "../../lib/i18n";
-import { removeMatch } from "../../lib/session";
+import { removeMatchAsync } from "../../lib/session";
 import {
   padelPointLabel,
   tennisPointLabel,
@@ -331,7 +331,7 @@ export function MatchHistoryPage() {
       setDeletingMatchId(null);
       return;
     }
-    removeMatch(matchId);
+    await removeMatchAsync(matchId);
     setMatches((current) => current.filter((match) => match.id !== matchId));
     setConfirmDeleteId(null);
     setDeletingMatchId(null);

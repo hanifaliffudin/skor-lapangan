@@ -103,6 +103,10 @@ select ok(
   'viewer projection keeps squash state without local data'
 );
 
+update public.matches
+set last_client_sequence = 1
+where id = '00000000-0000-4000-8000-000000000901';
+
 insert into public.match_events (
   id, match_id, owner_id, client_sequence, event_type, payload, created_at
 ) values (
@@ -119,6 +123,10 @@ select ok(
    from public.match_events where id = '00000000-0000-4000-8000-000000000902'),
   'service-box event is sanitized'
 );
+
+update public.matches
+set last_client_sequence = 2
+where id = '00000000-0000-4000-8000-000000000901';
 
 insert into public.match_events (
   id, match_id, owner_id, client_sequence, event_type, payload, created_at

@@ -24,7 +24,7 @@ select public.save_community_rule(
   'badminton',
   'Other account rule',
   'A rule that must survive another account deletion.',
-  '{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}'::jsonb,
+  '{"schemaVersion":2,"scoring":{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}}'::jsonb,
   true
 );
 
@@ -52,7 +52,7 @@ insert into public.matches (
   'badminton',
   'bwf-doubles-3x21-2025',
   'casual',
-  '{"id":"00000000-0000-4000-8000-000000000501"}'::jsonb,
+  '{"id":"00000000-0000-4000-8000-000000000501","ruleset":{"source":"official"}}'::jsonb,
   'active',
   '{"matchId":"00000000-0000-4000-8000-000000000501","points":{"A":0,"B":0}}'::jsonb,
   1,
@@ -84,7 +84,7 @@ select public.save_community_rule(
   'badminton',
   'Owner account rule',
   'A rule that belongs to the account being deleted.',
-  '{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}'::jsonb,
+  '{"schemaVersion":2,"scoring":{"pointsToWin":21,"winBy":2,"maxPoints":30,"bestOf":3,"scoringMode":"rally","serversPerTurn":1,"openingServerNumber":1}}'::jsonb,
   true
 );
 
@@ -94,6 +94,7 @@ select public.report_community_rule(
   'A report owned by the account being deleted.'
 );
 
+set local role service_role;
 select is(
   (select count(*)::integer from public.matches
    where owner_id = tests.get_supabase_uid('account_delete_owner')),
@@ -125,20 +126,25 @@ select is(
   'the account owns a report before deletion'
 );
 
+reset role;
+
 select public.delete_my_account_data();
 
+set local role service_role;
 select is(
   (select count(*)::integer from public.matches
    where owner_id = tests.get_supabase_uid('account_delete_owner')),
   0,
   'account deletion removes the owned match and its viewer capability'
 );
+reset role;
 select is(
   (select count(*)::integer
    from public.read_live_viewer(current_setting('test.account_delete_viewer_token'))),
   0,
   'a viewer token cannot read a match after account deletion'
 );
+set local role service_role;
 select is(
   (select count(*)::integer from public.match_events
    where owner_id = tests.get_supabase_uid('account_delete_owner')),
@@ -170,5 +176,6 @@ select is(
   'account deletion does not remove another account community rule'
 );
 
+reset role;
 select * from finish();
 rollback;

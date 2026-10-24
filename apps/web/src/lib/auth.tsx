@@ -10,9 +10,9 @@ import {
 } from "./auth-context";
 import {
   getStoredMatchInfo,
-  listStoredMatches,
-  removeAllStoredMatches,
-  saveMatch,
+  listStoredMatchesAsync,
+  removeAllStoredMatchesAsync,
+  saveMatchAsync,
 } from "./session";
 
 export { useAuth } from "./auth-context";
@@ -235,14 +235,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAction("claiming");
     void (async () => {
       try {
-        for (const match of listStoredMatches()) {
+        for (const match of await listStoredMatchesAsync()) {
           const storedMatchInfo = getStoredMatchInfo(match.definition.id);
-          saveMatch(match, {
+          await saveMatchAsync(match, {
             ownerId:
               storedMatchInfo?.persistent && storedMatchInfo.ownerId
                 ? storedMatchInfo.ownerId
                 : accountUserId,
             persistent: true,
+            ...(storedMatchInfo?.sync ? { sync: storedMatchInfo.sync } : {}),
           });
         }
 
@@ -421,7 +422,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return message;
         }
 
-        removeAllStoredMatches();
+        await removeAllStoredMatchesAsync();
         await supabase.auth.signOut({ scope: "local" });
         claimAttempted.current = null;
         const result = await signInAnonymouslyOnce();

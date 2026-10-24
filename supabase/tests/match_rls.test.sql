@@ -17,6 +17,7 @@ insert into public.matches (
   definition,
   status,
   current_state,
+  last_client_sequence,
   created_at
 ) values (
   '00000000-0000-4000-8000-000000000001',
@@ -24,9 +25,10 @@ insert into public.matches (
   'badminton',
   'bwf-doubles-3x21-2025',
   'casual',
-  '{}'::jsonb,
+  '{"ruleset":{"source":"official"}}'::jsonb,
   'active',
   '{}'::jsonb,
+  1,
   now()
 );
 

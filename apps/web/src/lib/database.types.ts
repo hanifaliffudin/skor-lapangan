@@ -18,6 +18,7 @@ export interface Database {
           sport: string;
           format: string;
           status: string;
+          pairing_mode: string;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +30,7 @@ export interface Database {
           sport?: string;
           format?: string;
           status?: string;
+          pairing_mode?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -38,6 +40,7 @@ export interface Database {
           sport?: string;
           format?: string;
           status?: string;
+          pairing_mode?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -50,6 +53,10 @@ export interface Database {
           display_name: string;
           sort_order: number;
           is_active: boolean;
+          gender: string | null;
+          skill_level: number;
+          availability: string;
+          avoid_player_ids: string[];
           created_at: string;
         };
         Insert: {
@@ -59,12 +66,20 @@ export interface Database {
           display_name: string;
           sort_order: number;
           is_active?: boolean;
+          gender?: string | null;
+          skill_level?: number;
+          availability?: string;
+          avoid_player_ids?: string[];
           created_at?: string;
         };
         Update: {
           display_name?: string;
           sort_order?: number;
           is_active?: boolean;
+          gender?: string | null;
+          skill_level?: number;
+          availability?: string;
+          avoid_player_ids?: string[];
         };
         Relationships: [];
       };
@@ -108,6 +123,7 @@ export interface Database {
           team_b_player_2: string;
           queue_order: number;
           started_at: string | null;
+          is_open_fallback: boolean;
           created_at: string;
         };
         Insert: {
@@ -123,12 +139,14 @@ export interface Database {
           team_b_player_2: string;
           queue_order: number;
           started_at?: string | null;
+          is_open_fallback?: boolean;
           created_at?: string;
         };
         Update: {
           court_id?: string;
           queue_order?: number;
           started_at?: string | null;
+          is_open_fallback?: boolean;
         };
         Relationships: [];
       };

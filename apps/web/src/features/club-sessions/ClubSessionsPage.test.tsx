@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -88,7 +88,9 @@ function createAdapter(): ClubSessionAdapter {
     addCourt: vi.fn().mockResolvedValue(undefined),
     setPlayerActive: vi.fn().mockResolvedValue(undefined),
     setCourtActive: vi.fn().mockResolvedValue(undefined),
+    updatePlayerProfile: vi.fn().mockResolvedValue(undefined),
     addQueuedMatch: vi.fn().mockResolvedValue(undefined),
+    addQueuedMatches: vi.fn().mockResolvedValue(undefined),
     markMatchStarted: vi.fn().mockResolvedValue(undefined),
     removeQueuedMatch: vi.fn().mockResolvedValue(undefined),
     setStatus: vi.fn().mockResolvedValue(undefined),
@@ -163,7 +165,140 @@ describe("Club Sessions page", () => {
     expect(adapter.createSession).toHaveBeenCalledWith({
       name: "Friday club",
       sessionDate: expect.any(String),
+      pairingMode: "open",
     });
+  });
+
+  it("fills the next free court when the queue is empty", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    vi.mocked(adapter.loadSession).mockResolvedValue({
+      ...detail,
+      queue: [],
+      results: {},
+    });
+
+    renderAt("/sessions/session-1");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Fill next courts" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Next rotation proposal" }),
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Reject proposal" }));
+    expect(adapter.addQueuedMatches).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Fill next courts" }));
+    await user.click(screen.getByRole("button", { name: "Confirm rotation" }));
+
+    await waitFor(() =>
+      expect(adapter.addQueuedMatches).toHaveBeenCalledWith({
+        sessionId: "session-1",
+        matches: expect.arrayContaining([
+          expect.objectContaining({ courtId: "court-1", queueOrder: 0 }),
+        ]),
+      }),
+    );
+    expect(adapter.addQueuedMatches).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels confirmation when the session changed after the preview", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    const initialDetail = { ...detail, queue: [], results: {} };
+    const changedDetail = {
+      ...initialDetail,
+      players: players.map((player) =>
+        player.id === "p-4"
+          ? { ...player, availability: "resting" as const }
+          : player,
+      ),
+    };
+    vi.mocked(adapter.loadSession)
+      .mockResolvedValueOnce(initialDetail)
+      .mockResolvedValueOnce(changedDetail)
+      .mockResolvedValue(changedDetail);
+
+    renderAt("/sessions/session-1");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Fill next courts" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Confirm rotation" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "The session data changed after this proposal was created. The proposal was cancelled; create a new preview to use the latest state.",
+      ),
+    ).toBeVisible();
+    expect(adapter.addQueuedMatches).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation before using open doubles in a mixed session", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    vi.mocked(adapter.loadSession).mockResolvedValue({
+      ...detail,
+      session: { ...session, pairing_mode: "mixed" },
+      players: players.map((player) => ({
+        ...player,
+        gender: "unspecified" as const,
+      })),
+      queue: [],
+      results: {},
+    });
+
+    renderAt("/sessions/session-1");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Fill next courts" }),
+    );
+    expect(
+      (
+        await screen.findAllByText(
+          "There is no valid mixed-doubles combination among the players ready to play. You can use open doubles for this rotation.",
+        )
+      )[0],
+    ).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: "Use open doubles this time" }),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Confirm rotation" }),
+    );
+    await waitFor(() =>
+      expect(adapter.addQueuedMatches).toHaveBeenCalledWith({
+        sessionId: "session-1",
+        matches: [expect.objectContaining({ isOpenFallback: true })],
+      }),
+    );
+  });
+
+  it("explains that the private board is unavailable offline", async () => {
+    const onLine = vi
+      .spyOn(window.navigator, "onLine", "get")
+      .mockReturnValue(false);
+    const adapter = adapterState.adapter!;
+
+    renderAt("/sessions");
+
+    expect(
+      await screen.findByText(
+        "Club session management needs an internet connection. Local matches can still be continued on this device.",
+      ),
+    ).toBeVisible();
+    expect(adapter.listSessions).not.toHaveBeenCalled();
+
+    onLine.mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    await waitFor(() => expect(adapter.listSessions).toHaveBeenCalledTimes(1));
+
+    onLine.mockRestore();
   });
 
   it("manages roster, courts, session status, and a completed match", async () => {
@@ -182,7 +317,21 @@ describe("Club Sessions page", () => {
       sessionId: "session-1",
       displayName: "Five",
       sortOrder: 4,
+      gender: "unspecified",
+      skillLevel: 3,
     });
+
+    await user.click(
+      screen.getByRole("combobox", { name: "Availability: One" }),
+    );
+    await user.click(screen.getByText("Resting", { exact: true }));
+    await waitFor(() =>
+      expect(adapter.updatePlayerProfile).toHaveBeenCalledWith({
+        sessionId: "session-1",
+        playerId: "p-1",
+        availability: "resting",
+      }),
+    );
 
     await user.type(screen.getByRole("textbox", { name: "Court" }), "Court 2");
     await user.click(screen.getByRole("button", { name: "Add court" }));

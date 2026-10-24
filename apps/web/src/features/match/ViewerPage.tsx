@@ -221,14 +221,36 @@ function viewerDefinition(state: MatchState): MatchDefinition {
   };
 }
 
-export function ViewerPage() {
+export function ViewerPage({ displayMode = false }: { displayMode?: boolean }) {
   const { token } = useParams();
   const navigate = useNavigate();
   const { locale, t } = useLocale();
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     document.title = t("viewerPageTitle");
   }, [t]);
+
+  useEffect(() => {
+    if (!displayMode) return;
+    const syncFullscreenState = () =>
+      setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () =>
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+  }, [displayMode]);
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      setFullscreen(false);
+    }
+  }
 
   const [snapshot, setSnapshot] = useState<ViewerSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -241,10 +263,19 @@ export function ViewerPage() {
     let active = true;
     let requestRunning = false;
     let timerId: number | null = null;
+    let connectionOffline =
+      typeof navigator !== "undefined" && !navigator.onLine;
     const refresh = async () => {
       if (!active || requestRunning || document.visibilityState === "hidden")
         return;
       requestRunning = true;
+      if (connectionOffline) {
+        if (hasSnapshot.current) setStale(true);
+        else setError(true);
+        setLoading(false);
+        requestRunning = false;
+        return;
+      }
       if (!supabase || !token) {
         setLoading(false);
         setError(true);
@@ -252,9 +283,15 @@ export function ViewerPage() {
         return;
       }
 
-      const { data, error: rpcError } = await supabase.rpc("read_live_viewer", {
-        p_token: token,
-      });
+      let data;
+      let rpcError;
+      try {
+        ({ data, error: rpcError } = await supabase.rpc("read_live_viewer", {
+          p_token: token,
+        }));
+      } catch {
+        rpcError = new Error("viewer refresh failed");
+      }
       requestRunning = false;
       if (!active) return;
       const row = data?.[0];
@@ -280,13 +317,13 @@ export function ViewerPage() {
         expiresAt: row.expires_at,
       });
       hasSnapshot.current = true;
-      setStale(false);
+      setStale(connectionOffline);
       setError(false);
       setLoading(false);
     };
 
     const schedule = () => {
-      if (!active) return;
+      if (!active || connectionOffline) return;
       timerId = window.setTimeout(
         () => {
           void refresh().finally(schedule);
@@ -300,18 +337,27 @@ export function ViewerPage() {
       if (timerId !== null) window.clearTimeout(timerId);
       void refresh().finally(schedule);
     };
+    const handleOffline = () => {
+      connectionOffline = true;
+      if (hasSnapshot.current) setStale(true);
+    };
 
     void refresh().finally(schedule);
-    const handleOnline = refreshAndSchedule;
+    const handleOnline = () => {
+      connectionOffline = false;
+      refreshAndSchedule();
+    };
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") refreshAndSchedule();
     };
     window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       active = false;
       if (timerId !== null) window.clearTimeout(timerId);
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [refreshAttempt, token]);
@@ -326,15 +372,46 @@ export function ViewerPage() {
     : "";
 
   return (
-    <div className="min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      <AppHeader compact />
-      <main className="mx-auto w-full max-w-[720px] px-[clamp(18px,5vw,40px)] pt-8 pb-16">
-        <p className="mb-3 text-xs font-black tracking-[0.12em] text-cobalt-dark uppercase">
-          {t("liveViewer")}
-        </p>
-        <h1 className="mb-3 text-[clamp(28px,6vw,42px)] tracking-[-0.04em]">
-          {t("viewerTitle")}
-        </h1>
+    <div
+      className={
+        displayMode
+          ? styles.displayShell
+          : "min-h-screen min-h-dvh bg-paper pb-[max(28px,env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+      }
+    >
+      {!displayMode ? <AppHeader compact /> : null}
+      <main
+        className={
+          displayMode
+            ? styles.displayMain
+            : "mx-auto w-full max-w-[720px] px-[clamp(18px,5vw,40px)] pt-8 pb-16"
+        }
+      >
+        {displayMode ? (
+          <div className={styles.displayToolbar}>
+            <div>
+              <p className={styles.displayEyebrow}>{t("viewerDisplayMode")}</p>
+              <strong>{t("viewerTitle")}</strong>
+            </div>
+            <Button
+              variant="outline"
+              className="min-h-11"
+              type="button"
+              onClick={() => void toggleFullscreen()}
+            >
+              {fullscreen ? t("viewerExitFullscreen") : t("viewerFullscreen")}
+            </Button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-3 text-xs font-black tracking-[0.12em] text-cobalt-dark uppercase">
+              {t("liveViewer")}
+            </p>
+            <h1 className="mb-3 text-[clamp(28px,6vw,42px)] tracking-[-0.04em]">
+              {t("viewerTitle")}
+            </h1>
+          </>
+        )}
         {loading ? <p role="status">{t("viewerLoading")}</p> : null}
         {error && !snapshot ? (
           <section className="mx-auto w-full max-w-[580px] px-[22px] py-20 text-center [&>p]:mx-auto [&>p]:max-w-[600px] [&>p]:text-[clamp(17px,3vw,21px)] [&>p]:leading-[1.55] [&>p]:text-text-muted">
@@ -353,7 +430,11 @@ export function ViewerPage() {
         {snapshot && state && definition ? (
           <>
             <p
-              className="mb-4 text-[13px] leading-[1.45] text-text-muted"
+              className={
+                displayMode
+                  ? styles.displayMeta
+                  : "mb-4 text-[13px] leading-[1.45] text-text-muted"
+              }
               role="status"
             >
               {stale ? t("viewerStale") : t("viewerLive")} · {t(snapshot.sport)}{" "}
@@ -373,7 +454,10 @@ export function ViewerPage() {
                 {t("viewerRefresh")}
               </Button>
             ) : null}
-            <section className={styles.scoreboard} aria-label={t("score")}>
+            <section
+              className={`${styles.scoreboard} ${displayMode ? styles.displayScoreboard : ""}`}
+              aria-label={t("score")}
+            >
               {(["A", "B"] as const).map((team) => (
                 <article
                   className={styles.scoreCard}
@@ -405,7 +489,13 @@ export function ViewerPage() {
                       </small>
                     ) : null}
                   </div>
-                  <strong className="block py-3 text-center text-[clamp(48px,12vw,76px)] leading-none font-black tabular-nums text-ink">
+                  <strong
+                    className={
+                      displayMode
+                        ? styles.displayScore
+                        : "block py-3 text-center text-[clamp(48px,12vw,76px)] leading-none font-black tabular-nums text-ink"
+                    }
+                  >
                     {state.tennis
                       ? tennisScoreLabel(state, team, locale)
                       : state.padel
@@ -415,7 +505,9 @@ export function ViewerPage() {
                 </article>
               ))}
             </section>
-            <Court definition={definition} state={state} />
+            <div className={displayMode ? styles.displayCourt : undefined}>
+              <Court definition={definition} state={state} />
+            </div>
             {state.status === "complete" ? (
               <p className="mb-4 text-[13px] leading-[1.45] text-text-muted">
                 {t("matchComplete")}
@@ -426,4 +518,8 @@ export function ViewerPage() {
       </main>
     </div>
   );
+}
+
+export function DisplayModePage() {
+  return <ViewerPage displayMode />;
 }

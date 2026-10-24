@@ -21,7 +21,7 @@ select is(
     p_sport => 'badminton',
     p_ruleset_id => 'bwf-doubles-3x21-2025',
     p_mode => 'casual',
-    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}}}'::jsonb,
+    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}},"ruleset":{"source":"official"}}'::jsonb,
     p_status => 'active',
     p_winner => null,
     p_current_state => '{"matchId":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","gameNumber":1,"gamesWon":{"A":0,"B":0},"points":{"A":0,"B":0},"servingTeam":"A","currentServer":0,"serverNumber":null,"positions":{"A":{"left":1,"right":0},"B":{"left":1,"right":0}},"status":"active","winner":null,"completedGames":[]}'::jsonb,
@@ -110,6 +110,7 @@ select throws_ok(
     p_events => '[]'::jsonb
   )$$,
   '42501',
+  'CONTROL_LOST',
   'the old device cannot sync after takeover'
 );
 
@@ -120,7 +121,7 @@ select is(
     p_sport => 'badminton',
     p_ruleset_id => 'bwf-doubles-3x21-2025',
     p_mode => 'casual',
-    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}}}'::jsonb,
+    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}},"ruleset":{"source":"official"}}'::jsonb,
     p_status => 'active',
     p_winner => null,
     p_current_state => '{"matchId":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","gameNumber":1,"gamesWon":{"A":0,"B":0},"points":{"A":1,"B":0},"servingTeam":"A","currentServer":0,"serverNumber":null,"positions":{"A":{"left":0,"right":1},"B":{"left":1,"right":0}},"status":"active","winner":null,"completedGames":[]}'::jsonb,
@@ -177,7 +178,7 @@ select is(
     p_sport => 'badminton',
     p_ruleset_id => 'bwf-doubles-3x21-2025',
     p_mode => 'casual',
-    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}}}'::jsonb,
+    p_definition => '{"id":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","rulesetId":"bwf-doubles-3x21-2025","mode":"casual","createdAt":"2026-10-14T00:00:00.000Z","initialServingTeam":"A","initialServingPlayer":0,"teams":{"A":{"name":"Team A","players":[{"id":"a1","name":"A1"},{"id":"a2","name":"A2"}]},"B":{"name":"Team B","players":[{"id":"b1","name":"B1"},{"id":"b2","name":"B2"}]}},"ruleset":{"source":"official"}}'::jsonb,
     p_status => 'complete',
     p_winner => 'A',
     p_current_state => '{"matchId":"00000000-0000-4000-8000-000000000961","sport":"badminton","format":"doubles","gameNumber":1,"gamesWon":{"A":1,"B":0},"points":{"A":21,"B":10},"servingTeam":"A","currentServer":0,"serverNumber":null,"positions":{"A":{"left":0,"right":1},"B":{"left":1,"right":0}},"status":"complete","winner":"A","completedGames":[]}'::jsonb,

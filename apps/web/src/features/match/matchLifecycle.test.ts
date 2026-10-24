@@ -113,6 +113,49 @@ describe("Match lifecycle", () => {
     });
   });
 
+  it("reports a same-sequence state divergence as an explicit conflict", async () => {
+    const local = awardRally(journal(), "A", {
+      id: "local-event",
+      createdAt: "2026-10-08T00:01:00.000Z",
+    });
+    const remote = awardRally(journal(), "B", {
+      id: "remote-event",
+      createdAt: "2026-10-08T00:01:00.000Z",
+    });
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => local),
+      readRemoteMatch: vi.fn().mockResolvedValue({
+        status: "loaded",
+        snapshot: {
+          journal: remote,
+          sequence: 1,
+          status: "active",
+          updatedAt: "2026-10-08T00:01:00.000Z",
+        },
+      }),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(),
+      syncJournal: vi.fn(),
+      revokeViewerLink: vi.fn(),
+      removeLocalMatch: vi.fn(),
+    });
+
+    await expect(
+      lifecycle.loadRemote({
+        matchId,
+        userId: "account-user",
+        isAnonymous: false,
+      }),
+    ).resolves.toEqual({
+      status: "conflict",
+      journal: local,
+      snapshot: expect.objectContaining({ journal: remote, sequence: 1 }),
+    });
+  });
+
   it("keeps an active Match local while control is not active", async () => {
     const syncJournal = vi.fn();
     const lifecycle = createMatchLifecycle({
@@ -177,6 +220,46 @@ describe("Match lifecycle", () => {
         remoteConfigured: true,
       }),
     ).resolves.toEqual({ status: "sync_failed", result: syncResult });
+    expect(removeLocalMatch).not.toHaveBeenCalled();
+  });
+
+  it("completes offline and keeps the final Match pending sync", async () => {
+    const removeLocalMatch = vi.fn();
+    const revokeViewerLink = vi.fn();
+    const syncJournal = vi.fn();
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => journal()),
+      readRemoteMatch: vi.fn(),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(() => true),
+      syncJournal,
+      revokeViewerLink,
+      removeLocalMatch,
+    });
+
+    await expect(
+      lifecycle.finish({
+        matchId,
+        journal: journal(),
+        userId: "account-user",
+        isAnonymous: false,
+        controlToken: "control-token",
+        afterSequence: 0,
+        isComplete: true,
+        online: false,
+        localOnlyRules: false,
+        remoteConfigured: true,
+      }),
+    ).resolves.toEqual({
+      status: "completed",
+      synced: false,
+      pendingSync: true,
+    });
+    expect(syncJournal).not.toHaveBeenCalled();
+    expect(revokeViewerLink).not.toHaveBeenCalled();
     expect(removeLocalMatch).not.toHaveBeenCalled();
   });
 
@@ -259,6 +342,113 @@ describe("Match lifecycle", () => {
 
     stop();
     random.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("retries sync failures with bounded exponential backoff and stops after success", async () => {
+    vi.useFakeTimers();
+    const syncJournal = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "failed", error: "network" })
+      .mockResolvedValueOnce({ status: "failed", error: "network" })
+      .mockResolvedValue({ status: "synced" });
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => journal()),
+      readRemoteMatch: vi.fn(),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(() => true),
+      syncJournal,
+      revokeViewerLink: vi.fn(),
+      removeLocalMatch: vi.fn(),
+    });
+    const input = () => ({
+      journal: journal(),
+      userId: "account-user",
+      isAnonymous: false,
+      controlToken: "control-token",
+      afterSequence: 0,
+      online: true,
+      localOnlyRules: false,
+      remoteReady: true,
+      matchIsActive: false,
+      controlStatus: "active",
+      schemaBlocked: false,
+      retrySchemaBlocked: false,
+    });
+
+    const stop = lifecycle.watchSync({
+      getInput: input,
+      onResult: vi.fn(),
+      onFailure: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(syncJournal).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(syncJournal).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(syncJournal).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(syncJournal).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(syncJournal).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(syncJournal).toHaveBeenCalledTimes(3);
+    stop();
+    vi.useRealTimers();
+  });
+
+  it("retries an offline pending sync immediately after connectivity returns", async () => {
+    vi.useFakeTimers();
+    let online = false;
+    const syncJournal = vi.fn().mockResolvedValue({ status: "synced" });
+    const lifecycle = createMatchLifecycle({
+      loadLocalMatch: vi.fn(() => journal()),
+      readRemoteMatch: vi.fn(),
+      readRemoteMatchHead: vi.fn(),
+      readRemoteMatchEventsSince: vi.fn(),
+      appendRemoteEvents: vi.fn(),
+      matchHeadHasSameState: vi.fn(),
+      canSyncLocalMatch: vi.fn(() => true),
+      syncJournal,
+      revokeViewerLink: vi.fn(),
+      removeLocalMatch: vi.fn(),
+    });
+
+    const stop = lifecycle.watchSync({
+      getInput: () => ({
+        journal: journal(),
+        userId: "guest-user",
+        isAnonymous: true,
+        controlToken: null,
+        afterSequence: 0,
+        online,
+        localOnlyRules: false,
+        remoteReady: true,
+        matchIsActive: false,
+        controlStatus: "active",
+        schemaBlocked: false,
+        retrySchemaBlocked: false,
+      }),
+      onResult: vi.fn(),
+      onFailure: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(syncJournal).not.toHaveBeenCalled();
+
+    online = true;
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(syncJournal).toHaveBeenCalledTimes(1);
+
+    stop();
     vi.useRealTimers();
   });
 });

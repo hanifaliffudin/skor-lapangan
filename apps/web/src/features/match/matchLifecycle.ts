@@ -89,7 +89,7 @@ export type SynchronizeResult =
   | { status: "blocked"; reason: "schema" };
 
 export type FinishResult =
-  | { status: "completed"; synced: boolean }
+  | { status: "completed"; synced: boolean; pendingSync: boolean }
   | { status: "offline" }
   | { status: "sync_failed"; result: SyncResult }
   | { status: "revoke_failed"; error: string };
@@ -102,11 +102,35 @@ export interface MatchLifecycleWatchInput {
   onFailure: (error: unknown) => void;
 }
 
+export interface MatchLifecycleSyncInput {
+  journal: MatchJournal;
+  userId: string;
+  isAnonymous: boolean;
+  controlToken: string | null;
+  afterSequence: number;
+  online: boolean;
+  localOnlyRules: boolean;
+  remoteReady: boolean;
+  matchIsActive: boolean;
+  controlStatus: string;
+  schemaBlocked: boolean;
+  retrySchemaBlocked: boolean;
+}
+
+export interface MatchLifecycleSyncWatchInput {
+  getInput: () => MatchLifecycleSyncInput;
+  onStart?: () => void;
+  onResult: (result: SynchronizeResult) => void;
+  onFailure: (error: unknown) => void;
+  shouldRetry?: (result: SynchronizeResult) => boolean;
+}
+
 export interface MatchLifecycleRuntime {
   setTimeout: (callback: () => void, delay: number) => unknown;
   clearTimeout: (handle: unknown) => void;
   isHidden: () => boolean;
   onVisible: (callback: () => void) => () => void;
+  onOnline: (callback: () => void) => () => void;
   random: () => number;
 }
 
@@ -125,6 +149,11 @@ const browserRuntime: MatchLifecycleRuntime = {
     return () =>
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   },
+  onOnline: (callback) => {
+    if (typeof window === "undefined") return () => undefined;
+    window.addEventListener("online", callback);
+    return () => window.removeEventListener("online", callback);
+  },
   random: () => Math.random(),
 };
 
@@ -140,20 +169,8 @@ export interface MatchLifecycle {
     controlActive: boolean;
   }): Promise<PollRemoteResult>;
   watchRemote(input: MatchLifecycleWatchInput): () => void;
-  synchronize(input: {
-    journal: MatchJournal;
-    userId: string;
-    isAnonymous: boolean;
-    controlToken: string | null;
-    afterSequence: number;
-    online: boolean;
-    localOnlyRules: boolean;
-    remoteReady: boolean;
-    matchIsActive: boolean;
-    controlStatus: string;
-    schemaBlocked: boolean;
-    retrySchemaBlocked: boolean;
-  }): Promise<SynchronizeResult>;
+  watchSync(input: MatchLifecycleSyncWatchInput): () => void;
+  synchronize(input: MatchLifecycleSyncInput): Promise<SynchronizeResult>;
   finish(input: {
     matchId: string;
     journal: MatchJournal;
@@ -346,6 +363,61 @@ export function createMatchLifecycle(
         removeVisibilityListener();
       };
     },
+    watchSync({ getInput, onStart, onResult, onFailure, shouldRetry }) {
+      let active = true;
+      let running = false;
+      let failures = 0;
+      let timeoutHandle: unknown = null;
+      const baseDelay = 5_000;
+      const maxDelay = 60_000;
+      const retryResult =
+        shouldRetry ??
+        ((result: SynchronizeResult) =>
+          result.status === "failed" || result.status === "control_held");
+      const schedule = (delay: number) => {
+        if (!active) return;
+        if (timeoutHandle !== null) runtime.clearTimeout(timeoutHandle);
+        timeoutHandle = runtime.setTimeout(run, delay);
+      };
+      const run = async () => {
+        if (!active) return;
+        if (runtime.isHidden() || running) {
+          schedule(baseDelay);
+          return;
+        }
+        running = true;
+        let result: SynchronizeResult | null = null;
+        try {
+          if (active) onStart?.();
+          result = await this.synchronize(getInput());
+          if (active) onResult(result);
+        } catch (error) {
+          if (active) onFailure(error);
+        } finally {
+          running = false;
+        }
+        if (!active) return;
+        if (!result || retryResult(result)) {
+          failures = Math.min(failures + 1, 4);
+          schedule(Math.min(baseDelay * 2 ** failures, maxDelay));
+          return;
+        }
+        failures = 0;
+      };
+      const removeVisibilityListener = runtime.onVisible(() => schedule(0));
+      const removeOnlineListener = runtime.onOnline(() => {
+        failures = 0;
+        schedule(0);
+      });
+      schedule(0);
+
+      return () => {
+        active = false;
+        if (timeoutHandle !== null) runtime.clearTimeout(timeoutHandle);
+        removeVisibilityListener();
+        removeOnlineListener();
+      };
+    },
     async synchronize({
       journal,
       userId,
@@ -398,6 +470,10 @@ export function createMatchLifecycle(
       localOnlyRules,
       remoteConfigured,
     }) {
+      if (isComplete && !online) {
+        return { status: "completed", synced: false, pendingSync: true };
+      }
+
       const canSync = Boolean(
         isComplete &&
         !localOnlyRules &&
@@ -426,7 +502,7 @@ export function createMatchLifecycle(
         return { status: "revoke_failed", error: revokeResult.error };
       }
       adapters.removeLocalMatch(matchId);
-      return { status: "completed", synced };
+      return { status: "completed", synced, pendingSync: false };
     },
   };
 }

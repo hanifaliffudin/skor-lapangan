@@ -125,6 +125,10 @@ select ok(
   'the Tennis score projection keeps on-court indexes and excludes names and mixed roles'
 );
 
+update public.matches
+set last_client_sequence = 1
+where id = '00000000-0000-4000-8000-000000000701';
+
 insert into public.match_events (
   id, match_id, owner_id, client_sequence, event_type, payload, created_at
 ) values (

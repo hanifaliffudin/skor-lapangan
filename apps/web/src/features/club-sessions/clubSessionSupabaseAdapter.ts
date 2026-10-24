@@ -1,8 +1,11 @@
 import { supabase } from "../../lib/supabase";
 import type {
   ClubSessionAdapter,
+  ClubSessionAvailability,
   ClubSessionDetail,
+  ClubSessionGender,
   ClubSessionMatchResult,
+  ClubSessionPairingMode,
   ClubSessionStatus,
   ClubSessionSummary,
 } from "./clubSessionManagement";
@@ -20,7 +23,7 @@ export function createClubSessionSupabaseAdapter(
       const ownerId = requireAccount(userId);
       const { data, error } = await supabase!
         .from("club_sessions")
-        .select("id,name,session_date,status,created_at")
+        .select("id,name,session_date,status,pairing_mode,created_at")
         .eq("owner_id", ownerId)
         .order("session_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -33,13 +36,15 @@ export function createClubSessionSupabaseAdapter(
         await Promise.all([
           supabase!
             .from("club_sessions")
-            .select("id,name,session_date,status,created_at")
+            .select("id,name,session_date,status,pairing_mode,created_at")
             .eq("id", sessionId)
             .eq("owner_id", ownerId)
             .maybeSingle(),
           supabase!
             .from("club_session_players")
-            .select("id,display_name,sort_order,is_active")
+            .select(
+              "id,display_name,sort_order,is_active,gender,skill_level,availability,avoid_player_ids",
+            )
             .eq("session_id", sessionId)
             .eq("owner_id", ownerId)
             .order("sort_order", { ascending: true })
@@ -54,7 +59,7 @@ export function createClubSessionSupabaseAdapter(
           supabase!
             .from("club_session_matches")
             .select(
-              "id,match_id,linked_match_id,court_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2,queue_order,started_at",
+              "id,match_id,linked_match_id,court_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2,queue_order,started_at,is_open_fallback",
             )
             .eq("session_id", sessionId)
             .eq("owner_id", ownerId)
@@ -94,13 +99,17 @@ export function createClubSessionSupabaseAdapter(
       }
       return {
         session: sessionResult.data as ClubSessionSummary,
-        players: playerResult.data ?? [],
+        players: (playerResult.data ?? []) as ClubSessionDetail["players"],
         courts: courtResult.data ?? [],
         queue,
         results,
       } satisfies ClubSessionDetail;
     },
-    async createSession(input) {
+    async createSession(input: {
+      name: string;
+      sessionDate: string;
+      pairingMode?: ClubSessionPairingMode;
+    }) {
       const ownerId = requireAccount(userId);
       const { data, error } = await supabase!
         .from("club_sessions")
@@ -108,6 +117,7 @@ export function createClubSessionSupabaseAdapter(
           owner_id: ownerId,
           name: input.name,
           session_date: input.sessionDate,
+          pairing_mode: input.pairingMode ?? "open",
         })
         .select("id")
         .single();
@@ -115,13 +125,21 @@ export function createClubSessionSupabaseAdapter(
         throw error ?? new Error("CLUB_SESSION_CREATE_FAILED");
       return data;
     },
-    async addPlayer(input) {
+    async addPlayer(input: {
+      sessionId: string;
+      displayName: string;
+      sortOrder: number;
+      gender?: ClubSessionGender;
+      skillLevel?: number;
+    }) {
       const ownerId = requireAccount(userId);
       const { error } = await supabase!.from("club_session_players").insert({
         session_id: input.sessionId,
         owner_id: ownerId,
         display_name: input.displayName,
         sort_order: input.sortOrder,
+        gender: input.gender ?? null,
+        skill_level: input.skillLevel ?? 3,
       });
       if (error) throw error;
     },
@@ -140,6 +158,35 @@ export function createClubSessionSupabaseAdapter(
       const { error } = await supabase!
         .from("club_session_players")
         .update({ is_active: input.isActive })
+        .eq("id", input.playerId)
+        .eq("session_id", input.sessionId)
+        .eq("owner_id", ownerId);
+      if (error) throw error;
+    },
+    async updatePlayerProfile(input: {
+      sessionId: string;
+      playerId: string;
+      gender?: ClubSessionGender;
+      skillLevel?: number;
+      availability?: ClubSessionAvailability;
+      avoidPlayerIds?: string[];
+    }) {
+      const ownerId = requireAccount(userId);
+      const updates = {
+        ...(input.gender !== undefined ? { gender: input.gender } : {}),
+        ...(input.skillLevel !== undefined
+          ? { skill_level: input.skillLevel }
+          : {}),
+        ...(input.availability !== undefined
+          ? { availability: input.availability }
+          : {}),
+        ...(input.avoidPlayerIds !== undefined
+          ? { avoid_player_ids: input.avoidPlayerIds }
+          : {}),
+      };
+      const { error } = await supabase!
+        .from("club_session_players")
+        .update(updates)
         .eq("id", input.playerId)
         .eq("session_id", input.sessionId)
         .eq("owner_id", ownerId);
@@ -169,7 +216,30 @@ export function createClubSessionSupabaseAdapter(
         team_b_player_1: teamBPlayer1,
         team_b_player_2: teamBPlayer2,
         queue_order: input.queueOrder,
+        is_open_fallback: input.isOpenFallback ?? false,
       });
+      if (error) throw error;
+    },
+    async addQueuedMatches(input) {
+      const ownerId = requireAccount(userId);
+      const { error } = await supabase!.from("club_session_matches").insert(
+        input.matches.map((match) => {
+          const [teamAPlayer1, teamAPlayer2, teamBPlayer1, teamBPlayer2] =
+            match.playerIds;
+          return {
+            session_id: input.sessionId,
+            owner_id: ownerId,
+            match_id: match.matchId,
+            court_id: match.courtId,
+            team_a_player_1: teamAPlayer1,
+            team_a_player_2: teamAPlayer2,
+            team_b_player_1: teamBPlayer1,
+            team_b_player_2: teamBPlayer2,
+            queue_order: match.queueOrder,
+            is_open_fallback: match.isOpenFallback ?? false,
+          };
+        }),
+      );
       if (error) throw error;
     },
     async markMatchStarted(input) {
