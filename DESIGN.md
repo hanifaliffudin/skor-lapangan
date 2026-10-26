@@ -8,6 +8,10 @@ Skor Lapangan adalah alat utilitas lapangan untuk pemain rekreasional. Tampilan 
 - Cobalt menandai aksi utama. Lime hanya menandai aksi skor dan konfirmasi.
 - Oranye tua menandai fokus keyboard dengan kontras pada permukaan off-white dan lime.
 - Permukaan off-white, teks ink, garis batas kuat, tanpa gradient atau glass effect.
+- Tema system mengikuti perangkat saat belum dipilih, tema terang menjaga keterbacaan di lapangan, dan tema gelap mengurangi silau saat bermain sore atau malam.
+- Teks di atas permukaan lime memakai foreground khusus dengan kontras tinggi, bukan warna teks utama tema gelap.
+- Pemilih tema memakai ikon monitor, matahari, dan bulan agar header tetap ringkas; label aksesibel dan pilihan native tetap menyediakan konteks lengkap.
+- Mode display pertandingan memakai palet gelap khusus yang tidak ikut terbalik oleh tema aplikasi, supaya layar skor tetap terbaca dari jauh.
 - Angka skor memakai numeral tabular berukuran besar.
 - Label kecil berhuruf kapital memakai jarak huruf longgar agar nama olahraga, set, dan format cepat terbaca sebelum angka skor.
 - Lapangan selalu memakai orientasi potret dengan net horizontal, mengikuti proporsi fisik lapangan.

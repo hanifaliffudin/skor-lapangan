@@ -29,6 +29,7 @@ import { localizedPath, useLocale } from "../../lib/i18n";
 import { normalizeIntegerInput } from "../../lib/numberInput";
 import {
   loadDraft,
+  clearDraft,
   saveDraft,
   saveMatch,
   saveMatchAsync,
@@ -93,6 +94,8 @@ export function SetupPage() {
   const initialDraft: SetupDraft | null = loadDraft();
   const [clubDraft, setClubDraft] = useState<SetupDraft | null>(null);
   const draft = clubDraft ?? initialDraft;
+  const rematchDefinition = draft?.rematch?.definition;
+  const rematchRuleset = rematchDefinition?.ruleset;
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
@@ -108,19 +111,43 @@ export function SetupPage() {
     document.title = t("setupPageTitle");
   }, [t]);
 
-  const [names, setNames] = useState(["", "", "", ""]);
+  const [names, setNames] = useState(() =>
+    rematchDefinition
+      ? [
+          rematchDefinition.teams.A.players[0]?.name ?? "",
+          rematchDefinition.teams.A.players[1]?.name ?? "",
+          rematchDefinition.teams.B.players[0]?.name ?? "",
+          rematchDefinition.teams.B.players[1]?.name ?? "",
+        ]
+      : ["", "", "", ""],
+  );
   const [clubSetupLoading, setClubSetupLoading] = useState(
     Boolean(clubMatchId),
   );
   const [clubSetupReady, setClubSetupReady] = useState(!clubMatchId);
   const [savingMatch, setSavingMatch] = useState(false);
-  const [format, setFormat] = useState<MatchFormat>(draft?.format ?? "doubles");
-  const [firstServer, setFirstServer] = useState("A-0");
-  const [officialScoringMode, setOfficialScoringMode] =
-    useState<ScoringMode>("side_out");
+  const [format, setFormat] = useState<MatchFormat>(
+    rematchDefinition?.format ?? draft?.format ?? "doubles",
+  );
+  const [firstServer, setFirstServer] = useState(
+    rematchDefinition
+      ? `${rematchDefinition.initialServingTeam}-${rematchDefinition.initialServingPlayer}`
+      : "A-0",
+  );
+  const [officialScoringMode, setOfficialScoringMode] = useState<ScoringMode>(
+    rematchRuleset?.configuration?.scoringMode ?? "side_out",
+  );
   const [ruleSource, setRuleSource] = useState<
     "official" | "community" | "guest_custom"
-  >(draft?.communityRuleId ? "community" : "official");
+  >(
+    draft?.communityRuleId
+      ? "community"
+      : rematchRuleset?.source === "community"
+        ? "community"
+        : rematchRuleset?.source === "guest_custom"
+          ? "guest_custom"
+          : "official",
+  );
   const [ruleError, setRuleError] = useState("");
   const [communityRules, setCommunityRules] = useState<CommunityRuleRecord[]>(
     [],
@@ -132,45 +159,90 @@ export function SetupPage() {
   const [communityConfiguration, setCommunityConfiguration] =
     useState<CommunityRuleConfiguration | null>(null);
   const [communityLoading, setCommunityLoading] = useState(
-    Boolean(draft?.communityRuleId),
+    Boolean(draft?.communityRuleId && !rematchDefinition),
   );
-  const [tennisRules, setTennisRules] =
-    useState<TennisRules>(defaultTennisRules);
-  const [padelRules, setPadelRules] = useState<PadelRules>(defaultPadelRules);
+  const [tennisRules, setTennisRules] = useState<TennisRules>(
+    rematchRuleset?.tennisConfiguration ?? defaultTennisRules,
+  );
+  const [padelRules, setPadelRules] = useState<PadelRules>(
+    rematchRuleset?.padelConfiguration ?? defaultPadelRules,
+  );
   const [tableTennisRules, setTableTennisRules] = useState<TableTennisRules>(
-    defaultTableTennisRules,
+    rematchRuleset?.tableTennisConfiguration ?? defaultTableTennisRules,
   );
-  const [squashRules, setSquashRules] =
-    useState<SquashRules>(defaultSquashRules);
+  const [squashRules, setSquashRules] = useState<SquashRules>(
+    rematchRuleset?.squashConfiguration ?? defaultSquashRules,
+  );
   const [tableTennisFirstReceiver, setTableTennisFirstReceiver] =
-    useState<PlayerIndex>(0);
-  const [firstServingTeam, setFirstServingTeam] = useState<TeamId>("A");
+    useState<PlayerIndex>(
+      rematchDefinition?.tableTennisOrders?.firstReceiver.player ?? 0,
+    );
+  const [firstServingTeam, setFirstServingTeam] = useState<TeamId>(
+    rematchDefinition?.initialServingTeam ?? "A",
+  );
   const [firstServerByTeam, setFirstServerByTeam] = useState<
     Record<TeamId, PlayerIndex>
-  >({ A: 0, B: 0 });
+  >({
+    A:
+      rematchDefinition?.tennisSetOrders?.serviceOrder.A[0] ??
+      rematchDefinition?.squashGameOrders?.serviceOrder.A[0] ??
+      (rematchDefinition?.tableTennisOrders?.firstServer.team === "A"
+        ? rematchDefinition.tableTennisOrders.firstServer.player
+        : 0),
+    B:
+      rematchDefinition?.tennisSetOrders?.serviceOrder.B[0] ??
+      rematchDefinition?.squashGameOrders?.serviceOrder.B[0] ??
+      (rematchDefinition?.tableTennisOrders?.firstServer.team === "B"
+        ? rematchDefinition.tableTennisOrders.firstServer.player
+        : 0),
+  });
   const [deuceReceiverByTeam, setDeuceReceiverByTeam] = useState<
     Record<TeamId, PlayerIndex>
-  >({ A: 0, B: 0 });
+  >({
+    A:
+      rematchDefinition?.tennisSetOrders?.deuceReceiver.A ??
+      rematchDefinition?.padelSetOrders?.deuceReceiver.A ??
+      0,
+    B:
+      rematchDefinition?.tennisSetOrders?.deuceReceiver.B ??
+      rematchDefinition?.padelSetOrders?.deuceReceiver.B ??
+      0,
+  });
   const [squashReceiverBySide, setSquashReceiverBySide] = useState<
     Record<TeamId, { left: PlayerIndex; right: PlayerIndex }>
   >({
-    A: { left: 1, right: 0 },
-    B: { left: 1, right: 0 },
+    A: rematchDefinition?.squashGameOrders?.receiverBySide.A ?? {
+      left: 1,
+      right: 0,
+    },
+    B: rematchDefinition?.squashGameOrders?.receiverBySide.B ?? {
+      left: 1,
+      right: 0,
+    },
   });
   const [squashOpeningServiceBox, setSquashOpeningServiceBox] = useState<
     "left" | "right"
-  >("right");
+  >(rematchDefinition?.squashGameOrders?.openingServiceBox ?? "right");
   const [mixedRoles, setMixedRoles] = useState<
     Record<TeamId, [PadelGender, PadelGender]>
   >({
-    A: ["woman", "man"],
-    B: ["woman", "man"],
+    A: rematchDefinition?.tennisLocalRoles?.A
+      ? [...rematchDefinition.tennisLocalRoles.A]
+      : rematchDefinition?.padelLocalRoles?.A
+        ? [...rematchDefinition.padelLocalRoles.A]
+        : ["woman", "man"],
+    B: rematchDefinition?.tennisLocalRoles?.B
+      ? [...rematchDefinition.tennisLocalRoles.B]
+      : rematchDefinition?.padelLocalRoles?.B
+        ? [...rematchDefinition.padelLocalRoles.B]
+        : ["woman", "man"],
   });
   const [customRules, setCustomRules] = useState<ScoringRules>(() => ({
-    ...officialRulesetFor(
-      draft?.sport ?? "badminton",
-      draft?.format ?? "doubles",
-    ).configuration,
+    ...(rematchRuleset?.configuration ??
+      officialRulesetFor(
+        draft?.sport ?? "badminton",
+        draft?.format ?? "doubles",
+      ).configuration),
   }));
 
   useEffect(() => {
@@ -257,6 +329,11 @@ export function SetupPage() {
   }, [clubMatchId, clubSessionId, t]);
 
   useEffect(() => {
+    if (draft?.rematch) {
+      setCommunityRulesLoading(false);
+      setCommunityLoading(false);
+      return;
+    }
     if (!draft || !supabase) {
       setCommunityRulesLoading(false);
       setCommunityRulesError(draft ? t("backendNotConfigured") : "");
@@ -293,6 +370,10 @@ export function SetupPage() {
   }, [draft?.sport, t]);
 
   useEffect(() => {
+    if (draft?.rematch) {
+      setCommunityLoading(false);
+      return;
+    }
     if (!draft?.communityRuleId) {
       setCommunityLoading(false);
       return;
@@ -505,8 +586,12 @@ export function SetupPage() {
       );
       return;
     }
+    const usesRematchCommunitySnapshot = Boolean(
+      rematchRuleset?.source === "community" && ruleSource === "community",
+    );
     if (
       ruleSource === "community" &&
+      !usesRematchCommunitySnapshot &&
       (!communityRule || !communityConfiguration || communityLoading)
     ) {
       setRuleError(t("loadRuleError"));
@@ -597,35 +682,20 @@ export function SetupPage() {
         : {}),
     };
     const ruleset: RulesetSnapshot =
-      ruleSource === "community" && communityRule && communityConfiguration
-        ? snapshotForCommunityRule(
-            communityRule,
-            communityConfiguration,
-            format,
-          )
-        : draft.sport === "squash"
-          ? {
-              ...officialSnapshot,
-              id: localRulesetId,
-              name: localRulesetName,
-              sport: "squash",
+      usesRematchCommunitySnapshot && rematchRuleset
+        ? { ...rematchRuleset, format }
+        : ruleSource === "community" && communityRule && communityConfiguration
+          ? snapshotForCommunityRule(
+              communityRule,
+              communityConfiguration,
               format,
-              source: ruleSource,
-              version: localRulesetVersion,
-              configuration: {
-                ...(ruleSource === "official"
-                  ? official.configuration
-                  : customConfiguration),
-                bestOf: squashRules.bestOf,
-              },
-              squashConfiguration: { ...squashRules },
-            }
-          : draft.sport === "table_tennis"
+            )
+          : draft.sport === "squash"
             ? {
                 ...officialSnapshot,
                 id: localRulesetId,
                 name: localRulesetName,
-                sport: "table_tennis",
+                sport: "squash",
                 format,
                 source: ruleSource,
                 version: localRulesetVersion,
@@ -633,61 +703,80 @@ export function SetupPage() {
                   ...(ruleSource === "official"
                     ? official.configuration
                     : customConfiguration),
-                  bestOf: tableTennisRules.bestOf,
+                  bestOf: squashRules.bestOf,
                 },
-                tableTennisConfiguration: { ...tableTennisRules },
+                squashConfiguration: { ...squashRules },
               }
-            : draft.sport === "tennis"
+            : draft.sport === "table_tennis"
               ? {
                   ...officialSnapshot,
                   id: localRulesetId,
                   name: localRulesetName,
-                  sport: "tennis",
+                  sport: "table_tennis",
                   format,
                   source: ruleSource,
                   version: localRulesetVersion,
-                  configuration:
-                    ruleSource === "official"
-                      ? { ...official.configuration! }
-                      : customConfiguration,
-                  tennisConfiguration: { ...tennisRules },
+                  configuration: {
+                    ...(ruleSource === "official"
+                      ? official.configuration
+                      : customConfiguration),
+                    bestOf: tableTennisRules.bestOf,
+                  },
+                  tableTennisConfiguration: { ...tableTennisRules },
                 }
-              : draft.sport === "padel"
+              : draft.sport === "tennis"
                 ? {
                     ...officialSnapshot,
                     id: localRulesetId,
                     name: localRulesetName,
-                    sport: "padel",
+                    sport: "tennis",
                     format,
-                    source:
-                      ruleSource === "official" ? official.source : ruleSource,
+                    source: ruleSource,
                     version: localRulesetVersion,
                     configuration:
                       ruleSource === "official"
                         ? { ...official.configuration! }
                         : customConfiguration,
-                    padelConfiguration: { ...padelRules },
+                    tennisConfiguration: { ...tennisRules },
                   }
-                : ruleSource === "official"
+                : draft.sport === "padel"
                   ? {
                       ...officialSnapshot,
                       id: localRulesetId,
                       name: localRulesetName,
-                      sport: draft.sport,
+                      sport: "padel",
                       format,
-                      source: "official",
+                      source:
+                        ruleSource === "official"
+                          ? official.source
+                          : ruleSource,
                       version: localRulesetVersion,
-                      configuration: { ...official.configuration },
+                      configuration:
+                        ruleSource === "official"
+                          ? { ...official.configuration! }
+                          : customConfiguration,
+                      padelConfiguration: { ...padelRules },
                     }
-                  : {
-                      id: localRulesetId,
-                      name: localRulesetName,
-                      sport: draft.sport,
-                      format,
-                      source: "guest_custom",
-                      version: localRulesetVersion,
-                      configuration: customConfiguration,
-                    };
+                  : ruleSource === "official"
+                    ? {
+                        ...officialSnapshot,
+                        id: localRulesetId,
+                        name: localRulesetName,
+                        sport: draft.sport,
+                        format,
+                        source: "official",
+                        version: localRulesetVersion,
+                        configuration: { ...official.configuration },
+                      }
+                    : {
+                        id: localRulesetId,
+                        name: localRulesetName,
+                        sport: draft.sport,
+                        format,
+                        source: "guest_custom",
+                        version: localRulesetVersion,
+                        configuration: customConfiguration,
+                      };
     const makePlayer = (
       index: number,
       teamId: TeamId,
@@ -794,6 +883,7 @@ export function SetupPage() {
         setRuleError(t("matchStorageError"));
         return;
       }
+      clearDraft();
       navigate(
         localizedPath(
           `/match/${id}${clubSessionId ? `?clubSessionId=${clubSessionId}` : ""}`,
@@ -809,6 +899,7 @@ export function SetupPage() {
       setRuleError(t("matchStorageError"));
       return;
     }
+    clearDraft();
     navigate(
       localizedPath(
         `/match/${id}${clubSessionId ? `?clubSessionId=${clubSessionId}` : ""}`,

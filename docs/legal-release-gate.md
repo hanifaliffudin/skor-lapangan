@@ -2,6 +2,10 @@
 
 Dokumen ini mengubah draft legal menjadi daftar pekerjaan yang dapat diverifikasi. Status saat ini: **belum siap dipublikasikan** karena identitas operator, kontak, keputusan produk, dan review hukum belum diisi.
 
+## Current portfolio scope
+
+Untuk penggunaan saat ini sebagai project portfolio dan alat mabar pribadi, gunakan [portfolio release scope](portfolio-release-scope.md). Full legal gate di bawah ini berlaku jika project dibuka sebagai layanan publik, account history atau Community Rules diaktifkan untuk pengguna umum, analytics ditambahkan, atau project mulai menerima pembayaran.
+
 ## Satu paket informasi yang harus diisi owner
 
 - Nama legal operator.

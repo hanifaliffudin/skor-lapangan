@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MatchJournal } from "@skor-lapangan/scoring-core";
 import {
   canSyncStoredMatch,
+  clearDraft,
   loadDraft,
   loadMatch,
   loadMatchAsync,
@@ -57,6 +58,44 @@ describe("guest session storage", () => {
       format: "mixed_doubles",
       mode: "casual",
     });
+  });
+
+  it("round-trips and clears a rematch snapshot", () => {
+    const definition = {
+      id: "source-match",
+      sport: "badminton" as const,
+      format: "doubles" as const,
+      rulesetId: "bwf-doubles-3x21-2025",
+      mode: "casual" as const,
+      createdAt: "2026-10-26T00:00:00.000Z",
+      initialServingTeam: "A" as const,
+      initialServingPlayer: 0 as const,
+      teams: {
+        A: {
+          name: "A",
+          players: [
+            { id: "a", name: "A1" },
+            { id: "a2", name: "A2" },
+          ] as const,
+        },
+        B: {
+          name: "B",
+          players: [
+            { id: "b", name: "B1" },
+            { id: "b2", name: "B2" },
+          ] as const,
+        },
+      },
+    };
+    saveDraft({
+      sport: "badminton",
+      format: "doubles",
+      mode: "casual",
+      rematch: { sourceMatchId: definition.id, definition },
+    });
+    expect(loadDraft()?.rematch?.sourceMatchId).toBe(definition.id);
+    clearDraft();
+    expect(loadDraft()).toBeNull();
   });
 
   it("uses the client UUID as the match storage identity", () => {

@@ -23,10 +23,16 @@ import {
   removeMatchAsync,
   saveDraft,
 } from "../../lib/session";
+import {
+  formatMatchResultShare,
+  resultSummaryFromJournal,
+  shareMatchResult,
+} from "../../lib/matchResult";
+import { setupDraftFromDefinition } from "../../lib/rematch";
 import { applySeoMetadata, homeSchema } from "../../lib/seo";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Share2, Trash2 } from "lucide-react";
 import styles from "../../styles/App.module.css";
 
 function pointLabel(state: MatchState, team: TeamId, locale: "en" | "id") {
@@ -55,10 +61,14 @@ export function HomePage() {
   );
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const [localShareStatus, setLocalShareStatus] = useState("");
   const resumableMatches = savedMatches.filter(
     (journal) =>
       deriveJournal(journal).state.status === "active" ||
       pendingMatchIds.has(journal.definition.id),
+  );
+  const completedMatches = savedMatches.filter(
+    (journal) => deriveJournal(journal).state.status === "complete",
   );
 
   useEffect(() => {
@@ -105,6 +115,39 @@ export function HomePage() {
 
   function continueToSetup() {
     saveDraft({ sport, format, mode: "casual" });
+    navigate(localizedPath("/setup", locale));
+  }
+
+  async function shareLocalMatch(journal: MatchJournal) {
+    const summary = resultSummaryFromJournal(journal);
+    const payload = formatMatchResultShare(summary, {
+      appName: "Skor Lapangan",
+      sport: t(summary.sport),
+      format: t(summary.format),
+      playedAt: t("playedAt"),
+    });
+    const result = await shareMatchResult(payload, {
+      share:
+        typeof navigator.share === "function"
+          ? (data) => navigator.share(data)
+          : undefined,
+      writeText: navigator.clipboard?.writeText
+        ? (text) => navigator.clipboard.writeText(text)
+        : undefined,
+    });
+    setLocalShareStatus(
+      result === "shared"
+        ? t("resultShared")
+        : result === "copied"
+          ? t("resultCopied")
+          : result === "failed"
+            ? t("shareResultFailed")
+            : "",
+    );
+  }
+
+  function rematchLocalMatch(journal: MatchJournal) {
+    saveDraft(setupDraftFromDefinition(journal.definition));
     navigate(localizedPath("/setup", locale));
   }
 
@@ -258,6 +301,65 @@ export function HomePage() {
             </div>
           </section>
         ) : null}
+        {completedMatches.length > 0 ? (
+          <section
+            className={styles.resumeSection}
+            aria-labelledby="completed-local-title"
+          >
+            <div>
+              <h2 id="completed-local-title">{t("completedLocalMatches")}</h2>
+              <p>{t("completedLocalMatchesBody")}</p>
+            </div>
+            <div className={styles.resumeList}>
+              {completedMatches.map((journal) => {
+                const summary = resultSummaryFromJournal(journal);
+                return (
+                  <article
+                    className={styles.resumeMatch}
+                    key={journal.definition.id}
+                  >
+                    <span className={styles.resumeMatchTitle}>
+                      {t(summary.sport)} · {t(summary.format)}
+                    </span>
+                    <div
+                      className={styles.resumeMatchScore}
+                      role="group"
+                      aria-label={t("score")}
+                    >
+                      <span>{summary.teamAName}</span>
+                      <strong>
+                        {summary.finalScore.A}
+                        <span aria-hidden="true">:</span>
+                        {summary.finalScore.B}
+                      </strong>
+                      <span>{summary.teamBName}</span>
+                    </div>
+                    <div className={styles.resumeMatchActions}>
+                      <Button
+                        variant="outline"
+                        className={styles.resumeButton}
+                        type="button"
+                        onClick={() => void shareLocalMatch(journal)}
+                      >
+                        <Share2 aria-hidden="true" size={17} />{" "}
+                        {t("shareResult")}
+                      </Button>
+                      <Button
+                        variant="default"
+                        className={styles.resumeButton}
+                        type="button"
+                        onClick={() => rematchLocalMatch(journal)}
+                      >
+                        {t("quickRematch")}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            {localShareStatus ? <p role="status">{localShareStatus}</p> : null}
+          </section>
+        ) : null}
         {showDeleteToast ? (
           <div className={styles.deleteToast} role="status" aria-atomic="true">
             <Check aria-hidden="true" size={18} />
@@ -393,6 +495,7 @@ export function HomePage() {
       <footer className={styles.footer}>
         <span>{t("officialRules")}</span>
         <span>{t("officialHint")}</span>
+        <span>{t("portfolioNotice")}</span>
         <Link
           className={styles.communityFooterLink}
           to={localizedPath("/rules", locale)}

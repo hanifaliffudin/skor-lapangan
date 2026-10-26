@@ -6,19 +6,27 @@ import { App } from "./App";
 import { AuthProvider } from "./lib/auth";
 import { LocaleProvider } from "./lib/i18n";
 import { sanitizeAnalyticsEvent } from "./lib/analytics";
+import { analyticsEnabled } from "./lib/runtime-config";
+import { initializeTheme, ThemeProvider } from "./lib/theme";
 import "./styles/global.css";
+
+initializeTheme();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <>
       <BrowserRouter>
-        <LocaleProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </LocaleProvider>
+        <ThemeProvider>
+          <LocaleProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </BrowserRouter>
-      <Analytics beforeSend={sanitizeAnalyticsEvent} />
+      {analyticsEnabled ? (
+        <Analytics beforeSend={sanitizeAnalyticsEvent} />
+      ) : null}
     </>
   </StrictMode>,
 );

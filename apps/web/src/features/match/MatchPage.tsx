@@ -59,6 +59,7 @@ import {
   loadMatchAsync,
   removeMatch,
   removeMatchAsync,
+  saveDraft,
   saveMatchAsync,
 } from "../../lib/session";
 import { supabase } from "../../lib/supabase";
@@ -79,6 +80,12 @@ import {
   readRemoteMatch,
   type RemoteMatchSnapshot,
 } from "../../lib/match-remote";
+import {
+  formatMatchResultShare,
+  resultSummaryFromJournal,
+  shareMatchResult,
+} from "../../lib/matchResult";
+import { setupDraftFromDefinition } from "../../lib/rematch";
 import { Court } from "./Court";
 import { ClubSessionRoundTimer } from "../club-sessions/ClubSessionRoundTimer";
 import { OverrideDialog } from "./OverrideDialog";
@@ -197,6 +204,8 @@ export function MatchPage() {
   const [viewerUrl, setViewerUrl] = useState("");
   const [viewerBusy, setViewerBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [resultShareMessage, setResultShareMessage] = useState("");
+  const [quickRematchBusy, setQuickRematchBusy] = useState(false);
   const [endingSession, setEndingSession] = useState(false);
   const [takeoverPending, setTakeoverPending] = useState(false);
   const [endError, setEndError] = useState("");
@@ -724,6 +733,42 @@ export function MatchPage() {
     } catch {
       setShareMessage("");
     }
+  }
+
+  async function shareCompletedResult() {
+    if (!journal || view?.state.status !== "complete") return;
+    const summary = resultSummaryFromJournal(journal);
+    const payload = formatMatchResultShare(summary, {
+      appName: "Skor Lapangan",
+      sport: t(summary.sport),
+      format: t(summary.format),
+      playedAt: t("playedAt"),
+    });
+    const result = await shareMatchResult(payload, {
+      share:
+        typeof navigator.share === "function"
+          ? (data) => navigator.share(data)
+          : undefined,
+      writeText: navigator.clipboard?.writeText
+        ? (text) => navigator.clipboard.writeText(text)
+        : undefined,
+    });
+    setResultShareMessage(
+      result === "shared"
+        ? t("resultShared")
+        : result === "copied"
+          ? t("resultCopied")
+          : result === "failed"
+            ? t("shareResultFailed")
+            : "",
+    );
+  }
+
+  function startQuickRematch() {
+    if (!journal || view?.state.status !== "complete") return;
+    setQuickRematchBusy(true);
+    saveDraft(setupDraftFromDefinition(journal.definition));
+    navigate(localizedPath("/setup", locale));
   }
 
   async function persistSyncMetadata(
@@ -1461,6 +1506,40 @@ export function MatchPage() {
               {t("winner")}: {definition.teams[state.winner!].name}
             </strong>
             {pendingSync ? <small>{t("pendingSyncBody")}</small> : null}
+          </section>
+        ) : null}
+
+        {state.status === "complete" ? (
+          <section
+            className={styles.shareControls}
+            aria-label={t("shareResult")}
+          >
+            <div>
+              <strong>{t("shareResult")}</strong>
+              <p>{t("shareResultDescription")}</p>
+            </div>
+            <div className={styles.shareActions}>
+              <Button
+                variant="outline"
+                className={styles.secondaryButton}
+                type="button"
+                onClick={() => void shareCompletedResult()}
+              >
+                {t("shareResult")}
+              </Button>
+              <Button
+                variant="default"
+                className={styles.secondaryButton}
+                type="button"
+                disabled={quickRematchBusy}
+                onClick={startQuickRematch}
+              >
+                {t("quickRematch")}
+              </Button>
+            </div>
+            {resultShareMessage ? (
+              <p role="status">{resultShareMessage}</p>
+            ) : null}
           </section>
         ) : null}
 

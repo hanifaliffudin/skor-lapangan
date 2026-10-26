@@ -4,15 +4,34 @@ import { AppHeader } from "../../components/AppHeader";
 import { AuthProviderButtons } from "../../components/AuthProviderButtons";
 import { useAuth } from "../../lib/auth";
 import { formatDateTime, localizedPath, useLocale } from "../../lib/i18n";
-import { removeMatchAsync } from "../../lib/session";
+import {
+  getStoredMatchInfo,
+  listStoredMatchesAsync,
+  removeMatchAsync,
+  saveDraft,
+} from "../../lib/session";
 import {
   padelPointLabel,
   tennisPointLabel,
   type MatchFormat,
   type PadelGameScoring,
+  type Sport,
   type TeamId,
 } from "@skor-lapangan/scoring-core";
 import { supabase } from "../../lib/supabase";
+import {
+  formatMatchResultShare,
+  resultSummaryFromJournal,
+  resultSummaryFromRemote,
+  shareMatchResult,
+} from "../../lib/matchResult";
+import {
+  calculateMatchStatistics,
+  localDateRangeToIso,
+  type MatchStatistics,
+} from "../../lib/matchStatistics";
+import { readRemoteMatchDefinition } from "../../lib/match-remote";
+import { setupDraftFromDefinition } from "../../lib/rematch";
 import type { Json } from "../../lib/database.types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +78,13 @@ interface SavedScore {
     tieBreakScore: { A: number; B: number } | null;
   };
 }
+
+type LocalSummaryRecord = {
+  summary: ReturnType<typeof resultSummaryFromJournal>;
+  ownerId: string | null;
+  syncStatus: "local" | "pending";
+  lastServerSequence: number;
+};
 
 function scoreRecord(value: Json | undefined): { A: number; B: number } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -233,6 +259,18 @@ export function MatchHistoryPage() {
   >("all");
   const [sportFilter, setSportFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [winnerFilter, setWinnerFilter] = useState<"all" | "A" | "B">("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [localSummaries, setLocalSummaries] = useState<LocalSummaryRecord[]>(
+    [],
+  );
+  const [statistics, setStatistics] = useState<MatchStatistics | null>(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const [statisticsError, setStatisticsError] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
+  const [rematchId, setRematchId] = useState<string | null>(null);
+  const [rematchError, setRematchError] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
@@ -248,6 +286,171 @@ export function MatchHistoryPage() {
     );
     return () => window.clearTimeout(timeoutId);
   }, [searchInput]);
+
+  useEffect(() => {
+    let active = true;
+    void listStoredMatchesAsync()
+      .then((journals) => {
+        if (!active) return;
+        setLocalSummaries(
+          journals.flatMap((journal) => {
+            const info = getStoredMatchInfo(journal.definition.id);
+            if (
+              user &&
+              !isAnonymous &&
+              info?.ownerId &&
+              info.ownerId !== user.id
+            ) {
+              return [];
+            }
+            return [
+              {
+                summary: resultSummaryFromJournal(journal),
+                ownerId: info?.ownerId ?? null,
+                syncStatus: info?.sync.status ?? "local",
+                lastServerSequence: info?.sync.lastServerSequence ?? 0,
+              },
+            ];
+          }),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [user, isAnonymous]);
+
+  const dateRange = localDateRangeToIso(fromDate, toDate);
+  const statisticsFilters = {
+    search: searchQuery,
+    sport: sportFilter as Sport | "all",
+    winner: winnerFilter,
+    fromDate: dateRange.from ?? undefined,
+    toDate: dateRange.to ?? undefined,
+  };
+
+  useEffect(() => {
+    let active = true;
+    setStatisticsLoading(true);
+    setStatisticsError("");
+    const localDeviceStats = calculateMatchStatistics(
+      localSummaries.map((record) => record.summary),
+      statisticsFilters,
+    );
+    const localPrimaryRecords = localSummaries.filter(
+      (record) =>
+        !user ||
+        isAnonymous ||
+        !record.ownerId ||
+        (record.ownerId === user.id &&
+          (record.syncStatus === "pending" || record.lastServerSequence === 0)),
+    );
+    const localStats = calculateMatchStatistics(
+      localPrimaryRecords.map((record) => record.summary),
+      statisticsFilters,
+    );
+    if (!supabase || !user || isAnonymous) {
+      setStatistics(localStats);
+      setStatisticsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    void supabase
+      .rpc("get_my_match_statistics", {
+        p_search: searchQuery || null,
+        p_sport: sportFilter === "all" ? null : sportFilter,
+        p_winner: winnerFilter === "all" ? null : winnerFilter,
+        p_from_updated_at: dateRange.from,
+        p_to_updated_at: dateRange.to,
+        p_exclude_match_ids: localPrimaryRecords
+          .filter((record) =>
+            Boolean(user && !isAnonymous && record.ownerId === user.id),
+          )
+          .map((record) => record.summary.id),
+      })
+      .then(({ data, error: queryError }) => {
+        if (!active) return;
+        if (queryError) {
+          setStatistics(localDeviceStats);
+          setStatisticsError(queryError.message);
+        } else {
+          const bySport = [...localStats.bySport];
+          for (const row of data ?? []) {
+            const sport = row.sport as Sport;
+            const completedMatches = Number(row.completed_matches);
+            const teamAWins = Number(row.team_a_wins);
+            const teamBWins = Number(row.team_b_wins);
+            if (
+              ![
+                "badminton",
+                "pickleball",
+                "tennis",
+                "padel",
+                "table_tennis",
+                "squash",
+              ].includes(sport) ||
+              ![completedMatches, teamAWins, teamBWins].every(
+                (value) => Number.isSafeInteger(value) && value >= 0,
+              )
+            ) {
+              continue;
+            }
+            const current = bySport.find((item) => item.sport === sport);
+            const next = {
+              sport,
+              completedMatches,
+              teamAWins,
+              teamBWins,
+            };
+            if (current) {
+              current.completedMatches += next.completedMatches;
+              current.teamAWins += next.teamAWins;
+              current.teamBWins += next.teamBWins;
+            } else {
+              bySport.push(next);
+            }
+          }
+          const completedMatches = bySport.reduce(
+            (sum, item) => sum + item.completedMatches,
+            0,
+          );
+          const teamAWins = bySport.reduce(
+            (sum, item) => sum + item.teamAWins,
+            0,
+          );
+          const teamBWins = bySport.reduce(
+            (sum, item) => sum + item.teamBWins,
+            0,
+          );
+          setStatistics({
+            completedMatches,
+            teamAWins,
+            teamBWins,
+            teamAWinRate: completedMatches
+              ? teamAWins / completedMatches
+              : null,
+            teamBWinRate: completedMatches
+              ? teamBWins / completedMatches
+              : null,
+            bySport,
+          });
+        }
+        setStatisticsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    localSummaries,
+    searchQuery,
+    sportFilter,
+    winnerFilter,
+    dateRange.from,
+    dateRange.to,
+    user,
+    isAnonymous,
+  ]);
 
   useEffect(() => {
     if (!supabase || !user || isAnonymous) {
@@ -266,6 +469,9 @@ export function MatchHistoryPage() {
         p_search: searchQuery || null,
         p_status: statusFilter === "all" ? null : statusFilter,
         p_sport: sportFilter === "all" ? null : sportFilter,
+        p_winner: winnerFilter === "all" ? null : winnerFilter,
+        p_from_updated_at: dateRange.from,
+        p_to_updated_at: dateRange.to,
         p_sort: sortOrder,
         p_limit: HISTORY_PAGE_SIZE,
         p_before_updated_at: null,
@@ -296,6 +502,9 @@ export function MatchHistoryPage() {
     sortOrder,
     sportFilter,
     statusFilter,
+    winnerFilter,
+    dateRange.from,
+    dateRange.to,
   ]);
 
   async function loadMoreMatches() {
@@ -307,6 +516,9 @@ export function MatchHistoryPage() {
         p_search: searchQuery || null,
         p_status: statusFilter === "all" ? null : statusFilter,
         p_sport: sportFilter === "all" ? null : sportFilter,
+        p_winner: winnerFilter === "all" ? null : winnerFilter,
+        p_from_updated_at: dateRange.from,
+        p_to_updated_at: dateRange.to,
         p_sort: sortOrder,
         p_limit: HISTORY_PAGE_SIZE,
         p_before_updated_at: historyCursor.updatedAt,
@@ -357,6 +569,9 @@ export function MatchHistoryPage() {
     searchInput.trim() ||
     statusFilter !== "all" ||
     sportFilter !== "all" ||
+    winnerFilter !== "all" ||
+    fromDate ||
+    toDate ||
     sortOrder !== "newest",
   );
 
@@ -366,6 +581,52 @@ export function MatchHistoryPage() {
     setStatusFilter("all");
     setSportFilter("all");
     setSortOrder("newest");
+    setWinnerFilter("all");
+    setFromDate("");
+    setToDate("");
+  }
+
+  async function handleShare(match: MatchHistoryRow) {
+    if (match.status !== "complete") return;
+    const summary = resultSummaryFromRemote(match);
+    const payload = formatMatchResultShare(summary, {
+      appName: "Skor Lapangan",
+      sport: t(summary.sport),
+      format: t(summary.format),
+      playedAt: t("playedAt"),
+    });
+    const result = await shareMatchResult(payload, {
+      share:
+        typeof navigator.share === "function"
+          ? (data) => navigator.share(data)
+          : undefined,
+      writeText: navigator.clipboard?.writeText
+        ? (text) => navigator.clipboard.writeText(text)
+        : undefined,
+    });
+    setShareStatus(
+      result === "shared"
+        ? t("resultShared")
+        : result === "copied"
+          ? t("resultCopied")
+          : result === "failed"
+            ? t("shareResultFailed")
+            : "",
+    );
+  }
+
+  async function handleRematch(match: MatchHistoryRow) {
+    if (match.status !== "complete") return;
+    setRematchId(match.id);
+    setRematchError("");
+    const result = await readRemoteMatchDefinition(match.id);
+    if (result.status === "error") {
+      setRematchError(t("rematchLoadError"));
+      setRematchId(null);
+      return;
+    }
+    saveDraft(setupDraftFromDefinition(result.definition, match.id));
+    navigate(localizedPath("/setup", locale));
   }
 
   return (
@@ -435,8 +696,57 @@ export function MatchHistoryPage() {
                   <option value="oldest">{t("historySortOldest")}</option>
                 </SelectControl>
               </label>
+              <label className={styles.historyFilterField}>
+                <span>{t("historyFilterWinner")}</span>
+                <SelectControl
+                  name="history-winner-filter"
+                  value={winnerFilter}
+                  onChange={(event) =>
+                    setWinnerFilter(event.target.value as typeof winnerFilter)
+                  }
+                >
+                  <option value="all">{t("historyFilterAll")}</option>
+                  <option value="A">{t("teamAWinner")}</option>
+                  <option value="B">{t("teamBWinner")}</option>
+                </SelectControl>
+              </label>
+              <label className={styles.historyFilterField}>
+                <span>{t("historyFromDate")}</span>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                />
+              </label>
+              <label className={styles.historyFilterField}>
+                <span>{t("historyToDate")}</span>
+                <Input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                />
+              </label>
             </div>
+            {hasHistoryFilters ? (
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={clearHistoryFilters}
+              >
+                {t("clearHistoryFilters")}
+              </Button>
+            ) : null}
           </section>
+        ) : null}
+        {shareStatus ? (
+          <p className={styles.formSuccess} role="status">
+            {shareStatus}
+          </p>
+        ) : null}
+        {rematchError ? (
+          <p className={styles.formError} role="alert">
+            {rematchError}
+          </p>
         ) : null}
         {!user || isAnonymous ? (
           <section className={styles.rulesEmpty}>
@@ -465,6 +775,78 @@ export function MatchHistoryPage() {
             </Button>
           </div>
         ) : null}
+        <section
+          className={styles.historyStats}
+          aria-labelledby="history-stats-title"
+        >
+          <div className={styles.historyStatsHeading}>
+            <div>
+              <h2 id="history-stats-title">{t("historyStatistics")}</h2>
+              <p>
+                {t(
+                  user && !isAnonymous
+                    ? "historyStatisticsSource"
+                    : "historyStatisticsLocalSource",
+                )}
+              </p>
+            </div>
+            {statisticsLoading ? (
+              <span role="status">{t("loading")}</span>
+            ) : null}
+          </div>
+          {statisticsError ? (
+            <p className={styles.formError}>{t("historyStatisticsFallback")}</p>
+          ) : null}
+          {statistics ? (
+            <>
+              <div className={styles.historyStatsGrid}>
+                <div>
+                  <strong>{statistics.completedMatches}</strong>
+                  <span>{t("completedMatches")}</span>
+                </div>
+                <div>
+                  <strong>{statistics.teamAWins}</strong>
+                  <span>{t("teamAWins")}</span>
+                </div>
+                <div>
+                  <strong>{statistics.teamBWins}</strong>
+                  <span>{t("teamBWins")}</span>
+                </div>
+                <div>
+                  <strong>
+                    {statistics.teamAWinRate === null
+                      ? "–"
+                      : `${Math.round(statistics.teamAWinRate * 100)}%`}
+                  </strong>
+                  <span>{t("teamAWinRate")}</span>
+                </div>
+                <div>
+                  <strong>
+                    {statistics.teamBWinRate === null
+                      ? "–"
+                      : `${Math.round(statistics.teamBWinRate * 100)}%`}
+                  </strong>
+                  <span>{t("teamBWinRate")}</span>
+                </div>
+              </div>
+              {statistics.bySport.length > 0 ? (
+                <div className={styles.historyStatsList}>
+                  {statistics.bySport.map((item) => (
+                    <div key={item.sport}>
+                      <strong>{t(item.sport)}</strong>
+                      <span>
+                        {item.completedMatches} · {t("teamAShort")}{" "}
+                        {item.teamAWins} · {t("teamBShort")} {item.teamBWins}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>{t("historyStatisticsEmpty")}</p>
+              )}
+            </>
+          ) : null}
+        </section>
         {!loading && !error && user && !isAnonymous && matches.length === 0 ? (
           <section className={styles.rulesEmpty}>
             <h2>
@@ -608,6 +990,29 @@ export function MatchHistoryPage() {
                           : "resumeMatch",
                       )}
                     </Button>
+                    {match.status === "complete" ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          className={styles.secondaryButton}
+                          type="button"
+                          onClick={() => void handleShare(match)}
+                        >
+                          {t("shareResult")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className={styles.secondaryButton}
+                          type="button"
+                          disabled={rematchId === match.id}
+                          onClick={() => void handleRematch(match)}
+                        >
+                          {rematchId === match.id
+                            ? t("working")
+                            : t("quickRematch")}
+                        </Button>
+                      </>
+                    ) : null}
                     {confirmDeleteId === match.id ? (
                       <div
                         className="flex flex-wrap items-center gap-2"

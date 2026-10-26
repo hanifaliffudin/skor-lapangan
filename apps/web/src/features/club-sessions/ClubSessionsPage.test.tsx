@@ -1,8 +1,15 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render as rtlRender,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme";
 import { ClubSessionsPage } from "./ClubSessionsPage";
 import type {
   ClubSessionAdapter,
@@ -100,16 +107,18 @@ function createAdapter(): ClubSessionAdapter {
 }
 
 function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <LocaleProvider>
-        <Routes>
-          <Route path="/sessions" element={<ClubSessionsPage />} />
-          <Route path="/sessions/:sessionId" element={<ClubSessionsPage />} />
-          <Route path="/setup" element={<div />} />
-        </Routes>
-      </LocaleProvider>
-    </MemoryRouter>,
+  return rtlRender(
+    <ThemeProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/sessions" element={<ClubSessionsPage />} />
+            <Route path="/sessions/:sessionId" element={<ClubSessionsPage />} />
+            <Route path="/setup" element={<div />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -200,7 +209,9 @@ describe("Club Sessions page", () => {
     await user.click(sportSelect);
     await waitFor(() =>
       expect(
-        screen.getAllByRole("option").map((option) => option.textContent),
+        within(screen.getByRole("listbox"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
       ).toEqual([
         "Badminton",
         "Pickleball",

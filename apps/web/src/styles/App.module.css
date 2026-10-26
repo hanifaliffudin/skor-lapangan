@@ -46,7 +46,7 @@
   place-items: center;
   color: white;
   background: var(--cobalt);
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 8px;
   font-size: 14px;
   letter-spacing: 0.04em;
@@ -115,10 +115,10 @@
   gap: 8px;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid #b83c38;
+  border: 1px solid var(--danger);
   border-radius: 6px;
   background: var(--surface);
-  color: #8a211f;
+  color: var(--danger);
   font-size: 13px;
 }
 
@@ -325,7 +325,7 @@
 }
 
 .deleteMatchConfirmActions button {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
 }
 
 .deleteMatchConfirmButton {
@@ -350,11 +350,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--inverse-surface);
   border-radius: 10px;
-  background: var(--ink);
+  background: var(--inverse-surface);
   box-shadow: 0 8px 24px rgb(17 24 39 / 18%);
-  color: white;
+  color: var(--inverse-foreground);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.4;
@@ -373,7 +373,7 @@
   padding: clamp(20px, 5vw, 34px);
   border: 2px solid var(--line-strong);
   background: var(--surface);
-  box-shadow: 8px 8px 0 var(--ink);
+  box-shadow: 8px 8px 0 var(--shadow);
 }
 
 .optionGroup {
@@ -423,7 +423,7 @@
 
 .choiceCard[data-selected="true"] {
   border-color: var(--cobalt);
-  background: #f0f4ff;
+  background: var(--selected-surface);
 }
 
 .choiceCard input {
@@ -475,7 +475,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 8px;
   font-weight: 850;
 }
@@ -502,12 +502,12 @@
 }
 
 .secondaryButton:hover {
-  background: #eef0f2;
+  background: var(--subtle-surface);
 }
 
 .dangerButton {
   color: white;
-  background: var(--danger);
+  background: var(--danger-strong);
 }
 
 .guestNote {
@@ -544,7 +544,7 @@
 .installButton {
   min-height: 48px;
   flex: 1 1 190px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--cobalt);
   color: white;
   font-weight: 850;
@@ -637,12 +637,12 @@
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--lime);
-  color: var(--ink);
+  color: var(--lime-foreground);
   font-weight: 800;
 }
 
 .pwaUpdateButton:hover:not(:disabled) {
-  background: #84d84c;
+  background: var(--lime-hover);
 }
 
 .footer {
@@ -698,7 +698,7 @@
 }
 
 .syncStatus[data-state="error"] {
-  color: #8a211f;
+  color: var(--danger);
 }
 
 .readOnlyNotice {
@@ -735,7 +735,7 @@
 
 .matchStatusBanner[data-state="warning"],
 .matchStatusBanner[data-state="held"] {
-  border-left-color: #b7791f;
+  border-left-color: var(--warning);
 }
 
 .matchStatusBanner > span {
@@ -850,8 +850,8 @@
   min-height: 100dvh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--display-background);
+  color: var(--display-foreground);
 }
 
 .displayMain {
@@ -874,7 +874,7 @@
 
 .displayToolbar strong {
   display: block;
-  color: var(--surface);
+  color: var(--display-foreground);
   font-size: clamp(20px, 3vw, 34px);
   letter-spacing: -0.04em;
 }
@@ -890,7 +890,7 @@
 
 .displayMeta {
   margin: 0;
-  color: #e1e5ea;
+  color: var(--display-meta);
   font-size: clamp(13px, 1.6vw, 20px);
   line-height: 1.45;
 }
@@ -901,8 +901,9 @@
 
 .displayScoreboard .scoreCard {
   padding: clamp(14px, 3vw, 36px);
-  border-color: var(--surface);
-  background: var(--surface);
+  border-color: var(--display-foreground);
+  background: var(--display-card);
+  color: var(--display-ink);
 }
 
 .displayScoreboard .scoreCard[data-serving="true"] {
@@ -913,7 +914,7 @@
 .displayScore {
   display: block;
   padding: clamp(18px, 4vw, 48px) 0;
-  color: var(--ink);
+  color: var(--display-ink);
   font-size: clamp(76px, 18vw, 240px);
   font-variant-numeric: tabular-nums;
   font-weight: 950;
@@ -997,9 +998,9 @@
 .communityDisclaimer {
   margin: 14px 0 24px;
   padding: 12px 14px;
-  border-left: 4px solid #81838a;
-  background: #ececef;
-  color: #34363c;
+  border-left: 4px solid var(--disclaimer-border);
+  background: var(--disclaimer-surface);
+  color: var(--disclaimer-text);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -1057,7 +1058,7 @@
 }
 
 .communityRuleCardLink:hover {
-  background: #f3f5fb;
+  background: var(--selected-surface);
 }
 
 .communityRuleCardLink:focus-visible {
@@ -1120,8 +1121,8 @@
   align-items: center;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #e6e7ea;
-  color: #40434a;
+  background: var(--badge-surface);
+  color: var(--badge-text);
   font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.04em;
@@ -1174,21 +1175,21 @@
 
 .ruleUnpublishButton {
   padding: 12px 18px;
-  border: 2px solid #b83c38;
+  border: 2px solid var(--danger);
   border-radius: 8px;
-  color: #8a211f;
+  color: var(--danger);
   background: var(--surface);
   font-weight: 850;
 }
 
 .ruleUnpublishButton:hover {
-  color: #7c1d1d;
-  background: #fbe8e7;
+  color: var(--danger-hover);
+  background: var(--danger-surface);
 }
 
 .ruleRepublishButton {
   padding: 12px 18px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 8px;
   color: white;
   background: var(--cobalt);
@@ -1351,6 +1352,82 @@
   gap: 12px;
 }
 
+.historyStats {
+  margin: 22px 0;
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.historyStatsHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.historyStatsHeading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.historyStatsHeading p,
+.historyStats > p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.historyStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.historyStatsGrid > div {
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.historyStatsGrid strong {
+  color: var(--ink);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.historyStatsGrid span,
+.historyStatsList span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.historyStatsList {
+  display: grid;
+  gap: 6px;
+}
+
+.historyStatsList > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.formSuccess {
+  margin: 10px 0;
+  color: var(--ink);
+  font-weight: 750;
+}
+
 .historyTeams {
   margin: 0;
   color: var(--text-muted);
@@ -1474,7 +1551,7 @@
   padding: 18px;
   display: grid;
   gap: 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--surface);
 }
 
@@ -1510,13 +1587,13 @@
 
 .ruleChoice[data-selected="true"] {
   border: 2px solid var(--cobalt);
-  background: #f0f4ff;
+  background: var(--selected-surface);
 }
 
 .ruleChoice:disabled,
 .ruleChoice[data-unavailable="true"] {
   border-style: dashed;
-  background: #f1f2f4;
+  background: var(--disabled-surface);
   color: var(--text-muted);
 }
 
@@ -1651,7 +1728,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--surface);
 }
 
@@ -1689,7 +1766,7 @@
 
 .selectField {
   padding: 18px 20px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--surface);
 }
 
@@ -1757,7 +1834,7 @@
 .rulesBadge[data-source="guest_custom"],
 .rulesBadge[data-source="community"] {
   color: var(--text-muted);
-  background: #eceef0;
+  background: var(--subtle-surface);
 }
 
 .winnerBanner {
@@ -1768,8 +1845,9 @@
   justify-content: space-between;
   gap: 8px 16px;
   flex-wrap: wrap;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   background: var(--lime);
+  color: var(--lime-foreground);
 }
 
 .scoreboard {
@@ -1897,9 +1975,9 @@
   height: 20px;
   display: inline-grid;
   place-items: center;
-  color: white;
+  color: var(--marker-foreground);
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--marker-surface);
   font-size: 10px;
 }
 
@@ -1942,7 +2020,7 @@
   border: 4px solid white;
   outline: 2px solid var(--ink);
   background: #356b4b;
-  box-shadow: 6px 6px 0 var(--ink);
+  box-shadow: 6px 6px 0 var(--shadow);
 }
 
 .court[data-sport="tennis"] {
@@ -2159,8 +2237,8 @@
 }
 
 .playerSpot[data-serving="true"] {
-  color: var(--ink);
-  border-color: var(--ink);
+  color: var(--lime-foreground);
+  border-color: var(--lime-foreground);
   background: var(--lime);
 }
 
@@ -2174,9 +2252,9 @@
   height: 18px;
   display: grid;
   place-items: center;
-  color: white;
+  color: var(--marker-foreground);
   border-radius: 50%;
-  background: var(--ink);
+  background: var(--marker-surface);
   font-size: 10px;
 }
 
@@ -2187,7 +2265,7 @@
   border-color: #e7d7b6;
   outline-color: #342a1e;
   background: linear-gradient(#b99d70 0 13%, #9a7b52 13% 100%);
-  box-shadow: 6px 6px 0 #342a1e;
+  box-shadow: 6px 6px 0 var(--shadow);
 }
 
 .court[data-sport="squash"][data-format="doubles"] {
@@ -2280,7 +2358,7 @@
   padding: 10px 12px;
   color: var(--ink);
   border-left: 4px solid var(--lime-dark);
-  background: #f2f5ea;
+  background: var(--warning-surface);
   font-size: 14px;
   font-weight: 750;
 }
@@ -2312,8 +2390,9 @@
 }
 
 .tennisPointChoice button[aria-pressed="true"] {
-  border: 2px solid var(--ink);
+  border: 2px solid var(--lime-foreground);
   background: var(--lime);
+  color: var(--lime-foreground);
 }
 
 .tennisPairOrders {
@@ -2345,16 +2424,16 @@
   width: 100%;
   min-height: 52px;
   padding: 8px 12px;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 8px;
   background: var(--lime);
-  color: var(--ink);
+  color: var(--lime-foreground);
   font-size: 20px;
   font-weight: 900;
 }
 
 .scoreAction:hover:not(:disabled) {
-  background: #84d84c;
+  background: var(--lime-hover);
 }
 
 .historyActions {
@@ -2374,7 +2453,7 @@
 }
 
 .controlButton:hover:not(:disabled) {
-  background: #eef0f2;
+  background: var(--subtle-surface);
 }
 
 .dangerTextButton {
@@ -2388,7 +2467,7 @@
   margin: auto;
   padding: 0;
   overflow: auto;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 0;
   color: var(--ink);
   background: var(--paper);
@@ -2488,7 +2567,7 @@
   margin: 0;
   padding: 12px 14px;
   border-left: 4px solid var(--danger);
-  background: color-mix(in srgb, var(--danger) 8%, white);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   color: var(--danger);
   font-size: 14px;
   font-weight: 750;
@@ -2551,7 +2630,7 @@
   display: grid;
   place-items: center;
   color: white;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--line-strong);
   border-radius: 50%;
   background: var(--cobalt);
   font-size: 32px;
@@ -2783,6 +2862,16 @@
     grid-template-columns: 1fr;
   }
 
+  .historyStatsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .historyStatsList > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .historyCardActions,
   .historyCardActions > button,
   .historyCardActions > div {
@@ -2795,7 +2884,7 @@
   }
 
   .quickStart {
-    box-shadow: 5px 5px 0 var(--ink);
+    box-shadow: 5px 5px 0 var(--shadow);
   }
 
   .primaryAction {

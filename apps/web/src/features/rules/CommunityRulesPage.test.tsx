@@ -1,14 +1,24 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render as rtlRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme";
 import { defaultCommunityRuleConfiguration } from "./communityRule";
 import {
   CommunityRuleDetailPage,
   CommunityRuleEditorPage,
   CommunityRulesDirectoryPage,
 } from "./CommunityRulesPage";
+
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(<ThemeProvider>{ui}</ThemeProvider>);
+}
 
 const { rpcMock, authState } = vi.hoisted(() => ({
   rpcMock: vi.fn(),

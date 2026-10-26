@@ -1,9 +1,19 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render as rtlRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme";
 import { MatchHistoryPage } from "./MatchHistoryPage";
+
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(<ThemeProvider>{ui}</ThemeProvider>);
+}
 
 const historyQuery = vi.hoisted(() => {
   const query = {

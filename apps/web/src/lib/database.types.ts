@@ -423,6 +423,9 @@ export interface Database {
           p_search?: string | null;
           p_status?: string | null;
           p_sport?: string | null;
+          p_winner?: string | null;
+          p_from_updated_at?: string | null;
+          p_to_updated_at?: string | null;
           p_sort?: string;
           p_limit?: number;
           p_before_updated_at?: string | null;
@@ -438,6 +441,22 @@ export interface Database {
           current_state: Json;
           created_at: string;
           updated_at: string;
+        }>;
+      };
+      get_my_match_statistics: {
+        Args: {
+          p_search?: string | null;
+          p_sport?: string | null;
+          p_winner?: string | null;
+          p_from_updated_at?: string | null;
+          p_to_updated_at?: string | null;
+          p_exclude_match_ids?: string[];
+        };
+        Returns: Array<{
+          sport: string;
+          completed_matches: number;
+          team_a_wins: number;
+          team_b_wins: number;
         }>;
       };
       acquire_match_control: {

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppHeader } from "../components/AppHeader";
 import { LocaleProvider } from "./i18n";
 import { AuthProvider, useAuth } from "./auth";
+import { ThemeProvider } from "./theme";
 
 type AuthListener = (event: string, session: unknown) => void;
 
@@ -95,12 +96,14 @@ function TestApp() {
   return (
     <StrictMode>
       <MemoryRouter>
-        <LocaleProvider>
-          <AuthProvider>
-            <AppHeader />
-            <AuthState />
-          </AuthProvider>
-        </LocaleProvider>
+        <ThemeProvider>
+          <LocaleProvider>
+            <AuthProvider>
+              <AppHeader />
+              <AuthState />
+            </AuthProvider>
+          </LocaleProvider>
+        </ThemeProvider>
       </MemoryRouter>
     </StrictMode>
   );

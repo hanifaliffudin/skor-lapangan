@@ -1,6 +1,7 @@
 import {
   deriveJournal,
   type MatchEvent,
+  type MatchDefinition,
   type MatchJournal,
 } from "@skor-lapangan/scoring-core";
 import type { Json } from "./database.types";
@@ -80,6 +81,10 @@ export type RemoteMatchHeadResult =
 
 export type RemoteMatchEventsResult =
   | { status: "loaded"; events: MatchEvent[] }
+  | { status: "error"; error: RemoteMatchErrorCode };
+
+export type RemoteMatchDefinitionResult =
+  | { status: "loaded"; definition: MatchDefinition }
   | { status: "error"; error: RemoteMatchErrorCode };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -580,4 +585,19 @@ export async function readRemoteMatch(
     journalFromDefinitionAndEvents(row.definition, events, matchId),
     matchId,
   );
+}
+
+export async function readRemoteMatchDefinition(
+  matchId: string,
+): Promise<RemoteMatchDefinitionResult> {
+  if (!supabase) return { status: "error", error: "REMOTE_UNAVAILABLE" };
+  const { data, error } = await supabase.rpc("read_match_definition", {
+    p_match_id: matchId,
+  });
+  if (error) return { status: "error", error: classifyRemoteRpcError(error) };
+  const row = data?.[0];
+  if (!row) return { status: "error", error: "MATCH_NOT_FOUND" };
+  const journal = journalFromDefinitionAndEvents(row.definition, [], matchId);
+  if (!journal) return { status: "error", error: "INVALID_REMOTE_MATCH" };
+  return { status: "loaded", definition: journal.definition };
 }

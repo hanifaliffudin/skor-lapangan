@@ -1,5 +1,6 @@
 import { track } from "@vercel/analytics";
 import type { BeforeSendEvent } from "@vercel/analytics/react";
+import { analyticsEnabled } from "./runtime-config";
 
 const ANALYTICS_BASE_URL = "https://skor-lapangan.invalid";
 
@@ -36,5 +37,6 @@ export function trackMatchSignal(
     | "remote_unavailable",
   result: "detected" | "resolved" | "failed",
 ): void {
+  if (!analyticsEnabled) return;
   track(`Match ${signal}`, { result });
 }

@@ -93,7 +93,7 @@ export function ClubSessionRoundTimer({
   return (
     <div
       className={`mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 text-sm ${
-        expired ? "border-2 border-orange-700" : "border border-cobalt"
+        expired ? "border-2 border-warning" : "border border-cobalt"
       }`}
       role="timer"
       aria-label={`${label}: ${formatClubSessionCountdown(remainingMs)}`}

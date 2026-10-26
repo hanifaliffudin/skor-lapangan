@@ -4,6 +4,11 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
 import { fillMessage, localizedPath, useLocale } from "../lib/i18n";
 import { hcaptchaSiteKey, type AuthProviderId } from "../lib/runtime-config";
+import {
+  THEME_PREFERENCES,
+  type ThemePreference,
+  useTheme,
+} from "../lib/theme";
 import { isRateLimitError } from "../lib/userError";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Monitor, Moon, Sun } from "lucide-react";
 
 const HCaptchaComponent = lazy(() =>
   import("@hcaptcha/react-hcaptcha").then(({ default: component }) => ({
@@ -23,6 +28,21 @@ const HCaptchaComponent = lazy(() =>
 
 export function AppHeader({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale, t } = useLocale();
+  const { preference: themePreference, setPreference: setThemePreference } =
+    useTheme();
+  const themeLabel = t(
+    themePreference === "system"
+      ? "themeSystem"
+      : themePreference === "light"
+        ? "themeLight"
+        : "themeDark",
+  );
+  const ThemeIcon =
+    themePreference === "system"
+      ? Monitor
+      : themePreference === "light"
+        ? Sun
+        : Moon;
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -174,7 +194,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
                 />
                 <span className="sr-only">{t("accountMenu")}</span>
               </summary>
-              <div className="absolute top-[calc(100%+8px)] right-0 z-30 grid w-[min(280px,calc(100vw-28px))] gap-1 rounded-lg border-2 border-line-strong bg-surface p-2 shadow-[4px_4px_0_var(--ink)] max-[560px]:right-[14px] max-[560px]:w-[min(320px,calc(100vw-28px))]">
+              <div className="absolute top-[calc(100%+8px)] right-0 z-30 grid w-[min(280px,calc(100vw-28px))] gap-1 rounded-lg border-2 border-line-strong bg-surface p-2 shadow-[4px_4px_0_var(--shadow)] max-[560px]:right-[14px] max-[560px]:w-[min(320px,calc(100vw-28px))]">
                 <div className="mb-1 flex min-w-0 items-center gap-3 border-b border-line px-3 pb-3 pt-1">
                   <span
                     className="grid size-9 shrink-0 place-items-center rounded-full bg-cobalt text-xs font-extrabold text-white"
@@ -249,7 +269,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               size="sm"
               type="button"
               aria-pressed={locale === "id"}
-              className="min-h-11 min-w-11 px-2.5 text-[13px] font-extrabold aria-pressed:bg-ink aria-pressed:text-white"
+              className="min-h-11 min-w-11 px-2.5 text-[13px] font-extrabold aria-pressed:bg-cobalt aria-pressed:text-white"
               onClick={() => changeLocale("id")}
             >
               ID
@@ -259,12 +279,43 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               size="sm"
               type="button"
               aria-pressed={locale === "en"}
-              className="min-h-11 min-w-11 px-2.5 text-[13px] font-extrabold aria-pressed:bg-ink aria-pressed:text-white"
+              className="min-h-11 min-w-11 px-2.5 text-[13px] font-extrabold aria-pressed:bg-cobalt aria-pressed:text-white"
               onClick={() => changeLocale("en")}
             >
               EN
             </Button>
           </div>
+          <label
+            className="relative grid size-11 shrink-0 place-items-center rounded-lg border border-line-strong bg-surface text-ink outline-none transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring/40"
+            title={`${t("theme")}: ${themeLabel}`}
+          >
+            <span
+              className="pointer-events-none grid place-items-center"
+              aria-hidden="true"
+            >
+              <ThemeIcon className="size-5" strokeWidth={2.25} />
+            </span>
+            <select
+              aria-label={`${t("theme")}: ${themeLabel}`}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              value={themePreference}
+              onChange={(event) =>
+                setThemePreference(event.target.value as ThemePreference)
+              }
+            >
+              {THEME_PREFERENCES.map((theme) => (
+                <option key={theme} value={theme}>
+                  {t(
+                    theme === "system"
+                      ? "themeSystem"
+                      : theme === "light"
+                        ? "themeLight"
+                        : "themeDark",
+                  )}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </header>
       <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
@@ -331,7 +382,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
       {showHeaderAuthError ? (
         <div className="mx-auto flex w-full max-w-[1120px] justify-end px-[clamp(18px,4vw,40px)] pb-3 pt-3 max-[560px]:px-[14px]">
           <div
-            className="grid w-full max-w-[440px] gap-2 rounded-md border border-[#b83c38] bg-surface p-[10px_12px] text-[13px] text-[#8a211f] wrap-anywhere"
+            className="grid w-full max-w-[440px] gap-2 rounded-md border border-danger bg-surface p-[10px_12px] text-[13px] text-danger wrap-anywhere"
             role="alert"
           >
             {authError ? <span>{errorMessage}</span> : null}

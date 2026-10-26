@@ -44,7 +44,7 @@ import { createClubSessionSupabaseAdapter } from "./clubSessionSupabaseAdapter";
 const fieldClass =
   "grid gap-2 text-sm font-bold text-ink [&_input]:mt-0 [&_input]:font-medium";
 const sectionClass =
-  "rounded-xl border-2 border-line-strong bg-surface p-5 shadow-[4px_4px_0_var(--ink)] max-[560px]:p-4";
+  "rounded-xl border-2 border-line-strong bg-surface p-5 shadow-[4px_4px_0_var(--shadow)] max-[560px]:p-4";
 
 function today() {
   const date = new Date();
@@ -1183,7 +1183,7 @@ export function ClubSessionsPage() {
                     ) : null}
                     {mixedFallbackPrompt ? (
                       <div
-                        className="mb-4 grid gap-3 rounded-lg border-2 border-orange-700 bg-paper p-3 text-sm leading-6 text-ink"
+                        className="mb-4 grid gap-3 rounded-lg border-2 border-warning bg-paper p-3 text-sm leading-6 text-ink"
                         role="alert"
                       >
                         <p className="m-0">
@@ -1381,7 +1381,7 @@ export function ClubSessionsPage() {
                         ) : null}
                         {manualFallbackPrompt ? (
                           <div
-                            className="grid gap-2 rounded-lg border-2 border-orange-700 p-3 text-sm leading-6 text-ink"
+                            className="grid gap-2 rounded-lg border-2 border-warning p-3 text-sm leading-6 text-ink"
                             role="alert"
                           >
                             <p className="m-0">
@@ -1430,7 +1430,7 @@ export function ClubSessionsPage() {
                                   t("clubSessionCourtName")}
                               </span>
                               {entry.is_open_fallback ? (
-                                <span className="rounded-full border border-orange-700 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-orange-800">
+                                <span className="rounded-full border border-warning px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-warning">
                                   {t("clubSessionOpenFallback")}
                                 </span>
                               ) : null}

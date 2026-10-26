@@ -29,7 +29,7 @@ export function PwaUpdateNotice() {
         {deferred ? t("pwaUpdateDeferred") : t("pwaUpdateReady")}
       </p>
       <Button
-        className="h-11 shrink-0 border border-line-strong bg-lime px-[14px] font-extrabold text-ink hover:bg-[#84d84c] max-[560px]:w-full"
+        className="h-11 shrink-0 border border-line-strong bg-lime px-[14px] font-extrabold text-lime-foreground hover:bg-lime-hover max-[560px]:w-full"
         type="button"
         disabled={updating}
         onClick={async () => {

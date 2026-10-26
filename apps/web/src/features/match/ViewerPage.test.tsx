@@ -1,8 +1,18 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render as rtlRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme";
 import { DisplayModePage, ViewerPage } from "./ViewerPage";
+
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  return rtlRender(<ThemeProvider>{ui}</ThemeProvider>);
+}
 
 const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
 

@@ -12,6 +12,7 @@ import { overrideState, type MatchJournal } from "@skor-lapangan/scoring-core";
 import { App } from "./App";
 import { LocaleProvider } from "./lib/i18n";
 import { listGuestMatches, loadMatch, saveMatch } from "./lib/session";
+import { ThemeProvider } from "./lib/theme";
 
 async function selectOption(
   user: ReturnType<typeof userEvent.setup>,
@@ -90,7 +91,7 @@ function restoreLocks() {
 }
 
 async function renderApp(ui: Parameters<typeof render>[0]) {
-  render(ui);
+  render(<ThemeProvider>{ui}</ThemeProvider>);
   await screen.findByRole("banner", undefined, { timeout: 5000 });
 }
 

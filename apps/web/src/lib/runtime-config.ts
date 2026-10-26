@@ -6,6 +6,8 @@ export const hcaptchaSiteKey =
 export const siteOrigin =
   import.meta.env.VITE_SITE_ORIGIN?.trim() ||
   "https://skor-lapangan.vercel.app";
+export const analyticsEnabled =
+  import.meta.env.VITE_ENABLE_ANALYTICS === "true";
 export const hasSupabaseConfig = Boolean(supabaseUrl && publishableKey);
 
 export const AUTH_PROVIDER_IDS = ["google", "github", "apple"] as const;

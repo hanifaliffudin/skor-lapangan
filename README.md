@@ -4,6 +4,10 @@ A mobile-first scorekeeper for Badminton, Pickleball, Tennis, Padel, Table tenni
 
 V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, Padel, Table tennis, and Squash, each with separate federation-rule, database, regression, and mobile promotion checks. Padel doubles and mixed doubles follow FIP rules; club singles is a labeled local variant because FIP does not define singles.
 
+## Current project scope
+
+Skor Lapangan is currently a portfolio project and an informal mabar scorekeeper. It is non-commercial, is not an official referee or federation service, and is intended for the owner and invited friends. Use nicknames and avoid entering sensitive personal data. Google account history and Community Rules remain Preview features rather than part of this private project scope. Analytics and Google Tag Manager are disabled by default.
+
 ## Features
 
 - Badminton singles and doubles: rally scoring, best of three games, first to 21, win by two, capped at 30.
@@ -69,7 +73,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all thirty-four migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions, Smart Rotation, sport-expansion, Play Profile, local-time, global-auth, and write-guard migrations before deploying that feature. Enable anonymous sign-ins, the configured OAuth providers, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all thirty-five migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions, Smart Rotation, sport-expansion, Play Profile, local-time, global-auth, write-guard, and history/statistics migrations before deploying that feature. Enable anonymous sign-ins, the configured OAuth providers, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 
@@ -80,6 +84,7 @@ Import the repository with its root directory unchanged. `vercel.json` builds th
 - [Project overview](docs/project-overview.md) for stakeholder, junior developer, engineer, and operator reading paths
 - [Changelog](CHANGELOG.md)
 - [Product roadmap](docs/product-roadmap.md)
+- [Portfolio release scope](docs/portfolio-release-scope.md)
 - [V1.0 implementation specification](docs/v1-implementation-spec.md)
 - [Player guide](docs/user-guide.md)
 - [QA and release checklist](docs/qa-release-checklist.md)

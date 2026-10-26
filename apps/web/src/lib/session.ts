@@ -1,4 +1,5 @@
 import type {
+  MatchDefinition,
   MatchJournal,
   MatchFormat,
   MatchMode,
@@ -105,10 +106,18 @@ export interface SetupDraft {
   format: MatchFormat;
   mode: MatchMode;
   communityRuleId?: string;
+  rematch?: {
+    sourceMatchId: string;
+    definition: MatchDefinition;
+  };
 }
 
 export function saveDraft(draft: SetupDraft): void {
   window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
+}
+
+export function clearDraft(): void {
+  window.sessionStorage.removeItem(draftKey);
 }
 
 export function loadDraft(): SetupDraft | null {
@@ -117,6 +126,15 @@ export function loadDraft(): SetupDraft | null {
   try {
     const parsed = JSON.parse(value) as SetupDraft;
     const format = parsed.format === undefined ? "doubles" : parsed.format;
+    const rematch = parsed.rematch;
+    const validRematch =
+      rematch === undefined ||
+      (isRecord(rematch) &&
+        typeof rematch.sourceMatchId === "string" &&
+        isMatchJournal(
+          { definition: rematch.definition, events: [] },
+          rematch.sourceMatchId,
+        ));
     if (
       (parsed.sport === "badminton" ||
         parsed.sport === "pickleball" ||
@@ -130,9 +148,15 @@ export function loadDraft(): SetupDraft | null {
           format === "mixed_doubles")) &&
       (parsed.mode === "casual" || parsed.mode === "referee") &&
       (parsed.communityRuleId === undefined ||
-        typeof parsed.communityRuleId === "string")
+        typeof parsed.communityRuleId === "string") &&
+      validRematch
     ) {
-      return { ...parsed, format, mode: "casual" };
+      return {
+        ...parsed,
+        format,
+        mode: "casual",
+        ...(validRematch && rematch ? { rematch } : {}),
+      };
     }
   } catch {
     return null;

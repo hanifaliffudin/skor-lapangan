@@ -1,10 +1,16 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render as rtlRender,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { awardRally, type MatchJournal } from "@skor-lapangan/scoring-core";
 import { loadMatch, saveMatch } from "../../lib/session";
 import { LocaleProvider } from "../../lib/i18n";
+import { ThemeProvider } from "../../lib/theme";
 import { MatchPage } from "./MatchPage";
 
 const { authValue, lifecycle } = vi.hoisted(() => {
@@ -117,14 +123,16 @@ vi.mock("./useMatchControl", () => ({
 }));
 
 function renderMatch() {
-  return render(
-    <MemoryRouter initialEntries={["/match/conflict-match"]}>
-      <LocaleProvider>
-        <Routes>
-          <Route path="/match/:matchId" element={<MatchPage />} />
-        </Routes>
-      </LocaleProvider>
-    </MemoryRouter>,
+  return rtlRender(
+    <ThemeProvider>
+      <MemoryRouter initialEntries={["/match/conflict-match"]}>
+        <LocaleProvider>
+          <Routes>
+            <Route path="/match/:matchId" element={<MatchPage />} />
+          </Routes>
+        </LocaleProvider>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 

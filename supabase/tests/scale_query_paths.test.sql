@@ -1,6 +1,6 @@
 begin;
 
-select plan(11);
+select plan(12);
 
 select ok(
   to_regclass('public.matches_owner_updated_id_idx') is not null,
@@ -24,9 +24,14 @@ select ok(
   'account history pagination RPC exists'
 );
 select ok(
-  to_regprocedure('public.list_my_match_summaries(text,text,text,text,integer,timestamptz,uuid)')
+  to_regprocedure('public.list_my_match_summaries(text,text,text,text,timestamptz,timestamptz,text,integer,timestamptz,uuid)')
     is not null,
   'filtered account history RPC exists'
+);
+select ok(
+  to_regprocedure('public.get_my_match_statistics(text,text,text,timestamptz,timestamptz,uuid[])')
+    is not null,
+  'account match statistics RPC exists'
 );
 select ok(
   to_regprocedure('public.list_community_rules_page(text,integer,timestamptz,uuid)')
