@@ -60,7 +60,7 @@ Offline completion produces a read-only Match in Pending sync state. The local r
 - Keep Club Session management, roster changes, court changes, queue changes, and other server-owned workflows unavailable offline in the first phase. The Match launched from an existing session may still use Offline Match Continuity, but the session board itself is not an offline write surface.
 - Treat durable persistence as part of accepting a score. If IndexedDB cannot write the next journal state, do not advance the visible Match state; show an actionable storage error and allow retry after the storage issue is resolved.
 - Keep the service worker application-shell cache behavior, and gate PWA update activation while a Match is actively scoring or has pending sync work. Prompt for the update after the Match reaches a safe state.
-- Use anonymous authentication for eligible guest sync after connectivity returns. Preserve the existing Google sign-in claim flow for eligible local Matches.
+- Use anonymous authentication for eligible guest sync after connectivity returns. Preserve the existing OAuth sign-in claim flow for eligible local Matches.
 - Keep server-owned history as the long-term recovery source after a signed-in Match has synced. Active signed-in Matches may remain locally cached for quick resume; completed synced records may be cleaned up locally.
 
 ## Testing Decisions

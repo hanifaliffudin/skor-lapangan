@@ -2,10 +2,17 @@ import { lazy, Suspense, useRef, useState } from "react";
 import type HCaptchaInstance from "@hcaptcha/react-hcaptcha";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth-context";
-import { localizedPath, useLocale } from "../lib/i18n";
-import { hcaptchaSiteKey } from "../lib/runtime-config";
+import { fillMessage, localizedPath, useLocale } from "../lib/i18n";
+import { hcaptchaSiteKey, type AuthProviderId } from "../lib/runtime-config";
 import { isRateLimitError } from "../lib/userError";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ChevronDown } from "lucide-react";
 
 const HCaptchaComponent = lazy(() =>
@@ -23,17 +30,51 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
     authError,
     authErrorKind,
     authNotice,
+    authProviders,
     isAnonymous,
     loading,
     retryGuestSession,
+    signInWithProvider,
     signInWithGoogle,
     signOut,
     user,
   } = useAuth();
   const [captchaError, setCaptchaError] = useState("");
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const captchaRef = useRef<HCaptchaInstance>(null);
   const needsCaptcha = authError?.toLowerCase().includes("captcha") ?? false;
   const guestSignInRateLimited = isRateLimitError(authError);
+  const providerOptions: readonly AuthProviderId[] = authProviders ?? [
+    "google",
+  ];
+
+  function providerName(provider: AuthProviderId): string {
+    return provider === "github"
+      ? "GitHub"
+      : provider === "apple"
+        ? "Apple"
+        : "Google";
+  }
+
+  function providerLabel(provider: AuthProviderId): string {
+    return provider === "google"
+      ? t("signInWithGoogle")
+      : fillMessage(t("signInWithProvider"), {
+          provider: providerName(provider),
+        });
+  }
+
+  function startProviderSignIn(provider: AuthProviderId) {
+    if (typeof signInWithProvider === "function") {
+      return signInWithProvider(provider);
+    }
+    return signInWithGoogle();
+  }
+
+  async function handleProviderSignIn(provider: AuthProviderId) {
+    const error = await startProviderSignIn(provider);
+    if (!error) setAuthDialogOpen(false);
+  }
 
   function changeLocale(nextLocale: "id" | "en") {
     setLocale(nextLocale);
@@ -58,15 +99,15 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
     if (didSignOut) navigate(localizedPath("/", locale), { replace: true });
   }
 
-  const isGoogleBusy = action === "google" || action === "claiming";
+  const isOAuthBusy = action === "oauth" || action === "claiming";
   const isGuestError = authErrorKind === "guest";
   const isClaimError = authErrorKind === "claim";
-  const isGoogleError = authErrorKind === "google" || authErrorKind === "claim";
+  const isOAuthError = authErrorKind === "oauth" || authErrorKind === "claim";
   const safeAuthError =
     authError?.toLowerCase().includes("identity_already_exists") ||
     authError?.toLowerCase().includes("identity is already linked") ||
     authError?.toLowerCase().includes("manual linking is disabled")
-      ? t("googleLinkFallback")
+      ? t("oauthLinkFallback")
       : authError;
   const errorMessage = isGuestError
     ? needsCaptcha
@@ -76,7 +117,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
       ? `${t("accountDeleteError")} ${safeAuthError ?? ""}`
       : isClaimError
         ? `${t("claimError")} ${safeAuthError ?? ""}`
-        : `${isGoogleError ? t("googleSignInError") : t("accountError")} ${safeAuthError ?? ""}`;
+        : `${isOAuthError ? t("accountSignInError") : t("accountError")} ${safeAuthError ?? ""}`;
   const showHeaderAuthError =
     Boolean(authError || captchaError) &&
     !(authErrorKind === "delete" && location.pathname.endsWith("/account"));
@@ -176,7 +217,7 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
                     variant="ghost"
                     type="button"
                     className="min-h-11 w-full justify-start px-3 text-sm font-semibold"
-                    disabled={loading || isGoogleBusy}
+                    disabled={loading || isOAuthBusy}
                     onClick={() => void handleSignOut()}
                   >
                     {action === "signing-out" ? t("signingOut") : t("signOut")}
@@ -184,15 +225,18 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
                 </div>
               </div>
             </details>
-          ) : isAccountRoute ? null : (
+          ) : isAccountRoute || providerOptions.length === 0 ? null : (
             <Button
-              variant="secondary"
+              variant="default"
               type="button"
-              className="min-h-11 px-3 text-[13px] font-extrabold max-[560px]:px-2 max-[560px]:text-[11px] max-[360px]:max-w-[118px] max-[360px]:overflow-hidden max-[360px]:text-ellipsis max-[360px]:whitespace-nowrap max-[360px]:text-[10px]"
-              disabled={loading || isGoogleBusy}
-              onClick={() => void signInWithGoogle()}
+              aria-haspopup="dialog"
+              aria-expanded={authDialogOpen}
+              className="min-h-11 gap-1.5 px-3 text-[13px] font-extrabold max-[360px]:px-2"
+              disabled={loading || isOAuthBusy}
+              onClick={() => setAuthDialogOpen(true)}
             >
-              {isGoogleBusy ? t("working") : t("signInWithGoogle")}
+              {isOAuthBusy ? t("working") : t("signIn")}
+              <ChevronDown className="size-3.5" aria-hidden="true" />
             </Button>
           )}
           <div
@@ -223,6 +267,54 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
           </div>
         </div>
       </header>
+      <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+        <DialogContent className="max-w-[420px] gap-5 p-6">
+          <DialogHeader className="gap-2">
+            <p className="m-0 text-[11px] font-extrabold uppercase tracking-[0.14em] text-cobalt">
+              {t("account")}
+            </p>
+            <DialogTitle className="text-xl font-extrabold text-ink">
+              {t("signInDialogTitle")}
+            </DialogTitle>
+            <DialogDescription className="leading-6">
+              {t("signInDialogDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2" aria-label={t("signInDialogProviders")}>
+            {providerOptions.map((provider) => (
+              <Button
+                key={provider}
+                variant="outline"
+                type="button"
+                className="min-h-12 w-full justify-between px-3 text-left font-extrabold"
+                disabled={loading || isOAuthBusy}
+                onClick={() => void handleProviderSignIn(provider)}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-md border border-line-strong bg-paper text-[11px] font-extrabold text-ink"
+                    aria-hidden="true"
+                  >
+                    {provider === "github" ? "GH" : "G"}
+                  </span>
+                  <span className="truncate">
+                    {isOAuthBusy ? t("working") : providerLabel(provider)}
+                  </span>
+                </span>
+                <span
+                  className="ml-3 text-lg leading-none text-text-muted"
+                  aria-hidden="true"
+                >
+                  →
+                </span>
+              </Button>
+            ))}
+          </div>
+          <p className="m-0 text-xs leading-5 text-text-muted">
+            {t("signInDialogGuestNote")}
+          </p>
+        </DialogContent>
+      </Dialog>
       {action === "claiming" || authNoticeMessage ? (
         <div className="mx-auto flex w-full max-w-[1120px] justify-end px-[clamp(18px,4vw,40px)] pb-3 pt-3 max-[560px]:px-[14px]">
           <div
@@ -271,16 +363,23 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
               >
                 {loading ? t("working") : t("retryGuestSync")}
               </Button>
-            ) : isGoogleError && authError && !isClaimError ? (
+            ) : isOAuthError &&
+              authError &&
+              !isClaimError &&
+              providerOptions.length > 0 ? (
               <Button
                 variant="outline"
                 size="sm"
                 className="min-h-11 justify-self-start px-3 text-[13px] font-extrabold"
                 type="button"
-                disabled={loading || isGoogleBusy}
-                onClick={() => void signInWithGoogle()}
+                disabled={loading || isOAuthBusy}
+                onClick={() =>
+                  void startProviderSignIn(providerOptions[0] ?? "google")
+                }
               >
-                {isGoogleBusy ? t("working") : t("signInWithGoogle")}
+                {isOAuthBusy
+                  ? t("working")
+                  : providerLabel(providerOptions[0] ?? "google")}
               </Button>
             ) : null}
             {captchaError ? <span>{captchaError}</span> : null}

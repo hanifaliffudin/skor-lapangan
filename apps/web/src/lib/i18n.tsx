@@ -7,7 +7,93 @@ import {
   type ReactNode,
 } from "react";
 
-export type Locale = "id" | "en";
+export const SUPPORTED_LOCALES = ["en", "id"] as const;
+export type Locale = (typeof SUPPORTED_LOCALES)[number];
+
+const localeConfig: Record<Locale, { tag: string; direction: "ltr" | "rtl" }> =
+  {
+    en: { tag: "en-US", direction: "ltr" },
+    id: { tag: "id-ID", direction: "ltr" },
+  };
+
+export function localeTag(locale: Locale): string {
+  return localeConfig[locale].tag;
+}
+
+export function localeDirection(locale: Locale): "ltr" | "rtl" {
+  return localeConfig[locale].direction;
+}
+
+function validDate(value: Date | number | string): Date | null {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatDateTime(
+  value: Date | number | string,
+  locale: Locale,
+): string {
+  const date = validDate(value);
+  if (!date) return "";
+
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatTime(
+  value: Date | number | string,
+  locale: Locale,
+): string {
+  const date = validDate(value);
+  if (!date) return "";
+
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatClockTime(
+  value: string | null | undefined,
+  locale: Locale,
+): string {
+  if (!value || !/^\d{2}:\d{2}/.test(value)) return "";
+  const [hourPart, minutePart] = value.slice(0, 5).split(":");
+  const hour = Number(hourPart ?? "");
+  const minute = Number(minutePart ?? "");
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return "";
+  }
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(1970, 0, 1, hour, minute)));
+}
+
+export function formatDateOnly(value: string, locale: Locale): string {
+  const date = validDate(`${value}T00:00:00Z`);
+  if (!date) return value;
+
+  return new Intl.DateTimeFormat(localeTag(locale), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
 
 export function fillMessage(
   template: string,
@@ -177,9 +263,9 @@ const messages = {
     resumeBodyAccount:
       "Lanjutkan pertandingan yang tersimpan di perangkat ini.",
     accountNote:
-      "Pertandingan baru akan tersimpan di perangkat ini dan disinkronkan ke akun Google Anda.",
+      "Pertandingan baru akan tersimpan di perangkat ini dan disinkronkan ke akun Anda.",
     guestHistoryPrompt:
-      "Masuk dengan Google untuk menyimpan riwayat dan melanjutkan pertandingan di perangkat lain.",
+      "Masuk ke akun untuk menyimpan riwayat dan melanjutkan pertandingan di perangkat lain.",
     resumeMatch: "Lanjutkan",
     openMatch: "Buka hasil",
     deleteMatch: "Hapus",
@@ -320,23 +406,36 @@ const messages = {
     communityRules: "Aturan komunitas",
     clubSessions: "Sesi klub",
     clubSessionsPageTitle: "Sesi klub · Skor Lapangan",
-    clubSessionEyebrow: "PAPAN SESI · BADMINTON GANDA",
+    clubSessionEyebrow: "PAPAN SESI · 6 OLAHRAGA · PROFIL",
     clubSessionsIntro:
       "Atur pemain, lapangan, dan antrean pertandingan untuk sesi main bersama.",
     clubSessionDetailIntro:
       "Catat peserta dan lapangan, susun pasangan secara manual, lalu simpan hasil dari pencatat skor.",
     clubSessionSignInTitle: "Sesi klub tersimpan di akun",
     clubSessionSignInBody:
-      "Masuk dengan Google untuk membuat papan sesi privat. Nama peserta hanya terlihat oleh akun pengelola.",
+      "Masuk ke akun untuk membuat papan sesi privat. Nama peserta hanya terlihat oleh akun pengelola.",
     clubSessionYourSessions: "Sesi Anda",
     clubSessionListEmpty:
       "Belum ada sesi. Buat sesi pertama untuk mulai menyusun permainan.",
     clubSessionCreateTitle: "Buat sesi",
     clubSessionCreateBody:
-      "Pilot ini mendukung sesi badminton ganda dengan pengelola tunggal.",
+      "Buat sesi open play untuk semua olahraga yang didukung dengan satu pengelola.",
     clubSessionName: "Nama sesi",
     clubSessionDate: "Tanggal",
+    clubSessionTime: "Waktu mulai",
+    clubSessionLocation: "Lokasi (opsional)",
+    clubSessionLocationPlaceholder: "Contoh: Court 3, Downtown Club",
+    clubSessionTimeZoneHint: "Waktu disimpan dalam zona {timeZone}.",
+    clubSessionSchedule: "Jadwal",
+    clubSessionTimeNotSet: "Waktu belum ditentukan",
     clubSessionPairingMode: "Mode pasangan",
+    clubSessionPlayProfile: "Format sesi",
+    clubSessionSinglesRound: "Tunggal · {players} pemain per match",
+    clubSessionShortRound: "Round singkat {minutes} menit",
+    clubSessionRoundTimer: "Round {minutes} menit",
+    clubSessionRoundRemaining: "tersisa",
+    clubSessionRoundExpired:
+      "Waktu habis. Selesaikan poin terakhir lalu ganti pemain.",
     clubSessionOpenDoubles: "Ganda open",
     clubSessionMixedDoubles: "Ganda campuran",
     clubSessionCreateAction: "Buat papan sesi",
@@ -378,8 +477,7 @@ const messages = {
     clubSessionAvoidPlayersBody:
       "Tandai pemain yang sebaiknya tidak dipasangkan. Preferensi ini tetap dapat diatasi saat kondisi lapangan terbatas.",
     clubSessionAddPlayer: "Tambah pemain",
-    clubSessionRosterEmpty:
-      "Tambahkan empat pemain untuk mulai membuat antrean.",
+    clubSessionRosterEmpty: "Tambahkan pemain untuk mulai membuat antrean.",
     clubSessionDeactivate: "Nonaktifkan",
     clubSessionReactivate: "Aktifkan",
     clubSessionRecord: "Main {played} · Menang {won} · Kalah {lost}",
@@ -399,7 +497,7 @@ const messages = {
       "Tambahkan setidaknya satu lapangan untuk membuat antrean.",
     clubSessionQueueTitle: "Antrean pertandingan",
     clubSessionQueueBody:
-      "Pilih satu lapangan dan empat pemain, atau isi lapangan berikutnya dengan Smart Rotation.",
+      "Pilih satu lapangan dan pemain sesuai profil sesi, atau isi lapangan berikutnya dengan Smart Rotation.",
     clubSessionSelectCourt: "Pilih lapangan",
     clubSessionSelectPlayer: "Pilih pemain",
     clubSessionTeamAPlayer: "Tim A · Pemain {number}",
@@ -407,11 +505,11 @@ const messages = {
     clubSessionAddToQueue: "Tambah ke antrean",
     clubSessionGenerateSchedule: "Buat jadwal otomatis",
     clubSessionGenerateScheduleBody:
-      "Rotasi ganda memakai pemain dan lapangan aktif, lalu menambahkan antrean siap dimainkan.",
+      "Buat antrean dari pemain dan lapangan aktif sesuai profil sesi.",
     clubSessionScheduleExists:
       "Jadwal sudah dibuat. Tambahkan pertandingan manual jika ingin memperpanjangnya.",
     clubSessionScheduleRequirements:
-      "Jadwal otomatis membutuhkan minimal empat pemain aktif dan satu lapangan aktif.",
+      "Jadwal otomatis membutuhkan minimal {players} pemain aktif dan satu lapangan aktif.",
     clubSessionFillNextCourts: "Isi lapangan berikutnya",
     clubSessionSmartRotationBody:
       "Rotasi memilih pemain dengan jumlah match paling sedikit, waktu tunggu terlama, dan pasangan yang lebih bervariasi.",
@@ -433,7 +531,7 @@ const messages = {
     clubSessionNoFreeCourt:
       "Belum ada lapangan kosong. Selesaikan atau mulai antrean yang ada terlebih dahulu.",
     clubSessionRotationRequirements:
-      "Rotasi membutuhkan minimal empat pemain yang siap bermain.",
+      "Rotasi membutuhkan jumlah pemain sesuai profil yang siap bermain.",
     clubSessionMixedFallbackRequired:
       "Belum ada kombinasi ganda campuran yang valid untuk pemain yang siap. Anda dapat memakai ganda open untuk rotasi ini.",
     clubSessionMixedManualFallbackRequired:
@@ -443,8 +541,11 @@ const messages = {
     clubSessionSaveProfileError:
       "Profil pemain belum tersimpan. Periksa koneksi lalu coba lagi.",
     clubSessionQueueRequirements:
-      "Perlu empat pemain aktif dan satu lapangan aktif.",
-    clubSessionAssignmentError: "Pilih lapangan dan empat pemain yang berbeda.",
+      "Perlu pemain aktif sesuai profil sesi dan satu lapangan aktif.",
+    clubSessionQueueRequirementsDynamic:
+      "Perlu {players} pemain aktif dan satu lapangan aktif.",
+    clubSessionAssignmentError:
+      "Pilih lapangan dan pemain berbeda sesuai format sesi.",
     clubSessionQueueClosed:
       "Sesi ditutup. Buka kembali sesi untuk menambah antrean.",
     clubSessionMatchNumber: "Pertandingan {number}",
@@ -472,15 +573,22 @@ const messages = {
       "Batas poin harus sama atau lebih besar dari target.",
     customRulesInvalid:
       "Masukkan angka bulat yang valid: target 1–101, selisih 1–10, dan batas poin minimal sama dengan target.",
+    signIn: "Masuk",
+    signInDialogTitle: "Masuk ke akun",
+    signInDialogDescription:
+      "Simpan riwayat pertandingan dan lanjutkan di perangkat lain.",
+    signInDialogProviders: "Pilih penyedia akun",
+    signInDialogGuestNote: "Anda tetap bisa bermain tanpa akun.",
     signInWithGoogle: "Masuk dengan Google",
+    signInWithProvider: "Masuk dengan {provider}",
     account: "Akun",
     accountMenu: "Menu akun",
     accountSettings: "Pengaturan akun",
-    accountTitle: "Akun Google",
-    accountPageTitle: "Akun Google · Skor Lapangan",
+    accountTitle: "Akun",
+    accountPageTitle: "Akun · Skor Lapangan",
     accountIntro: "Kelola akun dan pertandingan yang tersimpan.",
     accountSignedInAs: "Masuk sebagai",
-    accountRequiresGoogle: "Masuk dengan Google untuk membuka pengaturan akun.",
+    accountRequiresGoogle: "Masuk untuk membuka pengaturan akun.",
     accountRequiresGoogleBody:
       "Akun diperlukan untuk membuka riwayat, menyinkronkan pertandingan, dan mengelola data Anda.",
     accountDeleteSection: "Hapus akun",
@@ -494,15 +602,18 @@ const messages = {
     accountDeleteInProgress: "Menghapus akun…",
     accountDeleteError: "Akun belum dihapus:",
     accountError: "Masalah akun:",
-    googleSignInError: "Login Google gagal:",
-    claimError: "Login Google berhasil, tetapi match guest belum tersinkron:",
+    googleSignInError: "Login akun gagal:",
+    accountSignInError: "Login akun gagal:",
+    claimError: "Login berhasil, tetapi match guest belum tersinkron:",
     googleLinkFallback:
-      "Akun Google ini sudah memiliki akun Skor Lapangan. Kami akan masuk ke akun tersebut dan mencoba membawa match guest Anda.",
+      "Identitas ini sudah memiliki akun Skor Lapangan. Kami akan masuk ke akun tersebut dan mencoba membawa match guest Anda.",
+    oauthLinkFallback:
+      "Identitas ini sudah memiliki akun Skor Lapangan. Kami akan masuk ke akun tersebut dan mencoba membawa match guest Anda.",
     signingOut: "Keluar…",
     savingGuestMatches: "Menyimpan pertandingan guest ke akun Anda…",
     guestMatchesSaved: "Pertandingan guest sudah tersimpan di akun Anda.",
     accountDeleted: "Akun dihapus. Anda kembali sebagai guest.",
-    saveHistory: "Simpan riwayat dengan Google",
+    saveHistory: "Simpan riwayat ke akun",
     signOut: "Keluar",
     historySaved: "Riwayat tersimpan",
     syncSaved: "Skor tersimpan",
@@ -642,11 +753,11 @@ const messages = {
     ruleRepublished:
       "Aturan ini kembali tampil di direktori publik. Versinya tetap sama.",
     notRuleOwner: "Hanya pembuat aturan yang dapat mengeditnya.",
-    googleRequired: "Masuk dengan Google untuk menerbitkan aturan.",
-    historyGoogleRequired: "Masuk dengan Google untuk melihat riwayat.",
+    googleRequired: "Masuk ke akun untuk menerbitkan aturan.",
+    historyGoogleRequired: "Masuk ke akun untuk melihat riwayat.",
     historyPageTitle: "Riwayat pertandingan · Skor Lapangan",
     googleRequiredBody:
-      "Aturan komunitas hanya bisa diterbitkan dan dikelola oleh akun Google.",
+      "Aturan komunitas hanya bisa diterbitkan dan dikelola oleh akun permanen.",
     ruleTitle: "Nama aturan",
     sport: "Olahraga",
     ruleDescription: "Deskripsi",
@@ -656,9 +767,9 @@ const messages = {
     noCap: "Tanpa batas poin",
     shareLink: "Bagikan tautan",
     matchHistory: "Riwayat pertandingan",
-    historyIntro: "Pertandingan yang tersimpan di akun Google ini.",
+    historyIntro: "Pertandingan yang tersimpan di akun ini.",
     historyRequiresGoogle:
-      "Masuk dengan Google untuk melihat riwayat dan membukanya kembali dari perangkat lain. Anda tetap bisa bermain tanpa akun.",
+      "Masuk ke akun untuk melihat riwayat dan membukanya kembali dari perangkat lain. Anda tetap bisa bermain tanpa akun.",
     historyLoadError:
       "Riwayat belum bisa dimuat. Periksa koneksi lalu coba lagi.",
     historySearchPlaceholder: "Cari olahraga atau nama tim",
@@ -677,7 +788,7 @@ const messages = {
     gamesWon: "game dimenangkan",
     noSavedMatches: "Belum ada pertandingan tersimpan",
     noSavedMatchesBody:
-      "Mulai pertandingan saat koneksi aktif, atau sambungkan akun Google Anda.",
+      "Mulai pertandingan saat koneksi aktif, atau sambungkan akun Anda.",
     activeMatch: "Sedang berlangsung",
     historyInProgress: "Berlangsung",
     historyCompleted: "Selesai",
@@ -685,7 +796,7 @@ const messages = {
     lastUpdated: "Terakhir diperbarui:",
     openOnThisDevice: "Buka pertandingan",
     detailsOnOriginalDevice:
-      "Pertandingan aktif dapat dilanjutkan dari perangkat lain setelah masuk dengan akun Google.",
+      "Pertandingan aktif dapat dilanjutkan dari perangkat lain setelah masuk ke akun.",
     deleteHistoryMatch: "Hapus dari riwayat",
     confirmDeleteHistoryMatch: "Ya, hapus pertandingan",
     deletingHistoryMatch: "Menghapus…",
@@ -849,10 +960,9 @@ const messages = {
       "Resume an active match or open a local result waiting to sync.",
     resumeBody: "Continue an unfinished guest match.",
     resumeBodyAccount: "Continue a match saved on this device.",
-    accountNote:
-      "New matches stay on this device and sync to your Google account.",
+    accountNote: "New matches stay on this device and sync to your account.",
     guestHistoryPrompt:
-      "Sign in with Google to keep match history and continue on another device.",
+      "Sign in to keep match history and continue on another device.",
     resumeMatch: "Resume",
     openMatch: "Open result",
     deleteMatch: "Delete",
@@ -993,23 +1103,36 @@ const messages = {
     communityRules: "Community Rules",
     clubSessions: "Club sessions",
     clubSessionsPageTitle: "Club sessions · Skor Lapangan",
-    clubSessionEyebrow: "SESSION BOARD · BADMINTON DOUBLES",
+    clubSessionEyebrow: "SESSION BOARD · 6 SPORTS · PROFILES",
     clubSessionsIntro:
       "Organize players, courts, and a match queue for a casual club session.",
     clubSessionDetailIntro:
       "Add players and courts, assign pairs manually, then record results with the scorekeeper.",
     clubSessionSignInTitle: "Club sessions are saved to your account",
     clubSessionSignInBody:
-      "Sign in with Google to create a private session board. Player names are visible only to the organizer’s account.",
+      "Sign in to create a private session board. Player names are visible only to the organizer’s account.",
     clubSessionYourSessions: "Your sessions",
     clubSessionListEmpty:
       "No sessions yet. Create one to start organizing play.",
     clubSessionCreateTitle: "Create a session",
     clubSessionCreateBody:
-      "This pilot supports badminton doubles with one organizer.",
+      "Create an open-play session for any supported sport with one organizer.",
     clubSessionName: "Session name",
     clubSessionDate: "Date",
+    clubSessionTime: "Start time",
+    clubSessionLocation: "Location (optional)",
+    clubSessionLocationPlaceholder: "Example: Court 3, Downtown Club",
+    clubSessionTimeZoneHint: "Time is saved in the {timeZone} time zone.",
+    clubSessionSchedule: "Schedule",
+    clubSessionTimeNotSet: "Time not set",
     clubSessionPairingMode: "Pairing mode",
+    clubSessionPlayProfile: "Session format",
+    clubSessionSinglesRound: "Singles · {players} players per match",
+    clubSessionShortRound: "{minutes}-minute short rounds",
+    clubSessionRoundTimer: "{minutes}-minute round",
+    clubSessionRoundRemaining: "remaining",
+    clubSessionRoundExpired:
+      "Time is up. Finish the current point, then rotate players.",
     clubSessionOpenDoubles: "Open doubles",
     clubSessionMixedDoubles: "Mixed doubles",
     clubSessionCreateAction: "Create session board",
@@ -1051,7 +1174,7 @@ const messages = {
     clubSessionAvoidPlayersBody:
       "Mark players who should not be paired together. The preference can be overridden when court capacity is limited.",
     clubSessionAddPlayer: "Add player",
-    clubSessionRosterEmpty: "Add four players to start building the queue.",
+    clubSessionRosterEmpty: "Add players to start building the queue.",
     clubSessionDeactivate: "Deactivate",
     clubSessionReactivate: "Reactivate",
     clubSessionRecord: "Played {played} · Won {won} · Lost {lost}",
@@ -1070,7 +1193,7 @@ const messages = {
     clubSessionCourtsEmpty: "Add at least one court to create a queue entry.",
     clubSessionQueueTitle: "Match queue",
     clubSessionQueueBody:
-      "Choose a court and four players, or fill the next courts with Smart Rotation.",
+      "Choose a court and the players required by the session profile, or fill the next courts with Smart Rotation.",
     clubSessionSelectCourt: "Select a court",
     clubSessionSelectPlayer: "Select a player",
     clubSessionTeamAPlayer: "Team A · Player {number}",
@@ -1078,11 +1201,11 @@ const messages = {
     clubSessionAddToQueue: "Add to queue",
     clubSessionGenerateSchedule: "Generate schedule",
     clubSessionGenerateScheduleBody:
-      "A doubles rotation uses active players and courts, then adds a ready-to-play queue.",
+      "Build a queue from active players and courts using the session profile.",
     clubSessionScheduleExists:
       "A schedule already exists. Add manual matches if you want to extend it.",
     clubSessionScheduleRequirements:
-      "Automatic scheduling needs at least four active players and one active court.",
+      "Automatic scheduling needs at least {players} active players and one active court.",
     clubSessionFillNextCourts: "Fill next courts",
     clubSessionSmartRotationBody:
       "Rotation chooses players with the fewest matches, the longest wait, and more varied pairings.",
@@ -1104,7 +1227,7 @@ const messages = {
     clubSessionNoFreeCourt:
       "There is no free court yet. Start or finish the current queue entries first.",
     clubSessionRotationRequirements:
-      "Rotation needs at least four players who are ready to play.",
+      "Rotation needs the profile's required number of ready players.",
     clubSessionMixedFallbackRequired:
       "There is no valid mixed-doubles combination among the players ready to play. You can use open doubles for this rotation.",
     clubSessionMixedManualFallbackRequired:
@@ -1114,8 +1237,11 @@ const messages = {
     clubSessionSaveProfileError:
       "The player profile was not saved. Check the connection and try again.",
     clubSessionQueueRequirements:
-      "Four active players and one active court are required.",
-    clubSessionAssignmentError: "Choose a court and four different players.",
+      "Active players matching the session profile and one active court are required.",
+    clubSessionQueueRequirementsDynamic:
+      "{players} active players and one court are required.",
+    clubSessionAssignmentError:
+      "Choose a court and different players that match the session format.",
     clubSessionQueueClosed:
       "This session is closed. Reopen it to add to the queue.",
     clubSessionMatchNumber: "Match {number}",
@@ -1142,15 +1268,22 @@ const messages = {
     capMustBeAtLeastTarget: "The point cap must be at least the target score.",
     customRulesInvalid:
       "Enter whole numbers: target 1–101, win-by 1–10, and a point cap at least as high as the target.",
+    signIn: "Sign in",
+    signInDialogTitle: "Sign in to your account",
+    signInDialogDescription:
+      "Save match history and continue on another device.",
+    signInDialogProviders: "Choose an account provider",
+    signInDialogGuestNote: "You can keep playing without an account.",
     signInWithGoogle: "Sign in with Google",
+    signInWithProvider: "Sign in with {provider}",
     account: "Account",
     accountMenu: "Account menu",
     accountSettings: "Account settings",
-    accountTitle: "Google account",
-    accountPageTitle: "Google account · Skor Lapangan",
+    accountTitle: "Account",
+    accountPageTitle: "Account · Skor Lapangan",
     accountIntro: "Manage your account and saved matches.",
     accountSignedInAs: "Signed in as",
-    accountRequiresGoogle: "Sign in with Google to open account settings.",
+    accountRequiresGoogle: "Sign in to open account settings.",
     accountRequiresGoogleBody:
       "An account is needed to open history, sync matches, and manage your data.",
     accountDeleteSection: "Delete account",
@@ -1164,16 +1297,18 @@ const messages = {
     accountDeleteInProgress: "Deleting account…",
     accountDeleteError: "The account was not deleted:",
     accountError: "Account problem:",
-    googleSignInError: "Google sign-in failed:",
-    claimError:
-      "Google sign-in succeeded, but guest matches are not synced yet:",
+    googleSignInError: "Account sign-in failed:",
+    accountSignInError: "Account sign-in failed:",
+    claimError: "Sign-in succeeded, but guest matches are not synced yet:",
     googleLinkFallback:
-      "This Google account already has a Skor Lapangan account. We will sign you in there and try to bring over your guest matches.",
+      "This identity already has a Skor Lapangan account. We will sign you in there and try to bring over your guest matches.",
+    oauthLinkFallback:
+      "This identity already has a Skor Lapangan account. We will sign you in there and try to bring over your guest matches.",
     signingOut: "Signing out…",
     savingGuestMatches: "Saving your guest matches to your account…",
     guestMatchesSaved: "Your guest matches are now saved to your account.",
     accountDeleted: "Account deleted. You are back in guest mode.",
-    saveHistory: "Save history with Google",
+    saveHistory: "Save history to your account",
     signOut: "Sign out",
     historySaved: "History saved",
     syncSaved: "Score saved",
@@ -1308,10 +1443,10 @@ const messages = {
     ruleRepublished:
       "This ruleset is public again. Its version remains unchanged.",
     notRuleOwner: "Only the ruleset creator can edit it.",
-    googleRequired: "Sign in with Google to publish a ruleset.",
-    historyGoogleRequired: "Sign in with Google to view your history.",
+    googleRequired: "Sign in to publish a ruleset.",
+    historyGoogleRequired: "Sign in to view your history.",
     googleRequiredBody:
-      "Community Rules can only be published and managed by a Google account.",
+      "Community Rules can only be published and managed by a durable account.",
     ruleTitle: "Rule name",
     sport: "Sport",
     ruleDescription: "Description",
@@ -1322,9 +1457,9 @@ const messages = {
     shareLink: "Share link",
     matchHistory: "Match history",
     historyPageTitle: "Match history · Skor Lapangan",
-    historyIntro: "Matches saved to this Google account.",
+    historyIntro: "Matches saved to this account.",
     historyRequiresGoogle:
-      "Sign in with Google to view history and reopen it on another device. You can still play without an account.",
+      "Sign in to view history and reopen it on another device. You can still play without an account.",
     historyLoadError:
       "History could not be loaded. Check your connection and try again.",
     historySearchPlaceholder: "Search by sport or team name",
@@ -1342,8 +1477,7 @@ const messages = {
     loadMore: "Load more",
     gamesWon: "games won",
     noSavedMatches: "No saved matches yet",
-    noSavedMatchesBody:
-      "Start a match while online, or link your Google account.",
+    noSavedMatchesBody: "Start a match while online, or link your account.",
     activeMatch: "In progress",
     historyInProgress: "In progress",
     historyCompleted: "Completed",
@@ -1351,7 +1485,7 @@ const messages = {
     lastUpdated: "Last updated:",
     openOnThisDevice: "Open match",
     detailsOnOriginalDevice:
-      "Active matches can be continued on another device after signing in with Google.",
+      "Active matches can be continued on another device after signing in.",
     deleteHistoryMatch: "Delete from history",
     confirmDeleteHistoryMatch: "Yes, delete match",
     deletingHistoryMatch: "Deleting…",
@@ -1394,6 +1528,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = localeDirection(locale);
     window.localStorage.setItem("skor-lapangan:locale", locale);
   }, [locale]);
 

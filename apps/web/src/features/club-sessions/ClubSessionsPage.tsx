@@ -7,15 +7,24 @@ import {
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
+import { AuthProviderButtons } from "../../components/AuthProviderButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectControl } from "@/components/ui/select-control";
 import { useAuth } from "../../lib/auth";
-import { fillMessage, localizedPath, useLocale } from "../../lib/i18n";
+import {
+  fillMessage,
+  formatClockTime,
+  formatDateOnly,
+  localizedPath,
+  useLocale,
+} from "../../lib/i18n";
 import { saveDraft } from "../../lib/session";
 import {
   createClubSessionManagement,
+  clubSessionPlayProfile,
+  clubSessionPlayProfileForSport,
   derivePlayerRecords,
   deriveStandings,
   type ClubSessionCourt,
@@ -25,6 +34,7 @@ import {
   type ClubSessionMatchResult,
   type ClubSessionPlayer,
   type ClubSessionPairingMode,
+  type ClubSessionSport,
   type ClubSessionSmartRotationPlan,
   type ClubSessionSummary,
 } from "./clubSessionManagement";
@@ -47,9 +57,11 @@ export function ClubSessionsPage() {
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const {
+    authProviders,
     isAnonymous,
     loading: authLoading,
     signInWithGoogle,
+    signInWithProvider,
     user,
   } = useAuth();
   const isAccount = Boolean(user && !isAnonymous);
@@ -70,6 +82,10 @@ export function ClubSessionsPage() {
   );
   const [sessionName, setSessionName] = useState("");
   const [sessionDate, setSessionDate] = useState(today);
+  const [sessionTime, setSessionTime] = useState("");
+  const [sessionLocation, setSessionLocation] = useState("");
+  const [sessionSport, setSessionSport] =
+    useState<ClubSessionSport>("badminton");
   const [pairingMode, setPairingMode] =
     useState<ClubSessionPairingMode>("open");
   const [playerName, setPlayerName] = useState("");
@@ -78,9 +94,12 @@ export function ClubSessionsPage() {
   const [playerSkillLevel, setPlayerSkillLevel] = useState("3");
   const [courtName, setCourtName] = useState("");
   const [selectedCourt, setSelectedCourt] = useState("");
-  const [selectedPlayers, setSelectedPlayers] = useState<
-    [string, string, string, string]
-  >(["", "", "", ""]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [mixedFallbackPrompt, setMixedFallbackPrompt] = useState(false);
   const [manualFallbackPrompt, setManualFallbackPrompt] = useState(false);
   const [rotationPreview, setRotationPreview] =
@@ -101,6 +120,15 @@ export function ClubSessionsPage() {
     () => courts.filter((court) => court.is_active),
     [courts],
   );
+  const sessionProfile = session ? clubSessionPlayProfile(session) : null;
+  const requiredPlayersPerMatch = sessionProfile?.playersPerMatch ?? 4;
+  const sessionProfileLabel = sessionProfile
+    ? sessionProfile.format === "singles"
+      ? fillMessage(t("clubSessionSinglesRound"), {
+          players: sessionProfile.playersPerMatch,
+        })
+      : t("doubles")
+    : t("doubles");
 
   const loadData = useCallback(
     async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
@@ -136,6 +164,14 @@ export function ClubSessionsPage() {
         const detail = await management.loadSession(sessionId);
         setSession(detail.session);
         setPairingMode(detail.session.pairing_mode ?? "open");
+        setSelectedPlayers(
+          Array.from(
+            {
+              length: clubSessionPlayProfile(detail.session).playersPerMatch,
+            },
+            () => "",
+          ),
+        );
         setPlayers(detail.players);
         setCourts(detail.courts);
         setQueue(detail.queue);
@@ -191,10 +227,21 @@ export function ClubSessionsPage() {
       const { id } = await management.createSession({
         name: sessionName,
         sessionDate,
-        pairingMode,
+        startTime: sessionTime || undefined,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        locationName: sessionLocation,
+        sport: sessionSport,
+        playProfile: clubSessionPlayProfileForSport(sessionSport).id,
+        pairingMode:
+          clubSessionPlayProfileForSport(sessionSport).format === "singles"
+            ? "open"
+            : pairingMode,
       });
       setSessionName("");
       setSessionDate(today());
+      setSessionTime("");
+      setSessionLocation("");
+      setSessionSport("badminton");
       navigate(localizedPath(`/sessions/${id}`, locale));
     } catch {
       setError(t("clubSessionSaveError"));
@@ -323,7 +370,9 @@ export function ClubSessionsPage() {
         playerIds: selectedPlayers,
         allowOpenFallback,
       });
-      setSelectedPlayers(["", "", "", ""]);
+      setSelectedPlayers(
+        Array.from({ length: requiredPlayersPerMatch }, () => ""),
+      );
       setManualFallbackPrompt(false);
       await loadData();
     } catch (error) {
@@ -378,7 +427,9 @@ export function ClubSessionsPage() {
         code === "CLUB_SESSION_SCHEDULE_EXISTS"
           ? t("clubSessionScheduleExists")
           : code === "CLUB_SESSION_SCHEDULE_REQUIREMENTS"
-            ? t("clubSessionScheduleRequirements")
+            ? fillMessage(t("clubSessionScheduleRequirements"), {
+                players: requiredPlayersPerMatch,
+              })
             : t("clubSessionSaveError"),
       );
     } finally {
@@ -484,7 +535,11 @@ export function ClubSessionsPage() {
     if (action.type === "blocked") {
       return;
     }
-    saveDraft({ sport: "badminton", format: "doubles", mode: "casual" });
+    saveDraft({
+      sport: session.sport,
+      format: sessionProfile?.format ?? "doubles",
+      mode: "casual",
+    });
     navigate(
       localizedPath(
         `/setup?clubSessionId=${session.id}&clubMatchId=${action.matchId}`,
@@ -509,6 +564,17 @@ export function ClubSessionsPage() {
     [players, queue, results],
   );
   const hasCompletedResults = standings.some((standing) => standing.played > 0);
+  function queuePlayerLabel(index: number) {
+    const isDoubles = requiredPlayersPerMatch === 4;
+    return fillMessage(
+      t(
+        (isDoubles && index < 2) || (!isDoubles && index === 0)
+          ? "clubSessionTeamAPlayer"
+          : "clubSessionTeamBPlayer",
+      ),
+      { number: isDoubles ? (index % 2) + 1 : 1 },
+    );
+  }
 
   return (
     <div className="min-h-screen min-h-dvh bg-paper pb-14 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
@@ -526,7 +592,15 @@ export function ClubSessionsPage() {
         <header className="mb-7 mt-5 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.14em] text-cobalt">
-              {t("clubSessionEyebrow")}
+              {session
+                ? `${t(session.sport)} · ${sessionProfileLabel}${
+                    sessionProfile?.rotationUnit === "minutes"
+                      ? ` · ${fillMessage(t("clubSessionShortRound"), {
+                          minutes: sessionProfile.roundMinutes ?? 10,
+                        })}`
+                      : ""
+                  }`
+                : t("clubSessionEyebrow")}
             </p>
             <h1 className="m-0 text-[clamp(2rem,6vw,3.25rem)] font-black leading-[1.02] tracking-[-0.045em] text-ink">
               {session?.name ?? t("clubSessions")}
@@ -586,14 +660,12 @@ export function ClubSessionsPage() {
             <p className="mb-5 mt-2 leading-7 text-text-muted">
               {t("clubSessionSignInBody")}
             </p>
-            <Button
-              type="button"
-              className="min-h-11"
+            <AuthProviderButtons
               disabled={offline}
-              onClick={() => void signInWithGoogle()}
-            >
-              {t("signInWithGoogle")}
-            </Button>
+              fallbackSignIn={signInWithGoogle}
+              providers={authProviders}
+              signInWithProvider={signInWithProvider}
+            />
           </section>
         ) : error ? (
           <div
@@ -647,14 +719,29 @@ export function ClubSessionsPage() {
                   </div>
                 </div>
               ) : null}
-              <div className="mb-6 grid gap-3 sm:grid-cols-3">
+              <div className="mb-6 grid gap-3 sm:grid-cols-4">
                 <div className="rounded-lg border border-line-strong bg-surface px-4 py-3">
                   <p className="m-0 text-xs font-bold uppercase tracking-wide text-text-muted">
                     {t("clubSessionDate")}
                   </p>
                   <p className="mb-0 mt-1 font-extrabold text-ink">
-                    {session.session_date}
+                    {formatDateOnly(session.session_date, locale)}
                   </p>
+                </div>
+                <div className="rounded-lg border border-line-strong bg-surface px-4 py-3">
+                  <p className="m-0 text-xs font-bold uppercase tracking-wide text-text-muted">
+                    {t("clubSessionSchedule")}
+                  </p>
+                  <p className="mb-0 mt-1 font-extrabold text-ink">
+                    {session.start_time
+                      ? `${formatClockTime(session.start_time, locale)} · ${session.time_zone ?? "UTC"}`
+                      : t("clubSessionTimeNotSet")}
+                  </p>
+                  {session.location_name ? (
+                    <p className="mb-0 mt-1 text-xs font-semibold text-text-muted">
+                      {session.location_name}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="rounded-lg border border-line-strong bg-surface px-4 py-3">
                   <p className="m-0 text-xs font-bold uppercase tracking-wide text-text-muted">
@@ -1080,7 +1167,7 @@ export function ClubSessionsPage() {
                           disabled={
                             busy ||
                             offline ||
-                            activePlayers.length < 4 ||
+                            activePlayers.length < requiredPlayersPerMatch ||
                             activeCourts.length === 0
                           }
                           onClick={() => void previewNextCourts()}
@@ -1217,6 +1304,7 @@ export function ClubSessionsPage() {
                         <Label className={fieldClass}>
                           <span>{t("clubSessionCourtName")}</span>
                           <SelectControl
+                            aria-label={t("clubSessionSelectCourt")}
                             value={selectedCourt}
                             onChange={(event) =>
                               setSelectedCourt(event.target.value)
@@ -1235,27 +1323,18 @@ export function ClubSessionsPage() {
                         </Label>
                         {selectedPlayers.map((selected, index) => (
                           <Label className={fieldClass} key={index}>
-                            <span>
-                              {fillMessage(
-                                t(
-                                  index < 2
-                                    ? "clubSessionTeamAPlayer"
-                                    : "clubSessionTeamBPlayer",
-                                ),
-                                { number: (index % 2) + 1 },
-                              )}
-                            </span>
+                            <span>{queuePlayerLabel(index)}</span>
                             <SelectControl
+                              aria-label={queuePlayerLabel(index)}
                               value={selected}
                               disabled={offline}
                               onChange={(event) =>
-                                setSelectedPlayers(
-                                  (current) =>
-                                    current.map((id, playerIndex) =>
-                                      playerIndex === index
-                                        ? event.target.value
-                                        : id,
-                                    ) as [string, string, string, string],
+                                setSelectedPlayers((current) =>
+                                  current.map((id, playerIndex) =>
+                                    playerIndex === index
+                                      ? event.target.value
+                                      : id,
+                                  ),
                                 )
                               }
                               required
@@ -1285,15 +1364,19 @@ export function ClubSessionsPage() {
                           disabled={
                             busy ||
                             offline ||
-                            activePlayers.length < 4 ||
+                            activePlayers.length < requiredPlayersPerMatch ||
                             !activeCourts.length
                           }
                         >
                           {t("clubSessionAddToQueue")}
                         </Button>
-                        {activePlayers.length < 4 || !activeCourts.length ? (
+                        {activePlayers.length < requiredPlayersPerMatch ||
+                        !activeCourts.length ? (
                           <p className="m-0 text-xs leading-5 text-text-muted">
-                            {t("clubSessionQueueRequirements")}
+                            {fillMessage(
+                              t("clubSessionQueueRequirementsDynamic"),
+                              { players: requiredPlayersPerMatch },
+                            )}
                           </p>
                         ) : null}
                         {manualFallbackPrompt ? (
@@ -1367,12 +1450,23 @@ export function ClubSessionsPage() {
                               ) : null}
                             </div>
                             <p className="m-0 text-sm font-bold leading-6 text-ink">
-                              {playerById.get(entry.team_a_player_1) ?? "—"} +{" "}
-                              {playerById.get(entry.team_a_player_2) ?? "—"}
+                              {[entry.team_a_player_1, entry.team_a_player_2]
+                                .filter((playerId): playerId is string =>
+                                  Boolean(playerId),
+                                )
+                                .map(
+                                  (playerId) => playerById.get(playerId) ?? "—",
+                                )
+                                .join(" + ")}
                               <span className="px-2 text-text-muted">vs</span>
-                              {playerById.get(entry.team_b_player_1) ??
-                                "—"} +{" "}
-                              {playerById.get(entry.team_b_player_2) ?? "—"}
+                              {[entry.team_b_player_1, entry.team_b_player_2]
+                                .filter((playerId): playerId is string =>
+                                  Boolean(playerId),
+                                )
+                                .map(
+                                  (playerId) => playerById.get(playerId) ?? "—",
+                                )
+                                .join(" + ")}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                               <span className="text-xs font-semibold text-text-muted">
@@ -1451,7 +1545,8 @@ export function ClubSessionsPage() {
                         </span>
                       </span>
                       <span className="mt-1 block text-sm font-semibold text-text-muted">
-                        {item.session_date}
+                        {t(item.sport)} ·{" "}
+                        {formatDateOnly(item.session_date, locale)}
                       </span>
                     </Link>
                   ))}
@@ -1499,24 +1594,101 @@ export function ClubSessionsPage() {
                       required
                     />
                   </Label>
-                  <Label className={fieldClass}>
-                    <span>{t("clubSessionPairingMode")}</span>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Label className={fieldClass} htmlFor="club-session-time">
+                      <span>{t("clubSessionTime")}</span>
+                      <Input
+                        id="club-session-time"
+                        type="time"
+                        value={sessionTime}
+                        onChange={(event) => setSessionTime(event.target.value)}
+                      />
+                    </Label>
+                    <Label
+                      className={fieldClass}
+                      htmlFor="club-session-location"
+                    >
+                      <span>{t("clubSessionLocation")}</span>
+                      <Input
+                        id="club-session-location"
+                        value={sessionLocation}
+                        onChange={(event) =>
+                          setSessionLocation(event.target.value)
+                        }
+                        maxLength={120}
+                        placeholder={t("clubSessionLocationPlaceholder")}
+                      />
+                    </Label>
+                  </div>
+                  <p className="-mt-2 text-xs font-semibold leading-5 text-text-muted">
+                    {fillMessage(t("clubSessionTimeZoneHint"), {
+                      timeZone:
+                        Intl.DateTimeFormat().resolvedOptions().timeZone ||
+                        "UTC",
+                    })}
+                  </p>
+                  <Label className={fieldClass} htmlFor="club-session-sport">
+                    <span>{t("sport")}</span>
                     <SelectControl
-                      value={pairingMode}
+                      id="club-session-sport"
+                      aria-label={t("sport")}
+                      value={sessionSport}
                       onChange={(event) =>
-                        setPairingMode(
-                          event.target.value as ClubSessionPairingMode,
-                        )
+                        setSessionSport(event.target.value as ClubSessionSport)
                       }
                     >
-                      <option value="open">
-                        {t("clubSessionOpenDoubles")}
-                      </option>
-                      <option value="mixed">
-                        {t("clubSessionMixedDoubles")}
-                      </option>
+                      <option value="badminton">{t("badminton")}</option>
+                      <option value="pickleball">{t("pickleball")}</option>
+                      <option value="tennis">{t("tennis")}</option>
+                      <option value="padel">{t("padel")}</option>
+                      <option value="table_tennis">{t("table_tennis")}</option>
+                      <option value="squash">{t("squash")}</option>
                     </SelectControl>
                   </Label>
+                  {clubSessionPlayProfileForSport(sessionSport).format ===
+                  "doubles" ? (
+                    <Label className={fieldClass}>
+                      <span>{t("clubSessionPairingMode")}</span>
+                      <SelectControl
+                        value={pairingMode}
+                        onChange={(event) =>
+                          setPairingMode(
+                            event.target.value as ClubSessionPairingMode,
+                          )
+                        }
+                      >
+                        <option value="open">
+                          {t("clubSessionOpenDoubles")}
+                        </option>
+                        <option value="mixed">
+                          {t("clubSessionMixedDoubles")}
+                        </option>
+                      </SelectControl>
+                    </Label>
+                  ) : (
+                    <div className="rounded-lg border border-line bg-paper p-3 text-sm font-semibold leading-6 text-text-muted">
+                      <span className="font-extrabold text-ink">
+                        {t("clubSessionPlayProfile")}: {t("singles")}
+                      </span>
+                      <br />
+                      {fillMessage(t("clubSessionSinglesRound"), {
+                        players:
+                          clubSessionPlayProfileForSport(sessionSport)
+                            .playersPerMatch,
+                      })}
+                      {clubSessionPlayProfileForSport(sessionSport)
+                        .roundMinutes ? (
+                        <>
+                          <br />
+                          {fillMessage(t("clubSessionShortRound"), {
+                            minutes:
+                              clubSessionPlayProfileForSport(sessionSport)
+                                .roundMinutes ?? 10,
+                          })}
+                        </>
+                      ) : null}
+                    </div>
+                  )}
                   <Button
                     className="min-h-11"
                     type="submit"

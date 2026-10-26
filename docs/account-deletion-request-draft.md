@@ -28,7 +28,7 @@ Hello Skor Lapangan,
 
 The in-app deletion flow was unavailable or failed. Please help me delete my Skor Lapangan account and the personal data associated with it.
 
-- Google account email: `[EMAIL USED TO SIGN IN]`
+- Account email: `[EMAIL USED TO SIGN IN]`
 - Optional detail to help locate the account: `[OPTIONAL]`
 
 I understand that deleting the account may remove saved match history and may affect Community Rules I created, if that feature is enabled.

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   assertQueueAssignment,
+  clubSessionPlayProfile,
+  clubSessionPlayProfileForSport,
   createClubSessionManagement,
   derivePlayerRecords,
   deriveStandings,
@@ -17,6 +19,7 @@ const session: ClubSessionSummary = {
   id: "session-1",
   name: "Saturday doubles",
   session_date: "2026-10-19",
+  sport: "badminton",
   status: "active",
   created_at: "2026-10-19T00:00:00.000Z",
 };
@@ -111,6 +114,50 @@ describe("Club Session management", () => {
     expect(new Set(plan.matches[1]?.playerIds)).toEqual(
       new Set(["p-1", "p-2", "p-3", "p-4"]),
     );
+  });
+
+  it("uses a squash singles profile and plans two players per court", () => {
+    const squashSession: ClubSessionSummary = {
+      ...session,
+      sport: "squash",
+      play_profile: "squash_singles",
+    };
+
+    expect(clubSessionPlayProfile(squashSession)).toMatchObject({
+      format: "singles",
+      playersPerMatch: 2,
+      rotationUnit: "game",
+    });
+
+    const plan = planSmartRotation({
+      session: squashSession,
+      players,
+      courts,
+      queue: [],
+      results: {},
+    });
+
+    expect(plan.matches[0]?.playerIds).toEqual(["p-1", "p-2"]);
+    expect(plan.matches[0]?.explanation?.playerCounts).toEqual([0, 0]);
+    expect(() =>
+      assertQueueAssignment({
+        session: squashSession,
+        players,
+        courts,
+        courtId: "court-1",
+        playerIds: ["p-1", "p-2"],
+      }),
+    ).not.toThrow();
+  });
+
+  it("uses ten-minute short rounds for table tennis", () => {
+    expect(clubSessionPlayProfileForSport("table_tennis")).toMatchObject({
+      id: "table_tennis_singles_short",
+      format: "singles",
+      playersPerMatch: 2,
+      rotationUnit: "minutes",
+      roundMinutes: 10,
+    });
   });
 
   it("fills only the free court when another court is still occupied", () => {

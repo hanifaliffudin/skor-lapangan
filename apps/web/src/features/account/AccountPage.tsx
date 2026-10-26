@@ -12,7 +12,8 @@ import {
 } from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
 import { useAuth } from "../../lib/auth";
-import { localizedPath, useLocale } from "../../lib/i18n";
+import { fillMessage, localizedPath, useLocale } from "../../lib/i18n";
+import type { AuthProviderId } from "../../lib/runtime-config";
 import styles from "../../styles/App.module.css";
 
 export function AccountPage() {
@@ -22,15 +23,36 @@ export function AccountPage() {
     action,
     authError,
     authErrorKind,
+    authProviders,
     deleteAccount,
     isAnonymous,
     loading,
+    signInWithProvider,
     signInWithGoogle,
     signOut,
     user,
   } = useAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const providerOptions: readonly AuthProviderId[] = authProviders ?? [
+    "google",
+  ];
+
+  function providerName(provider: AuthProviderId): string {
+    return provider === "github"
+      ? "GitHub"
+      : provider === "apple"
+        ? "Apple"
+        : "Google";
+  }
+
+  function providerLabel(provider: AuthProviderId): string {
+    return provider === "google"
+      ? t("signInWithGoogle")
+      : fillMessage(t("signInWithProvider"), {
+          provider: providerName(provider),
+        });
+  }
 
   useEffect(() => {
     document.title = t("accountPageTitle");
@@ -69,16 +91,27 @@ export function AccountPage() {
           <section className={styles.rulesEmpty}>
             <h2>{t("accountRequiresGoogle")}</h2>
             <p>{t("accountRequiresGoogleBody")}</p>
-            <Button
-              type="button"
-              className="mt-4 min-h-11"
-              disabled={loading || action === "google" || action === "claiming"}
-              onClick={() => void signInWithGoogle()}
-            >
-              {action === "google" || action === "claiming"
-                ? t("working")
-                : t("signInWithGoogle")}
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {providerOptions.map((provider) => (
+                <Button
+                  key={provider}
+                  type="button"
+                  className="min-h-11"
+                  disabled={
+                    loading || action === "oauth" || action === "claiming"
+                  }
+                  onClick={() =>
+                    void (typeof signInWithProvider === "function"
+                      ? signInWithProvider(provider)
+                      : signInWithGoogle())
+                  }
+                >
+                  {action === "oauth" || action === "claiming"
+                    ? t("working")
+                    : providerLabel(provider)}
+                </Button>
+              ))}
+            </div>
           </section>
         ) : (
           <div className="grid gap-4">

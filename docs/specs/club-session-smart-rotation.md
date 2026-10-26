@@ -4,7 +4,7 @@ Status: Accepted MVP plan
 
 ## Problem
 
-Open-play badminton sessions become unfair when the organizer has to build every match by hand. Players who arrive early may play repeatedly, late arrivals may be left out, and the same partners or opponents can meet all afternoon. A full round-robin schedule is also brittle because the roster changes while the session is running.
+Open-play sessions across the six supported sports become unfair when the organizer has to build every match by hand. Players who arrive early may play repeatedly, late arrivals may be left out, and the same partners or opponents can meet all afternoon. A full round-robin schedule is also brittle because the roster changes while the session is running. The same four-player doubles queue is not a valid default for every sport: Squash and Table tennis commonly use singles or short rounds, while Padel open play can rotate full courts by time or set.
 
 Smart Rotation chooses the next Club Session Match when a court becomes available. It keeps individual match counts close, respects the session's pairing rule, and leaves the organizer in control when the real-world situation does not fit the suggested match.
 
@@ -20,9 +20,11 @@ Smart Rotation chooses the next Club Session Match when a court becomes availabl
 
 ### In scope
 
-- A Club Session pairing mode: Open doubles or Mixed doubles.
+- A Club Session sport: any of Badminton, Pickleball, Tennis, Padel, Table tennis, or Squash.
+- A sport-aware Play Profile that defines format, participants per court or table, rotation unit, turn-taking rule, capacity, and skill mode.
+- A Club Session pairing mode where the selected Play Profile supports teams: Open doubles or Mixed doubles.
 - Optional player gender category, skill level, and availability state.
-- A pure planner that selects one match per free court without reusing a player already queued or playing on another court.
+- A pure planner that selects the next profile-valid round without reusing a player already queued or playing on another court or table.
 - Fairness based on started/completed match counts.
 - A reviewable explanation showing each selected player's current match count and the tie-breaker metrics used for the proposal.
 - Court-side priority based on the longest wait when fairness is tied.
@@ -30,6 +32,14 @@ Smart Rotation chooses the next Club Session Match when a court becomes availabl
 - Team skill balance as a soft tie-breaker.
 - Manual queueing and manual organizer override.
 - An explanation in the session board when no smart match can be made.
+
+### Community-fit requirements
+
+- Queue position, wait time, check-in state, and active court or table must be visible to the organizer.
+- The rotation policy must be explicit before play starts: everyone-off, winner-stays, challenge, timed rotation, or organizer assignment.
+- Capacity, skill mode, warm-up limit, cancellation deadline, and walk-in policy must be session data, not only chat instructions.
+- A manual override must preserve the planned round and record why the organizer changed it.
+- Public discovery, RSVP, waitlist, payment, and multi-organizer permissions remain separate slices after the private organizer workflow is validated.
 
 ### Out of scope for this MVP
 
@@ -77,7 +87,8 @@ The planner may choose a less balanced skill matchup when that is the only way t
 
 ### AC-1: Fair match count
 
-- Given four eligible players with zero matches, when the organizer fills a court, then the planner selects those four players.
+- Given the profile-required number of eligible players with zero matches, when the organizer fills a court, then the planner selects that valid participant set.
+- Given a squash or table-tennis singles profile with two eligible players, when the organizer fills a court or table, then the planner creates a two-player match without requiring doubles slots.
 - Given eligible players with counts `0, 0, 1, 1, 2`, when one court is filled, then the planner includes the lowest-count players whenever four valid players exist.
 - Given an active match on one court, when another court is filled, then players in the active match are not selected again.
 - Given a queued but not-started match, when another court is filled, then players already assigned to that queue entry are not selected again.

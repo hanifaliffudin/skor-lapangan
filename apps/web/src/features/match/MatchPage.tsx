@@ -8,6 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AuthProviderButtons } from "../../components/AuthProviderButtons";
 import {
   awardRally,
   canSelectPadelDecidingSide,
@@ -79,6 +80,7 @@ import {
   type RemoteMatchSnapshot,
 } from "../../lib/match-remote";
 import { Court } from "./Court";
+import { ClubSessionRoundTimer } from "../club-sessions/ClubSessionRoundTimer";
 import { OverrideDialog } from "./OverrideDialog";
 import { forkMatchAsNew } from "./matchRecovery";
 import { createMatchLifecycle } from "./matchLifecycle";
@@ -131,9 +133,11 @@ export function MatchPage() {
 
   const {
     action,
+    authProviders,
     isAnonymous,
     loading: authLoading,
     signInWithGoogle,
+    signInWithProvider,
     user,
   } = useAuth();
   const matchLifecycle = useMemo(
@@ -1350,6 +1354,13 @@ export function MatchPage() {
                 {t(bestOf === 3 ? "bestOfThree" : "bestOfFive")}
               </p>
             ) : null}
+            {clubSessionId && matchId ? (
+              <ClubSessionRoundTimer
+                enabled={Boolean(matchIsActive && user && !isAnonymous)}
+                matchId={matchId}
+                sessionId={clubSessionId}
+              />
+            ) : null}
           </div>
           <div
             className={styles.rulesBadge}
@@ -1431,17 +1442,14 @@ export function MatchPage() {
             <p className="m-0 max-w-[560px] text-sm leading-6 text-text-muted">
               {t("guestHistoryPrompt")}
             </p>
-            <Button
-              variant="outline"
-              type="button"
-              className="min-h-11 shrink-0"
-              disabled={action === "google" || action === "claiming"}
-              onClick={() => void signInWithGoogle()}
-            >
-              {action === "google" || action === "claiming"
-                ? t("working")
-                : t("saveHistory")}
-            </Button>
+            <AuthProviderButtons
+              action={action}
+              className="shrink-0"
+              fallbackSignIn={signInWithGoogle}
+              labelMode="saveHistory"
+              providers={authProviders}
+              signInWithProvider={signInWithProvider}
+            />
           </div>
         ) : null}
         {matchStatusNotice}

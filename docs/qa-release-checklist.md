@@ -2,7 +2,7 @@
 
 Use this checklist before a public release and again after a scoring, sync, or database change. Record the version, environment, browser/device, tester, date, and result in the release notes or issue tracker. Do not mark a check complete without evidence.
 
-The latest engineering evidence run from 2026-10-24 is recorded in [qa-evidence-smart-rotation-2026-10-23.md](qa-evidence-smart-rotation-2026-10-23.md). The earlier runs remain available in [qa-evidence-v1.0-2026-10-22.md](qa-evidence-v1.0-2026-10-22.md), [qa-evidence-v1.0-2026-10-20.md](qa-evidence-v1.0-2026-10-20.md), [qa-evidence-v1.0-2026-10-15.md](qa-evidence-v1.0-2026-10-15.md), [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md), and [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). None is a production release sign-off; real-device checks, legal review, and owner approval remain open even though the production deployment responded successfully.
+The latest engineering evidence run from 2026-10-26 is recorded in [qa-evidence-club-session-all-sports-2026-10-26.md](qa-evidence-club-session-all-sports-2026-10-26.md). The earlier runs remain available in [qa-evidence-smart-rotation-2026-10-23.md](qa-evidence-smart-rotation-2026-10-23.md), [qa-evidence-v1.0-2026-10-22.md](qa-evidence-v1.0-2026-10-22.md), [qa-evidence-v1.0-2026-10-20.md](qa-evidence-v1.0-2026-10-20.md), [qa-evidence-v1.0-2026-10-15.md](qa-evidence-v1.0-2026-10-15.md), [qa-evidence-v1.0-2026-10-13.md](qa-evidence-v1.0-2026-10-13.md), and [qa-evidence-v1.0-2026-10-09.md](qa-evidence-v1.0-2026-10-09.md). None is a production release sign-off; Preview/production migration history, real-device checks, legal review, and owner approval remain open.
 
 ## Automated checks
 
@@ -10,12 +10,13 @@ The latest engineering evidence run from 2026-10-24 is recorded in [qa-evidence-
 - [x] `pnpm typecheck` passes.
 - [x] `pnpm build` passes.
 - [x] `pnpm exec prettier --check .` passes.
-- [x] `pnpm test:coverage` passes with the configured scoring-core and web thresholds.
-- [x] `pnpm test:e2e` passes against a local preview or dev server; use the Chrome smoke flow as a manual fallback when the host cannot launch a headless browser.
+- [x] `pnpm test:coverage` passes with the configured scoring-core and web thresholds. The 2026-10-26 run reported scoring-core 91.31% statements / 78.22% branches / 94.08% functions and web 74.71% / 73.63% / 62.67%.
+- [x] `pnpm test:e2e` passes against a local preview or dev server: 12 tests passed and 3 tests were intentionally skipped because they require configured server/auth or network-transition fixtures.
+  - Run `E2E_USE_PREVIEW=1 pnpm test:e2e` for the production-preview path; it builds the app, registers the service worker, and runs the browser suite serially so offline-shell checks are exercised instead of skipped. Server-backed guest sync remains gated by `E2E_SERVER_SMOKE=1` and a disposable Supabase environment.
 - [x] Review `supabase/tests/match_rls.test.sql`, `supabase/tests/live_viewer_rls.test.sql`, `supabase/tests/account_deletion.test.sql`, `supabase/tests/table_tennis_scoring.test.sql`, `supabase/tests/squash_scoring.test.sql`, `supabase/tests/community_rules_rls.test.sql`, and `supabase/tests/release_guardrails.test.sql` in a disposable test database. The account deletion test covers owned data, reports, cascading events, and viewer access. Extend the Community Rules checks for all six sports, v2 validation, version locking, reports, and denied direct reads. Never run test setup against production data.
 - [x] Review `supabase/tests/atomic_match_sync.test.sql` in the same disposable database. Verify first write, idempotent retry, stale snapshot rejection, divergent snapshot rejection, and rollback when an event fails.
 - [x] Review `supabase/tests/cross_device_match_control.test.sql` and `supabase/tests/match_event_integrity.test.sql` in the same disposable database. Verify journal reads, initial lease, held lease, takeover, old-token rejection, complete read-only behavior, lease cleanup, duplicate-event rejection, sequence/sport validation, and journal completeness.
-- [x] Review `supabase/tests/club_sessions.test.sql` in the same disposable database. Verify owner-only RLS, four-player/court queue assignment, planned-match attachment, session deletion cascade, and preservation of account match journals.
+- [x] Review `supabase/tests/club_sessions.test.sql` in the same disposable database. Verify owner-only RLS, four-player/court queue assignment, planned-match attachment, session deletion cascade, preservation of account match journals, and the new write guards/RPC.
 - [x] Smart Rotation domain and page tests cover fairness, occupied/free multi-court selection, late/resting/unavailable no-show handling, uneven Mixed rosters, proposal explanations, rejection, and stale-preview protection.
 - [x] `git diff --check` passes. The browser-bundle secret review remains part of the production sign-off.
 
@@ -66,12 +67,12 @@ The latest engineering evidence run from 2026-10-24 is recorded in [qa-evidence-
 
 ## Account foundation
 
-- [ ] As a guest, click Google login and confirm the OAuth callback transfers an unexpired guest match through `transfer-guest-matches`; confirm an expired guest match is not transferred or claimed.
+- [ ] As a guest, click each enabled provider login and confirm the OAuth callback transfers an unexpired guest match through `transfer-guest-matches`; confirm an expired guest match is not transferred or claimed.
 - [ ] Complete OAuth on local and Preview. Confirm the callback updates the session, guest transfer runs when a source guest token exists, and `claim_guest_matches()` runs once for matches already owned by the account, with a visible claiming state and a recoverable error state.
 - [ ] Refresh the same browser and open `/history`; confirm matches are grouped into active and completed sections, ordered by `updated_at`, show sport/format/status/score/time, and open from server history even when the local snapshot is absent.
 - [ ] Open `/history` and `/account` in English and Indonesian. Verify loading, empty, error, keyboard focus, 44 px controls, and narrow-phone layout.
 - [ ] Sign out and confirm the account menu disappears and a new anonymous guest session is available.
-- [ ] On Preview, delete a disposable Google test account after the second confirmation. Confirm match history, events, reports, rules, versions, viewer access, local match storage, and the Auth session are gone.
+- [ ] On Preview, delete a disposable test account after the second confirmation. Confirm match history, events, reports, rules, versions, viewer access, local match storage, and the Auth session are gone.
 - [ ] Confirm user A cannot read or delete user B's history, and confirm no service-role key appears in the browser bundle or Vercel client variables.
 - [ ] Repeat the complete account flow in a second browser. Confirm an active match hydrates from server history, remains read-only while another device owns control, takeover downloads the latest server snapshot, and a completed match opens read-only without a lease.
 - [ ] Confirm a long journal hydrates through bounded definition plus event reads, polling does not overlap requests, hidden tabs pause polling, and returning to a visible tab revalidates the control lease.
@@ -80,7 +81,7 @@ The latest engineering evidence run from 2026-10-24 is recorded in [qa-evidence-
 
 - [ ] Confirm `/rules`, `/rules/new`, `/rules/:ruleId`, and the Indonesian equivalents open the intended directory, editor, and detail states.
 - [ ] Confirm the directory filters all six sports and exposes loading, empty, unavailable, and RPC error states without false statistics or seed data.
-- [ ] With a disposable Google account, create and edit a rule for every sport; verify canonical schema v2, optimistic-lock rejection, owner-only mutation, and publish/unpublish behavior.
+- [ ] With a disposable account, create and edit a rule for every sport; verify canonical schema v2, optimistic-lock rejection, owner-only mutation, and publish/unpublish behavior.
 - [ ] From detail and setup, use a published rule for singles, doubles, and Tennis/Padel mixed doubles where supported. Verify `source: "community"`, version, sport-specific configuration, and singles server normalization in the match definition snapshot.
 - [ ] Edit or unpublish after match creation and confirm the existing match remains playable from its snapshot while new setup selections reject the unavailable rule.
 - [ ] Submit valid/invalid reports anonymously, verify the three-per-hour limit, and process the queue only through the restricted SQL Editor runbook.
@@ -109,9 +110,9 @@ The latest engineering evidence run from 2026-10-24 is recorded in [qa-evidence-
 - [ ] Confirm new matches expose only Casual mode and old saved Referee matches remain readable.
 - [ ] Apply the release-guardrail migration, verify the hourly `purge-expired-guest-data` Cron job succeeds, and confirm the job removes expired rows.
 - [ ] Publish the approved privacy notice and terms with real operator and privacy contact details.
-- [ ] Deploy Google OAuth, `delete-account`, and `transfer-guest-matches` to Preview first. Promote production only after the account foundation smoke test, guest-transfer test, deletion test, privacy notice, terms, and owner approval pass.
+- [ ] Deploy the enabled OAuth providers, `delete-account`, and `transfer-guest-matches` to Preview first. Promote production only after the account foundation smoke test, guest-transfer test, deletion test, privacy notice, terms, and owner approval pass.
 - [ ] Verify all Community Rules migrations, including `20261014100000_community_rules_all_sports.sql`, are applied in filename order. Confirm safe RPC reads work and direct table reads remain denied.
 - [ ] Run the production smoke test after Vercel deployment and after the Supabase migrations/configuration are complete.
-- [x] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests.
-- [ ] On Preview, verify Club Sessions with a disposable Google account: create/delete a session, isolate two owners, add/deactivate/reactivate players and courts, start/resume a queued match, recover after score sync, and confirm mobile, keyboard, loading, empty, and error states.
+- [ ] Run the CI-equivalent checks: frozen install, format check, typecheck, unit tests, production build, production dependency audit, and Supabase pgTAP tests. The current pass covers format, typecheck, unit tests, and build only; audit and pgTAP remain pending.
+- [ ] On Preview, verify Club Sessions with a disposable account: create/delete a session, isolate two owners, add/deactivate/reactivate players and courts, start/resume a queued match, recover after score sync, and confirm mobile, keyboard, loading, empty, and error states.
 - [ ] Run the [Smart Rotation pilot checklist](qa-smart-rotation-pilot.md) with a real club organizer and record the observations before production promotion.

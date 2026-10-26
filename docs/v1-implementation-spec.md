@@ -8,13 +8,13 @@ The app remains mobile-first and English-default, with Indonesian available. The
 
 ## Match storage and ownership
 
-- A guest can start and control a match without Google sign-in.
+- A guest can start and control a match without signing in.
 - The browser generates the match UUID and every event UUID. Retrying sync must not create duplicate matches or events.
 - Guest scoring stays local-first. While online, the app syncs the match and event journal to Supabase under a Supabase anonymous-auth user. Offline events remain queued locally and retry with their original UUIDs.
 - Match snapshot and event uploads are committed in one server transaction. A stale or divergent client snapshot must be rejected rather than overwriting a newer server state.
 - Guest data remains available for 12 hours after the last server-accepted match activity, capped at 24 hours from creation. New accepted activity refreshes the inactivity expiry but cannot extend the hard cap. Expired records become inaccessible immediately and an hourly Supabase Cron job physically removes them and their events.
 - The same browser can resume a guest match while its local owner session and server record are still valid. One tab controls a match at a time; other tabs are read-only.
-- The V1.0 baseline does not require Google sign-in. The staged account foundation adds persistent account history and guest-to-account claiming after its own foundation gate passes.
+- The V1.0 baseline does not require account sign-in. The staged account foundation adds persistent account history and guest-to-account claiming after its own foundation gate passes.
 - Server-stored guest matches contain score and court state only. Player-entered names and guest-only rule configuration stay in the browser.
 - A completed guest match can remain available to its Live Viewer until the guest match expires. Ending a match ends its guest-only custom rules immediately.
 
@@ -47,18 +47,18 @@ The app remains mobile-first and English-default, with Indonesian available. The
 
 ### Account foundation and deferred community features
 
-- The V1.0 guest workflow remains the baseline release. The next staged account foundation adds Google sign-in, persistent account history, guest-to-account claiming, sign out, and in-app account deletion.
+- The V1.0 guest workflow remains the baseline release. The next staged account foundation adds configured OAuth sign-in, persistent account history, guest-to-account claiming, sign out, and in-app account deletion.
 - Public Community Rules remain excluded until the separate moderation, legal, privacy, and security checks pass.
 
 ## Data integrity and access control
 
-- Supabase Auth anonymous users own guest records until the OAuth account session is restored and the server-only transfer flow moves unexpired matches to the Google-linked account. The account foundation uses the existing Auth identity and owner-scoped history; it does not add a profile table.
+- Supabase Auth anonymous users own guest records until the OAuth account session is restored and the server-only transfer flow moves unexpired matches to the linked durable account. The account foundation uses the existing Auth identity and owner-scoped history; it does not add a profile table.
 - RLS enforces ownership. The frontend never receives a service-role key.
 - Event UUID and `(match_id, client_sequence)` uniqueness make retries idempotent and protect ordering.
 - Guest expiry is checked in database read/write paths and viewer authorization. A cleanup job is for storage reclamation, not the security boundary.
 - Database action limits reduce guest match, event, and viewer abuse. Supabase Auth's anonymous sign-in limit is configured separately; CAPTCHA remains a fallback if abuse warrants it.
 - New V1 matches use the single Casual workflow. Referee is hidden until it has distinct behavior; historical matches retain their stored label.
-- Supabase migrations and SQL policy tests are versioned in the repository. Applying migrations, enabling anonymous sign-ins, configuring Google OAuth, and deploying both server-only account functions are explicit release steps. Keep Community Rules disabled until their separate gate is approved.
+- Supabase migrations and SQL policy tests are versioned in the repository. Applying migrations, enabling anonymous sign-ins, configuring the enabled OAuth providers, and deploying both server-only account functions are explicit release steps. Keep Community Rules disabled until their separate gate is approved.
 
 ## Implementation order
 

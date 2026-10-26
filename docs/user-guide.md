@@ -20,7 +20,7 @@ For Squash, setup follows the WSF singles 2025 and doubles 2022 rules. Best of f
 ## Choose a ruleset
 
 - Official Rules are locked in the app and follow the federation source listed in [rules-sources.md](rules-sources.md).
-- Community Rules are user-published and always labeled unofficial. Open `/rules` to filter by sport, inspect a rule version, report a problem, or use it in setup. A Google-linked account can create, edit, publish, and unpublish its own rules.
+- Community Rules are user-published and always labeled unofficial. Open `/rules` to filter by sport, inspect a rule version, report a problem, or use it in setup. A durable account linked through an enabled OAuth provider can create, edit, publish, and unpublish its own rules.
 - After unpublishing a rule, its owner can use **Republish** (or **Terbitkan lagi** in Indonesian) to make the same version public again without editing the settings or creating a new version.
 - Guest custom rules let a guest change the scoring settings supported by the selected sport. They apply only to that guest match, stay in the browser, and are discarded when the match ends.
 
@@ -57,11 +57,11 @@ Anyone who gets the link can view the match until the link expires or the owner 
 
 ## Accounts and history
 
-Guests can play without an account. Guest matches remain local to the browser or device and do not support cross-device resume. Choose **Sign in with Google** to link an active guest session and keep eligible match history with the same account. Open **History** to see server-synced matches, grouped into **Berlangsung** and **Selesai**. An active match can be continued from another browser or device after its journal is downloaded. A completed match opens as read-only. Open **Account** to sign out or permanently delete the account and its stored data.
+Guests can play without an account. Guest matches remain local to the browser or device and do not support cross-device resume. Choose one of the enabled sign-in providers to link an active guest session and keep eligible match history with the same account. Open **History** to see server-synced matches, grouped into **Berlangsung** and **Selesai**. An active match can be continued from another browser or device after its journal is downloaded. A completed match opens as read-only. Open **Account** to sign out or permanently delete the account and its stored data.
 
 If the local and server versions have the same event sequence but different state, the app shows a conflict instead of choosing a version silently. Use **Gunakan versi server** or **Use server version** to discard the local branch and continue from the server snapshot, or choose **Simpan sebagai Match baru** / **Save as a new Match** to preserve the device version under a new Match ID without changing the server Match.
 
-Community Rule reports are reviewed manually by the operator. Reporters can submit a reason, optional details, and optional contact email without Google sign-in; the system rate-limits anonymous reporting and never automatically hides a rule. Use Official Rules for federation-standard play.
+Community Rule reports are reviewed manually by the operator. Reporters can submit a reason, optional details, and optional contact email without signing in; the system rate-limits anonymous reporting and never automatically hides a rule. Use Official Rules for federation-standard play.
 
 ## If something looks wrong
 

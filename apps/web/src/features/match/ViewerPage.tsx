@@ -12,7 +12,7 @@ import {
   tennisScoreLabel,
 } from "@skor-lapangan/scoring-core";
 import { AppHeader } from "../../components/AppHeader";
-import { localizedPath, useLocale } from "../../lib/i18n";
+import { formatTime, localizedPath, useLocale } from "../../lib/i18n";
 import { supabase } from "../../lib/supabase";
 import { Button } from "@/components/ui/button";
 import styles from "../../styles/App.module.css";
@@ -364,12 +364,7 @@ export function ViewerPage({ displayMode = false }: { displayMode?: boolean }) {
 
   const state = snapshot?.currentState;
   const definition = state ? viewerDefinition(state) : null;
-  const updatedTime = snapshot
-    ? new Date(snapshot.updatedAt).toLocaleTimeString(
-        locale === "id" ? "id-ID" : "en-US",
-        { hour: "2-digit", minute: "2-digit" },
-      )
-    : "";
+  const updatedTime = snapshot ? formatTime(snapshot.updatedAt, locale) : "";
 
   return (
     <div

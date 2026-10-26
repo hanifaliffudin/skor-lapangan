@@ -6,6 +6,8 @@ import type {
   ClubSessionGender,
   ClubSessionMatchResult,
   ClubSessionPairingMode,
+  ClubSessionPlayProfileId,
+  ClubSessionSport,
   ClubSessionStatus,
   ClubSessionSummary,
 } from "./clubSessionManagement";
@@ -13,6 +15,28 @@ import type {
 function requireAccount(userId: string | null): string {
   if (!supabase || !userId) throw new Error("CLUB_SESSION_BACKEND_UNAVAILABLE");
   return userId;
+}
+
+function assignmentColumns(playerIds: string[]): {
+  team_a_player_1: string;
+  team_a_player_2: string | null;
+  team_b_player_1: string;
+  team_b_player_2: string | null;
+} {
+  if (playerIds.length === 2) {
+    return {
+      team_a_player_1: playerIds[0]!,
+      team_a_player_2: null,
+      team_b_player_1: playerIds[1]!,
+      team_b_player_2: null,
+    };
+  }
+  return {
+    team_a_player_1: playerIds[0]!,
+    team_a_player_2: playerIds[1] ?? null,
+    team_b_player_1: playerIds[2]!,
+    team_b_player_2: playerIds[3] ?? null,
+  };
 }
 
 export function createClubSessionSupabaseAdapter(
@@ -23,7 +47,9 @@ export function createClubSessionSupabaseAdapter(
       const ownerId = requireAccount(userId);
       const { data, error } = await supabase!
         .from("club_sessions")
-        .select("id,name,session_date,status,pairing_mode,created_at")
+        .select(
+          "id,name,session_date,start_time,time_zone,location_name,sport,play_profile,status,pairing_mode,created_at,updated_at",
+        )
         .eq("owner_id", ownerId)
         .order("session_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -36,7 +62,9 @@ export function createClubSessionSupabaseAdapter(
         await Promise.all([
           supabase!
             .from("club_sessions")
-            .select("id,name,session_date,status,pairing_mode,created_at")
+            .select(
+              "id,name,session_date,start_time,time_zone,location_name,sport,play_profile,status,pairing_mode,created_at,updated_at",
+            )
             .eq("id", sessionId)
             .eq("owner_id", ownerId)
             .maybeSingle(),
@@ -108,6 +136,11 @@ export function createClubSessionSupabaseAdapter(
     async createSession(input: {
       name: string;
       sessionDate: string;
+      startTime?: string;
+      timeZone?: string;
+      locationName?: string;
+      sport: ClubSessionSport;
+      playProfile: ClubSessionPlayProfileId;
       pairingMode?: ClubSessionPairingMode;
     }) {
       const ownerId = requireAccount(userId);
@@ -117,6 +150,19 @@ export function createClubSessionSupabaseAdapter(
           owner_id: ownerId,
           name: input.name,
           session_date: input.sessionDate,
+          start_time: input.startTime || null,
+          time_zone:
+            input.timeZone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone ||
+            "UTC",
+          location_name: input.locationName?.trim() || null,
+          sport: input.sport,
+          play_profile: input.playProfile,
+          format:
+            input.playProfile.endsWith("_singles") ||
+            input.playProfile === "table_tennis_singles_short"
+              ? "singles"
+              : "doubles",
           pairing_mode: input.pairingMode ?? "open",
         })
         .select("id")
@@ -204,17 +250,12 @@ export function createClubSessionSupabaseAdapter(
     },
     async addQueuedMatch(input) {
       const ownerId = requireAccount(userId);
-      const [teamAPlayer1, teamAPlayer2, teamBPlayer1, teamBPlayer2] =
-        input.playerIds;
       const { error } = await supabase!.from("club_session_matches").insert({
         session_id: input.sessionId,
         owner_id: ownerId,
         match_id: input.matchId,
         court_id: input.courtId,
-        team_a_player_1: teamAPlayer1,
-        team_a_player_2: teamAPlayer2,
-        team_b_player_1: teamBPlayer1,
-        team_b_player_2: teamBPlayer2,
+        ...assignmentColumns(input.playerIds),
         queue_order: input.queueOrder,
         is_open_fallback: input.isOpenFallback ?? false,
       });
@@ -224,22 +265,32 @@ export function createClubSessionSupabaseAdapter(
       const ownerId = requireAccount(userId);
       const { error } = await supabase!.from("club_session_matches").insert(
         input.matches.map((match) => {
-          const [teamAPlayer1, teamAPlayer2, teamBPlayer1, teamBPlayer2] =
-            match.playerIds;
           return {
             session_id: input.sessionId,
             owner_id: ownerId,
             match_id: match.matchId,
             court_id: match.courtId,
-            team_a_player_1: teamAPlayer1,
-            team_a_player_2: teamAPlayer2,
-            team_b_player_1: teamBPlayer1,
-            team_b_player_2: teamBPlayer2,
+            ...assignmentColumns(match.playerIds),
             queue_order: match.queueOrder,
             is_open_fallback: match.isOpenFallback ?? false,
           };
         }),
       );
+      if (error) throw error;
+    },
+    async addQueuedMatchesIfCurrent(input) {
+      requireAccount(userId);
+      const { error } = await supabase!.rpc("queue_club_session_matches", {
+        p_session_id: input.sessionId,
+        p_expected_updated_at: input.expectedUpdatedAt,
+        p_matches: input.matches.map((match) => ({
+          matchId: match.matchId,
+          courtId: match.courtId,
+          playerIds: match.playerIds,
+          queueOrder: match.queueOrder,
+          isOpenFallback: match.isOpenFallback ?? false,
+        })),
+      });
       if (error) throw error;
     },
     async markMatchStarted(input) {

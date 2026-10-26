@@ -73,6 +73,8 @@ vi.mock("./runtime-config", () => ({
   get hcaptchaSiteKey() {
     return auth.hcaptchaSiteKey;
   },
+  authProviders: ["google", "github"],
+  defaultAuthProvider: "google",
 }));
 
 function AuthState() {
@@ -132,6 +134,34 @@ describe("guest authentication", () => {
     expect(await screen.findByText("guest-user:true")).toBeVisible();
     expect(auth.signInAnonymously).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the header to one sign-in action and opens the provider chooser", async () => {
+    const user = userEvent.setup();
+    auth.signInAnonymously.mockResolvedValue({
+      data: { session: auth.guestSession },
+      error: null,
+    });
+    auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null });
+
+    render(<TestApp />);
+
+    await user.click(await screen.findByRole("button", { name: "Sign in" }));
+    expect(
+      screen.getByRole("heading", { name: "Sign in to your account" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Sign in with GitHub" }),
+    ).toBeVisible();
+
+    await user.click(
+      screen.getByRole("button", { name: "Sign in with GitHub" }),
+    );
+    await waitFor(() =>
+      expect(auth.signInWithOAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: "github" }),
+      ),
+    );
   });
 
   it("shows anonymous sign-in errors and retries guest sync successfully", async () => {
@@ -231,7 +261,7 @@ describe("guest authentication", () => {
     expect(auth.linkIdentity).not.toHaveBeenCalled();
   });
 
-  it("resets the Google button when the OAuth page is left with Back", async () => {
+  it("resets the sign-in button when the OAuth page is left with Back", async () => {
     const user = userEvent.setup();
     auth.getSession.mockResolvedValue({
       data: { session: auth.guestSession },
@@ -241,8 +271,9 @@ describe("guest authentication", () => {
 
     render(<TestApp />);
 
+    await user.click(await screen.findByRole("button", { name: "Sign in" }));
     await user.click(
-      await screen.findByRole("button", { name: "Sign in with Google" }),
+      screen.getByRole("button", { name: "Sign in with Google" }),
     );
     expect(
       await screen.findByRole("button", { name: "Working…" }),
@@ -251,7 +282,7 @@ describe("guest authentication", () => {
     window.dispatchEvent(new Event("pageshow"));
 
     expect(
-      await screen.findByRole("button", { name: "Sign in with Google" }),
+      await screen.findByRole("button", { name: "Sign in" }),
     ).toBeEnabled();
   });
 

@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n";
+import { siteOrigin } from "./runtime-config";
 
-export const SITE_ORIGIN = "https://skor-lapangan.vercel.app";
+export const SITE_ORIGIN = siteOrigin;
 
 type SeoSchema = Record<string, unknown>;
 

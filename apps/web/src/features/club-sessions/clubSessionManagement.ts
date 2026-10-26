@@ -1,16 +1,113 @@
 export type ClubSessionStatus = "active" | "completed";
+export type ClubSessionSport =
+  "badminton" | "pickleball" | "tennis" | "padel" | "table_tennis" | "squash";
 export type ClubSessionGender = "man" | "woman" | "other" | "unspecified";
 export type ClubSessionPairingMode = "open" | "mixed";
 export type ClubSessionAvailability =
   "available" | "late" | "resting" | "unavailable";
+export type ClubSessionFormat = "singles" | "doubles";
+export type ClubSessionRotationUnit = "game" | "minutes";
+export type ClubSessionPlayProfileId =
+  | "badminton_doubles"
+  | "pickleball_doubles"
+  | "tennis_doubles"
+  | "padel_doubles"
+  | "table_tennis_singles_short"
+  | "squash_singles";
+
+export interface ClubSessionPlayProfile {
+  id: ClubSessionPlayProfileId;
+  sport: ClubSessionSport;
+  format: ClubSessionFormat;
+  playersPerMatch: 2 | 4;
+  rotationUnit: ClubSessionRotationUnit;
+  roundMinutes?: number;
+}
+
+const clubSessionPlayProfiles: Record<
+  ClubSessionPlayProfileId,
+  ClubSessionPlayProfile
+> = {
+  badminton_doubles: {
+    id: "badminton_doubles",
+    sport: "badminton",
+    format: "doubles",
+    playersPerMatch: 4,
+    rotationUnit: "game",
+  },
+  pickleball_doubles: {
+    id: "pickleball_doubles",
+    sport: "pickleball",
+    format: "doubles",
+    playersPerMatch: 4,
+    rotationUnit: "game",
+  },
+  tennis_doubles: {
+    id: "tennis_doubles",
+    sport: "tennis",
+    format: "doubles",
+    playersPerMatch: 4,
+    rotationUnit: "game",
+  },
+  padel_doubles: {
+    id: "padel_doubles",
+    sport: "padel",
+    format: "doubles",
+    playersPerMatch: 4,
+    rotationUnit: "game",
+  },
+  table_tennis_singles_short: {
+    id: "table_tennis_singles_short",
+    sport: "table_tennis",
+    format: "singles",
+    playersPerMatch: 2,
+    rotationUnit: "minutes",
+    roundMinutes: 10,
+  },
+  squash_singles: {
+    id: "squash_singles",
+    sport: "squash",
+    format: "singles",
+    playersPerMatch: 2,
+    rotationUnit: "game",
+  },
+};
+
+export function clubSessionPlayProfileForSport(
+  sport: ClubSessionSport,
+): ClubSessionPlayProfile {
+  const profileId: ClubSessionPlayProfileId =
+    sport === "table_tennis"
+      ? "table_tennis_singles_short"
+      : sport === "squash"
+        ? "squash_singles"
+        : (`${sport}_doubles` as ClubSessionPlayProfileId);
+  return clubSessionPlayProfiles[profileId];
+}
 
 export interface ClubSessionSummary {
   id: string;
   name: string;
   session_date: string;
+  start_time?: string | null;
+  time_zone?: string;
+  location_name?: string | null;
+  sport: ClubSessionSport;
+  play_profile?: ClubSessionPlayProfileId;
   status: ClubSessionStatus;
   created_at: string;
+  updated_at?: string;
   pairing_mode?: ClubSessionPairingMode;
+}
+
+export function clubSessionPlayProfile(
+  session: Pick<ClubSessionSummary, "sport" | "play_profile">,
+): ClubSessionPlayProfile {
+  return (
+    (session.play_profile
+      ? clubSessionPlayProfiles[session.play_profile]
+      : undefined) ?? clubSessionPlayProfileForSport(session.sport)
+  );
 }
 
 export interface ClubSessionPlayer {
@@ -37,9 +134,9 @@ export interface ClubSessionMatch {
   linked_match_id: string | null;
   court_id: string;
   team_a_player_1: string;
-  team_a_player_2: string;
+  team_a_player_2: string | null;
   team_b_player_1: string;
-  team_b_player_2: string;
+  team_b_player_2: string | null;
   queue_order: number;
   started_at: string | null;
   is_open_fallback?: boolean;
@@ -53,11 +150,11 @@ export interface ClubSessionMatchResult {
 
 export interface ClubSessionScheduleMatch {
   courtId: string;
-  playerIds: [string, string, string, string];
+  playerIds: string[];
   round: number;
   isOpenFallback?: boolean;
   explanation?: {
-    playerCounts: [number, number, number, number];
+    playerCounts: number[];
     fairnessGap: number;
     avoidPenalty: number;
     repeatPenalty: number;
@@ -97,6 +194,11 @@ export interface ClubSessionAdapter {
   createSession(input: {
     name: string;
     sessionDate: string;
+    startTime?: string | undefined;
+    timeZone?: string | undefined;
+    locationName?: string | undefined;
+    sport: ClubSessionSport;
+    playProfile: ClubSessionPlayProfileId;
     pairingMode?: ClubSessionPairingMode;
   }): Promise<{ id: string }>;
   addPlayer(input: {
@@ -133,7 +235,7 @@ export interface ClubSessionAdapter {
     sessionId: string;
     matchId: string;
     courtId: string;
-    playerIds: [string, string, string, string];
+    playerIds: string[];
     queueOrder: number;
     isOpenFallback?: boolean;
   }): Promise<void>;
@@ -142,7 +244,18 @@ export interface ClubSessionAdapter {
     matches: Array<{
       matchId: string;
       courtId: string;
-      playerIds: [string, string, string, string];
+      playerIds: string[];
+      queueOrder: number;
+      isOpenFallback?: boolean;
+    }>;
+  }): Promise<void>;
+  addQueuedMatchesIfCurrent?(input: {
+    sessionId: string;
+    expectedUpdatedAt: string;
+    matches: Array<{
+      matchId: string;
+      courtId: string;
+      playerIds: string[];
       queueOrder: number;
       isOpenFallback?: boolean;
     }>;
@@ -168,6 +281,11 @@ export interface ClubSessionManagement {
   createSession(input: {
     name: string;
     sessionDate: string;
+    startTime?: string | undefined;
+    timeZone?: string | undefined;
+    locationName?: string | undefined;
+    sport: ClubSessionSport;
+    playProfile?: ClubSessionPlayProfileId;
     pairingMode?: ClubSessionPairingMode;
   }): Promise<{ id: string }>;
   addPlayer(input: {
@@ -206,7 +324,7 @@ export interface ClubSessionManagement {
     courts: ClubSessionCourt[];
     queue: ClubSessionMatch[];
     courtId: string;
-    playerIds: [string, string, string, string];
+    playerIds: string[];
     allowOpenFallback?: boolean;
   }): Promise<void>;
   generateSchedule(input: {
@@ -253,7 +371,7 @@ export function assertQueueAssignment(input: {
   players: ClubSessionPlayer[];
   courts: ClubSessionCourt[];
   courtId: string;
-  playerIds: [string, string, string, string];
+  playerIds: string[];
   allowOpenFallback?: boolean;
 }): void {
   if (input.session.status !== "active") {
@@ -267,19 +385,22 @@ export function assertQueueAssignment(input: {
   const activeCourtIds = new Set(
     input.courts.filter((court) => court.is_active).map((court) => court.id),
   );
+  const profile = clubSessionPlayProfile(input.session);
   if (
     !activeCourtIds.has(input.courtId) ||
+    input.playerIds.length !== profile.playersPerMatch ||
     input.playerIds.some((playerId) => !activePlayerIds.has(playerId)) ||
     new Set(input.playerIds).size !== input.playerIds.length
   ) {
     throw new Error("CLUB_SESSION_ASSIGNMENT_INVALID");
   }
-  if (input.session.pairing_mode !== "mixed") return;
+  if (input.session.pairing_mode !== "mixed" || profile.format !== "doubles")
+    return;
   const playersById = new Map(
     input.players.map((player) => [player.id, player]),
   );
-  const teamA: [string, string] = [input.playerIds[0], input.playerIds[1]];
-  const teamB: [string, string] = [input.playerIds[2], input.playerIds[3]];
+  const teamA: [string, string] = [input.playerIds[0]!, input.playerIds[1]!];
+  const teamB: [string, string] = [input.playerIds[2]!, input.playerIds[3]!];
   const isValidMixedAssignment =
     isMixedPair(teamA, playersById) && isMixedPair(teamB, playersById);
   if (!isValidMixedAssignment && !input.allowOpenFallback) {
@@ -303,8 +424,12 @@ export function derivePlayerRecords(
     if (!entry.linked_match_id) continue;
     const result = results[entry.linked_match_id];
     if (!result || result.status !== "complete" || !result.winner) continue;
-    const sideA = [entry.team_a_player_1, entry.team_a_player_2];
-    const sideB = [entry.team_b_player_1, entry.team_b_player_2];
+    const sideA = [entry.team_a_player_1, entry.team_a_player_2].filter(
+      (playerId): playerId is string => Boolean(playerId),
+    );
+    const sideB = [entry.team_b_player_1, entry.team_b_player_2].filter(
+      (playerId): playerId is string => Boolean(playerId),
+    );
     for (const playerId of sideA) {
       const record = records.get(playerId);
       if (!record) continue;
@@ -351,8 +476,8 @@ export function deriveStandings(
 }
 
 interface RotationPairing {
-  playerIds: [string, string, string, string];
-  teams: [[string, string], [string, string]];
+  playerIds: string[];
+  teams: [string[], string[]];
 }
 
 interface RotationCandidate {
@@ -391,7 +516,7 @@ function queuePlayerIds(entry: ClubSessionMatch): string[] {
     entry.team_a_player_2,
     entry.team_b_player_1,
     entry.team_b_player_2,
-  ];
+  ].filter((playerId): playerId is string => Boolean(playerId));
 }
 
 function rotationSnapshotKey(input: {
@@ -404,6 +529,8 @@ function rotationSnapshotKey(input: {
   return JSON.stringify({
     session: {
       id: input.session.id,
+      sport: input.session.sport,
+      playProfile: clubSessionPlayProfile(input.session).id,
       status: input.session.status,
       pairingMode: input.session.pairing_mode ?? "open",
     },
@@ -454,6 +581,14 @@ function pairKey(first: string, second: string): string {
 }
 
 function pairingOptions(playerIds: string[]): RotationPairing[] {
+  if (playerIds.length === 2) {
+    return [
+      {
+        playerIds: [...playerIds],
+        teams: [[playerIds[0]!], [playerIds[1]!]],
+      },
+    ];
+  }
   const [a, b, c, d] = playerIds;
   if (!a || !b || !c || !d) return [];
   return [
@@ -482,33 +617,30 @@ function pairingOptions(playerIds: string[]): RotationPairing[] {
 }
 
 function isMixedPair(
-  pair: [string, string],
+  pair: string[],
   playersById: Map<string, ClubSessionPlayer>,
 ): boolean {
-  const first = playersById.get(pair[0])?.gender;
-  const second = playersById.get(pair[1])?.gender;
+  if (pair.length !== 2) return false;
+  const first = playersById.get(pair[0]!)?.gender;
+  const second = playersById.get(pair[1]!)?.gender;
   return (
     (first === "man" && second === "woman") ||
     (first === "woman" && second === "man")
   );
 }
 
-function combinationsOfFour(playerIds: string[]): string[][] {
+function combinationsOfSize(playerIds: string[], size: number): string[][] {
   const combinations: string[][] = [];
-  for (let first = 0; first < playerIds.length - 3; first += 1) {
-    for (let second = first + 1; second < playerIds.length - 2; second += 1) {
-      for (let third = second + 1; third < playerIds.length - 1; third += 1) {
-        for (let fourth = third + 1; fourth < playerIds.length; fourth += 1) {
-          combinations.push([
-            playerIds[first]!,
-            playerIds[second]!,
-            playerIds[third]!,
-            playerIds[fourth]!,
-          ]);
-        }
-      }
+  function visit(start: number, picked: string[]) {
+    if (picked.length === size) {
+      combinations.push([...picked]);
+      return;
+    }
+    for (let index = start; index < playerIds.length; index += 1) {
+      visit(index + 1, [...picked, playerIds[index]!]);
     }
   }
+  visit(0, []);
   return combinations;
 }
 
@@ -530,7 +662,7 @@ function planCandidate(
   opponentHistory: Map<string, number>,
 ): RotationCandidate | null {
   const pairings = pairingOptions(playerIds).filter((pairing) =>
-    pairingMode === "mixed"
+    pairingMode === "mixed" && playerIds.length === 4
       ? pairing.teams.every((team) => isMixedPair(team, playersById))
       : true,
   );
@@ -557,23 +689,22 @@ function planCandidate(
   return pairings
     .map((pairing) => {
       const partnerPenalty = pairing.teams.reduce(
-        (total, [first, second]) =>
-          total + (partnerHistory.get(pairKey(first, second)) ?? 0),
+        (total, team) =>
+          team.length === 2
+            ? total + (partnerHistory.get(pairKey(team[0]!, team[1]!)) ?? 0)
+            : total,
         0,
       );
-      const opponentPenalty =
-        (opponentHistory.get(
-          pairKey(pairing.teams[0][0], pairing.teams[1][0]),
-        ) ?? 0) +
-        (opponentHistory.get(
-          pairKey(pairing.teams[0][0], pairing.teams[1][1]),
-        ) ?? 0) +
-        (opponentHistory.get(
-          pairKey(pairing.teams[0][1], pairing.teams[1][0]),
-        ) ?? 0) +
-        (opponentHistory.get(
-          pairKey(pairing.teams[0][1], pairing.teams[1][1]),
-        ) ?? 0);
+      const opponentPenalty = pairing.teams[0].reduce(
+        (total, first) =>
+          total +
+          pairing.teams[1].reduce(
+            (teamTotal, second) =>
+              teamTotal + (opponentHistory.get(pairKey(first, second)) ?? 0),
+            0,
+          ),
+        0,
+      );
       const teamSkill = pairing.teams.map((team) =>
         team.reduce(
           (total, playerId) =>
@@ -588,7 +719,7 @@ function planCandidate(
         waitKey,
         repeatPenalty: partnerPenalty + opponentPenalty,
         skillGap: Math.abs(teamSkill[0]! - teamSkill[1]!),
-        stableKey: sortedPlayerIds.join("|") + pairKey(...pairing.teams[0]),
+        stableKey: sortedPlayerIds.join("|") + pairing.teams[0].join("|"),
       };
     })
     .sort(
@@ -664,12 +795,17 @@ export function planSmartRotation(input: {
         );
       }
     });
-    const teams: [[string, string], [string, string]] = [
-      [entry.team_a_player_1, entry.team_a_player_2],
-      [entry.team_b_player_1, entry.team_b_player_2],
+    const teams: [string[], string[]] = [
+      [entry.team_a_player_1, entry.team_a_player_2].filter(
+        (playerId): playerId is string => Boolean(playerId),
+      ),
+      [entry.team_b_player_1, entry.team_b_player_2].filter(
+        (playerId): playerId is string => Boolean(playerId),
+      ),
     ];
-    for (const [first, second] of teams) {
-      const key = pairKey(first, second);
+    for (const team of teams) {
+      if (team.length !== 2) continue;
+      const key = pairKey(team[0]!, team[1]!);
       partnerHistory.set(key, (partnerHistory.get(key) ?? 0) + 1);
     }
     for (const first of teams[0]) {
@@ -693,9 +829,15 @@ export function planSmartRotation(input: {
   let canUseOpenFallback = false;
   let usedOpenFallback = false;
   let reason: ClubSessionSmartRotationPlan["reason"];
+  const profile = clubSessionPlayProfile(input.session);
+  const isMixedSession =
+    input.session.pairing_mode === "mixed" && profile.format === "doubles";
 
   for (const court of freeCourts) {
-    const openCandidate = combinationsOfFour(remainingPlayers)
+    const openCandidate = combinationsOfSize(
+      remainingPlayers,
+      profile.playersPerMatch,
+    )
       .map((ids) =>
         planCandidate(
           ids,
@@ -722,37 +864,36 @@ export function planSmartRotation(input: {
       break;
     }
 
-    const mixedCandidate =
-      input.session.pairing_mode === "mixed"
-        ? combinationsOfFour(remainingPlayers)
-            .map((ids) =>
-              planCandidate(
-                ids,
-                "mixed",
-                playersById,
-                playedCounts,
-                lastPlayedAt,
-                partnerHistory,
-                opponentHistory,
-              ),
-            )
-            .filter((candidate): candidate is RotationCandidate =>
-              Boolean(candidate),
-            )
-            .sort(
-              (left, right) =>
-                compareNumberVectors(left.countVector, right.countVector) ||
-                left.avoidPenalty - right.avoidPenalty ||
-                left.waitKey - right.waitKey ||
-                left.repeatPenalty - right.repeatPenalty ||
-                left.skillGap - right.skillGap ||
-                left.stableKey.localeCompare(right.stableKey),
-            )[0]
-        : openCandidate;
+    const mixedCandidate = isMixedSession
+      ? combinationsOfSize(remainingPlayers, profile.playersPerMatch)
+          .map((ids) =>
+            planCandidate(
+              ids,
+              "mixed",
+              playersById,
+              playedCounts,
+              lastPlayedAt,
+              partnerHistory,
+              opponentHistory,
+            ),
+          )
+          .filter((candidate): candidate is RotationCandidate =>
+            Boolean(candidate),
+          )
+          .sort(
+            (left, right) =>
+              compareNumberVectors(left.countVector, right.countVector) ||
+              left.avoidPenalty - right.avoidPenalty ||
+              left.waitKey - right.waitKey ||
+              left.repeatPenalty - right.repeatPenalty ||
+              left.skillGap - right.skillGap ||
+              left.stableKey.localeCompare(right.stableKey),
+          )[0]
+      : openCandidate;
 
     const chosen = mixedCandidate ?? openCandidate;
     let selectedOpenFallback = false;
-    if (!mixedCandidate && input.session.pairing_mode === "mixed") {
+    if (!mixedCandidate && isMixedSession) {
       canUseOpenFallback = true;
       if (!input.allowOpenFallback) {
         reason = "MIXED_FALLBACK_REQUIRED";
@@ -769,7 +910,7 @@ export function planSmartRotation(input: {
       explanation: {
         playerCounts: chosen.pairing.playerIds.map(
           (playerId) => playedCounts.get(playerId) ?? 0,
-        ) as [number, number, number, number],
+        ),
         fairnessGap:
           Math.max(...chosen.countVector) - Math.min(...chosen.countVector),
         avoidPenalty: chosen.avoidPenalty,
@@ -830,6 +971,34 @@ export function generateDoublesSchedule(
   return schedule;
 }
 
+export function generateSinglesSchedule(
+  players: ClubSessionPlayer[],
+  courts: ClubSessionCourt[],
+): ClubSessionScheduleMatch[] {
+  const activePlayers = players.filter((player) => player.is_active);
+  const activeCourts = courts.filter((court) => court.is_active);
+  if (activePlayers.length < 2 || activeCourts.length === 0) return [];
+
+  return combinationsOfSize(
+    activePlayers.map((player) => player.id),
+    2,
+  ).map((playerIds, index) => ({
+    courtId: activeCourts[index % activeCourts.length]!.id,
+    playerIds,
+    round: index + 1,
+  }));
+}
+
+export function generateClubSessionSchedule(
+  session: ClubSessionSummary,
+  players: ClubSessionPlayer[],
+  courts: ClubSessionCourt[],
+): ClubSessionScheduleMatch[] {
+  return clubSessionPlayProfile(session).format === "singles"
+    ? generateSinglesSchedule(players, courts)
+    : generateDoublesSchedule(players, courts);
+}
+
 async function persistSmartRotationPlan(
   adapter: ClubSessionAdapter,
   input: {
@@ -837,6 +1006,7 @@ async function persistSmartRotationPlan(
     queue: ClubSessionMatch[];
     plan: ClubSessionSmartRotationPlan;
   },
+  expectedUpdatedAt?: string,
 ): Promise<void> {
   if (!input.plan.matches.length) return;
   const nextQueueOrder =
@@ -844,16 +1014,22 @@ async function persistSmartRotationPlan(
       (highest, entry) => Math.max(highest, entry.queue_order),
       -1,
     ) + 1;
-  await adapter.addQueuedMatches({
-    sessionId: input.session.id,
-    matches: input.plan.matches.map((match, index) => ({
-      matchId: crypto.randomUUID(),
-      courtId: match.courtId,
-      playerIds: match.playerIds,
-      queueOrder: nextQueueOrder + index,
-      ...(match.isOpenFallback ? { isOpenFallback: true } : {}),
-    })),
-  });
+  const matches = input.plan.matches.map((match, index) => ({
+    matchId: crypto.randomUUID(),
+    courtId: match.courtId,
+    playerIds: match.playerIds,
+    queueOrder: nextQueueOrder + index,
+    ...(match.isOpenFallback ? { isOpenFallback: true } : {}),
+  }));
+  if (expectedUpdatedAt && adapter.addQueuedMatchesIfCurrent) {
+    await adapter.addQueuedMatchesIfCurrent({
+      sessionId: input.session.id,
+      expectedUpdatedAt,
+      matches,
+    });
+    return;
+  }
+  await adapter.addQueuedMatches({ sessionId: input.session.id, matches });
 }
 
 export function createClubSessionManagement(
@@ -862,7 +1038,12 @@ export function createClubSessionManagement(
   return {
     listSessions: () => adapter.listSessions(),
     loadSession: (sessionId) => adapter.loadSession(sessionId),
-    createSession: (input) => adapter.createSession(input),
+    createSession: (input) =>
+      adapter.createSession({
+        ...input,
+        playProfile:
+          input.playProfile ?? clubSessionPlayProfileForSport(input.sport).id,
+      }),
     addPlayer: ({
       sessionId,
       displayName,
@@ -911,7 +1092,11 @@ export function createClubSessionManagement(
       if (input.queue.length > 0) {
         throw new Error("CLUB_SESSION_SCHEDULE_EXISTS");
       }
-      const schedule = generateDoublesSchedule(input.players, input.courts);
+      const schedule = generateClubSessionSchedule(
+        input.session,
+        input.players,
+        input.courts,
+      );
       if (schedule.length === 0) {
         throw new Error("CLUB_SESSION_SCHEDULE_REQUIREMENTS");
       }
@@ -932,7 +1117,11 @@ export function createClubSessionManagement(
       if (rotationSnapshotKey(current) !== input.plan.snapshotKey) {
         throw new Error("CLUB_SESSION_ROTATION_STALE");
       }
-      await persistSmartRotationPlan(adapter, input);
+      await persistSmartRotationPlan(
+        adapter,
+        input,
+        current.session.updated_at,
+      );
     },
     fillNextCourts: async (input) => {
       const plan = planSmartRotation(input);

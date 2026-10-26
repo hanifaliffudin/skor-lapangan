@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import {
   officialRulesetFor,
+  toRulesetSnapshot,
   type CommunityRuleConfiguration,
   type MatchFormat,
   type MatchDefinition,
@@ -89,10 +90,9 @@ export function SetupPage() {
   const [searchParams] = useSearchParams();
   const clubSessionId = searchParams.get("clubSessionId");
   const clubMatchId = searchParams.get("clubMatchId");
-  const draft: SetupDraft | null =
-    clubSessionId && clubMatchId
-      ? ({ sport: "badminton", format: "doubles", mode: "casual" } as const)
-      : loadDraft();
+  const initialDraft: SetupDraft | null = loadDraft();
+  const [clubDraft, setClubDraft] = useState<SetupDraft | null>(null);
+  const draft = clubDraft ?? initialDraft;
   const navigate = useNavigate();
   const { locale, t } = useLocale();
   const { isAnonymous, user } = useAuth();
@@ -188,32 +188,50 @@ export function SetupPage() {
         }
         return;
       }
-      const { data: assignment, error: assignmentError } = await supabase
-        .from("club_session_matches")
-        .select(
-          "match_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2",
-        )
-        .eq("match_id", clubMatchId)
-        .eq("session_id", clubSessionId)
-        .maybeSingle();
-      if (assignmentError || !assignment) {
+      const [
+        { data: session, error: sessionError },
+        { data: assignment, error: assignmentError },
+      ] = await Promise.all([
+        supabase
+          .from("club_sessions")
+          .select("sport,format")
+          .eq("id", clubSessionId)
+          .maybeSingle(),
+        supabase
+          .from("club_session_matches")
+          .select(
+            "match_id,team_a_player_1,team_a_player_2,team_b_player_1,team_b_player_2",
+          )
+          .eq("match_id", clubMatchId)
+          .eq("session_id", clubSessionId)
+          .maybeSingle(),
+      ]);
+      if (sessionError || assignmentError || !session || !assignment) {
         if (active) {
           setRuleError(t("clubSessionLoadError"));
           setClubSetupLoading(false);
         }
         return;
       }
+      const sessionDraft: SetupDraft = {
+        sport: session.sport as SetupDraft["sport"],
+        format: session.format as MatchFormat,
+        mode: "casual",
+      };
       const ids = [
         assignment.team_a_player_1,
         assignment.team_a_player_2,
         assignment.team_b_player_1,
         assignment.team_b_player_2,
       ];
+      const rosterIds = ids.filter(
+        (id): id is string => typeof id === "string",
+      );
       const { data: roster, error: rosterError } = await supabase
         .from("club_session_players")
         .select("id,display_name")
         .eq("session_id", clubSessionId)
-        .in("id", ids);
+        .in("id", rosterIds);
       if (rosterError || !roster) {
         if (active) {
           setRuleError(t("clubSessionLoadError"));
@@ -225,7 +243,10 @@ export function SetupPage() {
         roster.map((player) => [player.id, player.display_name]),
       );
       if (active) {
-        setNames(ids.map((id) => namesById.get(id) ?? ""));
+        setClubDraft(sessionDraft);
+        setFormat(sessionDraft.format);
+        setRuleSource("official");
+        setNames(ids.map((id) => (id ? (namesById.get(id) ?? "") : "")));
         setClubSetupReady(true);
         setClubSetupLoading(false);
       }
@@ -333,7 +354,13 @@ export function SetupPage() {
     };
   }, [draft?.communityRuleId, draft?.sport, t]);
 
-  if (!draft) return <Navigate to={localizedPath("/", locale)} replace />;
+  if (!draft) {
+    return clubSessionId ? (
+      <p role="status">{t("loading")}</p>
+    ) : (
+      <Navigate to={localizedPath("/", locale)} replace />
+    );
+  }
 
   const playerCount = format === "singles" ? 1 : 2;
   const serverChoices: Array<[TeamId, PlayerIndex]> =
@@ -508,6 +535,7 @@ export function SetupPage() {
       format,
       officialScoringMode,
     );
+    const officialSnapshot = toRulesetSnapshot(official);
     const localRulesetId =
       ruleSource === "guest_custom"
         ? `guest-${crypto.randomUUID()}`
@@ -577,6 +605,7 @@ export function SetupPage() {
           )
         : draft.sport === "squash"
           ? {
+              ...officialSnapshot,
               id: localRulesetId,
               name: localRulesetName,
               sport: "squash",
@@ -593,6 +622,7 @@ export function SetupPage() {
             }
           : draft.sport === "table_tennis"
             ? {
+                ...officialSnapshot,
                 id: localRulesetId,
                 name: localRulesetName,
                 sport: "table_tennis",
@@ -609,6 +639,7 @@ export function SetupPage() {
               }
             : draft.sport === "tennis"
               ? {
+                  ...officialSnapshot,
                   id: localRulesetId,
                   name: localRulesetName,
                   sport: "tennis",
@@ -623,6 +654,7 @@ export function SetupPage() {
                 }
               : draft.sport === "padel"
                 ? {
+                    ...officialSnapshot,
                     id: localRulesetId,
                     name: localRulesetName,
                     sport: "padel",
@@ -638,6 +670,7 @@ export function SetupPage() {
                   }
                 : ruleSource === "official"
                   ? {
+                      ...officialSnapshot,
                       id: localRulesetId,
                       name: localRulesetName,
                       sport: draft.sport,

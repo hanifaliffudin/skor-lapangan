@@ -2,7 +2,7 @@
 
 Status: ready for a club organizer to run in Supabase Preview.
 
-This is a short, observable pilot script for one badminton club session. It is not a production sign-off. Use a disposable Google account and a roster whose players have agreed that their display names and optional gender/skill metadata will be used privately by the organizer.
+This is a short, observable pilot script for one badminton club session. It is not a production sign-off. Use a disposable account linked through an enabled OAuth provider and a roster whose players have agreed that their display names and optional gender/skill metadata will be used privately by the organizer.
 
 ## Before the session
 

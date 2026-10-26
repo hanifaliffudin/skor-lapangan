@@ -20,14 +20,14 @@ V1.0 launched with Badminton and Pickleball. The preview also contains Tennis, P
 - A court view that shows current positions and the active server.
 - Undo, redo, and one-event score overrides.
 - Guest matches with client-generated UUIDs, local-first scoring, rate-limited atomic server sync, and a 12-hour inactivity expiry capped at 24 hours. Stale or divergent snapshots are rejected; expired records are cleaned hourly.
-- Google account history that can hydrate active or completed matches on another browser or device. Active matches use a single-editor lease with explicit takeover; other devices stay read-only until they acquire control.
+- Account history through configured OAuth providers can hydrate active or completed matches on another browser or device. Active matches use a single-editor lease with explicit takeover; other devices stay read-only until they acquire control.
 - Read-only Live Viewer links with revocation and a 12-hour maximum expiry, no later than the match data.
-- Club Sessions for organizer-owned badminton open play: player/court roster, manual queueing, Smart Rotation for fair next-court assignments, and ranked standings.
+- Club Sessions for organizer-owned open play across all six supported sports: sport-aware Play Profiles, player/court roster, manual queueing, Smart Rotation for fair next-court assignments, and ranked standings.
 - A large TV/projector Display Mode opened from the scorekeeper screen, while the scorekeeper keeps control from a phone and Live Viewer stays read-only.
 - Durable PWA offline scoring in IndexedDB, with pending match sync retried at startup, on reconnect, and when a match is reopened.
 - Locked Official Rules, published Community Rules, and guest-only custom rules. Community Rules are versioned and snapshotted into each match.
 - One Casual match workflow in V1. Referee mode is hidden until it has meaningfully different behavior.
-- English by default, with Indonesian available.
+- English by default, with Indonesian available. Locale, date, time, direction, auth provider, and public origin are configuration seams for additional markets.
 
 ## Tech stack
 
@@ -43,11 +43,13 @@ pnpm install
 pnpm dev
 ```
 
-The app can run locally without Supabase, but server sync, Google account features, Live Viewer links, and Community Rules require the Supabase setup below. Community Rules should be rolled out to Preview first with a disposable Google account and anonymous session. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
+The app can run locally without Supabase, but server sync, account features, Live Viewer links, and Community Rules require the Supabase setup below. Community Rules should be rolled out to Preview first with a disposable durable account and anonymous session. Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
 
 ```dotenv
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
+VITE_SITE_ORIGIN=https://your-public-domain.example
+VITE_AUTH_PROVIDERS=google,github,apple
 VITE_HCAPTCHA_SITE_KEY=your-hcaptcha-site-key
 ```
 
@@ -67,7 +69,7 @@ pnpm test:e2e
 
 ## Supabase setup
 
-Run all twenty-eight migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions and Smart Rotation migrations before deploying that feature. Enable anonymous sign-ins, Google OAuth, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
+Run all thirty-four migrations in filename order using the Supabase SQL Editor or `supabase db push`. Apply the bounded journal reader and event-integrity migrations before deploying the matching frontend. Apply the Club Sessions, Smart Rotation, sport-expansion, Play Profile, local-time, global-auth, and write-guard migrations before deploying that feature. Enable anonymous sign-ins, the configured OAuth providers, and deploy the server-only `delete-account` and `transfer-guest-matches` Edge Functions. Complete the moderation, contact, security, and legal gates in Preview before Production. See [docs/supabase-setup.md](docs/supabase-setup.md) and [docs/operations-runbook.md](docs/operations-runbook.md) for setup and verification steps.
 
 ## Deploy to Vercel
 

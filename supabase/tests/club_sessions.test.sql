@@ -1,5 +1,5 @@
 begin;
-select plan(22);
+select plan(31);
 
 select tests.rls_enabled('public', 'club_sessions');
 select tests.rls_enabled('public', 'club_session_players');
@@ -30,6 +30,50 @@ select is(
   (select pairing_mode from public.club_sessions limit 1),
   'open',
   'new sessions default to open pairing'
+);
+insert into public.club_sessions (id, owner_id, name, session_date, sport)
+values (
+  '00000000-0000-4000-8000-000000001002',
+  tests.get_supabase_uid('club_owner'),
+  'Sunday pickleball',
+  '2026-10-20',
+  'pickleball'
+);
+select is(
+  (select sport from public.club_sessions
+   where id = '00000000-0000-4000-8000-000000001002'),
+  'pickleball',
+  'pickleball is supported for club sessions'
+);
+insert into public.club_sessions (id, owner_id, name, session_date, sport)
+values
+  ('00000000-0000-4000-8000-000000001003', tests.get_supabase_uid('club_owner'), 'Tuesday tennis', '2026-10-21', 'tennis'),
+  ('00000000-0000-4000-8000-000000001004', tests.get_supabase_uid('club_owner'), 'Wednesday padel', '2026-10-22', 'padel'),
+  ('00000000-0000-4000-8000-000000001005', tests.get_supabase_uid('club_owner'), 'Thursday table tennis', '2026-10-23', 'table_tennis'),
+  ('00000000-0000-4000-8000-000000001006', tests.get_supabase_uid('club_owner'), 'Friday squash', '2026-10-24', 'squash');
+select is(
+  (select array_agg(sport order by sport) from public.club_sessions),
+  ARRAY['badminton', 'padel', 'pickleball', 'squash', 'table_tennis', 'tennis']::text[],
+  'all supported sports are available for club sessions'
+);
+select is(
+  (select play_profile from public.club_sessions
+   where sport = 'table_tennis'),
+  'table_tennis_singles_short',
+  'table tennis sessions default to the short singles profile'
+);
+select is(
+  (select format from public.club_sessions
+   where sport = 'squash'),
+  'singles',
+  'squash sessions default to singles format'
+);
+select throws_ok(
+  $$insert into public.club_sessions (owner_id, name, session_date, sport)
+    values (tests.get_supabase_uid('club_owner'), 'Hockey session', '2026-10-25', 'hockey')$$,
+  '23514'::char(5),
+  null,
+  'club sessions reject sports outside the supported sport profiles'
 );
 select is(
   (select gender from public.club_session_players order by sort_order limit 1),
@@ -91,15 +135,78 @@ select is(
   'queue entries default to non-fallback doubles'
 );
 
+select throws_ok(
+  $$insert into public.club_sessions
+      (owner_id, name, session_date, sport, time_zone)
+    values
+      (tests.get_supabase_uid('club_owner'), 'Invalid timezone', '2026-10-25', 'badminton', 'Mars/Olympus')$$,
+  '23514'::char(5),
+  null,
+  'club sessions reject non-IANA time zones'
+);
+
+insert into public.club_session_players
+  (id, session_id, owner_id, display_name, sort_order, is_active)
+values (
+  '00000000-0000-4000-8000-000000001015',
+  '00000000-0000-4000-8000-000000001001',
+  tests.get_supabase_uid('club_owner'),
+  'Inactive',
+  4,
+  false
+);
+
+select throws_ok(
+  $$insert into public.club_session_matches
+      (session_id, owner_id, match_id, court_id,
+       team_a_player_1, team_a_player_2, team_b_player_1, team_b_player_2,
+       queue_order)
+    values
+      ('00000000-0000-4000-8000-000000001001', tests.get_supabase_uid('club_owner'),
+       '00000000-0000-4000-8000-000000001051', '00000000-0000-4000-8000-000000001021',
+       '00000000-0000-4000-8000-000000001015', '00000000-0000-4000-8000-000000001012',
+       '00000000-0000-4000-8000-000000001013', '00000000-0000-4000-8000-000000001014',
+       1)$$,
+  'P0001'::char(5),
+  null,
+  'club session queue rejects inactive players at the database boundary'
+);
+
+select throws_ok(
+  $$insert into public.club_session_matches
+      (session_id, owner_id, match_id, court_id,
+       team_a_player_1, team_a_player_2, team_b_player_1, team_b_player_2,
+       queue_order, is_open_fallback)
+    values
+      ('00000000-0000-4000-8000-000000001001', tests.get_supabase_uid('club_owner'),
+       '00000000-0000-4000-8000-000000001052', '00000000-0000-4000-8000-000000001021',
+       '00000000-0000-4000-8000-000000001011', '00000000-0000-4000-8000-000000001012',
+       '00000000-0000-4000-8000-000000001013', '00000000-0000-4000-8000-000000001014',
+       1, true)$$,
+  'P0001'::char(5),
+  null,
+  'open pairing sessions reject open fallback flags'
+);
+
+select throws_ok(
+  $$select public.queue_club_session_matches(
+      '00000000-0000-4000-8000-000000001001',
+      '2000-01-01T00:00:00Z'::timestamptz,
+      '[]'::jsonb)$$,
+  'P0001'::char(5),
+  'CLUB_SESSION_ROTATION_STALE',
+  'atomic Club Session queue rejects a stale session snapshot'
+);
+
 select is(
   (select count(*)::integer from public.club_sessions),
-  1,
-  'the owner can read their session'
+  6,
+  'the owner can read their sessions'
 );
 select is(
   (select count(*)::integer from public.club_session_players),
-  4,
-  'the owner can read the session roster'
+  5,
+  'the owner can read the full session roster'
 );
 select is(
   (select count(*)::integer from public.club_session_courts),

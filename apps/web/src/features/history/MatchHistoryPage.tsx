@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../../components/AppHeader";
+import { AuthProviderButtons } from "../../components/AuthProviderButtons";
 import { useAuth } from "../../lib/auth";
-import { localizedPath, useLocale } from "../../lib/i18n";
+import { formatDateTime, localizedPath, useLocale } from "../../lib/i18n";
 import { removeMatchAsync } from "../../lib/session";
 import {
   padelPointLabel,
@@ -206,7 +207,14 @@ function savedScore(value: Json): SavedScore | null {
 
 export function MatchHistoryPage() {
   const { locale, t } = useLocale();
-  const { action, isAnonymous, signInWithGoogle, user } = useAuth();
+  const {
+    action,
+    authProviders,
+    isAnonymous,
+    signInWithGoogle,
+    signInWithProvider,
+    user,
+  } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -434,16 +442,13 @@ export function MatchHistoryPage() {
           <section className={styles.rulesEmpty}>
             <h2>{t("historyGoogleRequired")}</h2>
             <p>{t("historyRequiresGoogle")}</p>
-            <Button
-              type="button"
-              className="mt-4 min-h-11"
-              disabled={action === "google" || action === "claiming"}
-              onClick={() => void signInWithGoogle()}
-            >
-              {action === "google" || action === "claiming"
-                ? t("working")
-                : t("signInWithGoogle")}
-            </Button>
+            <AuthProviderButtons
+              action={action}
+              className="mt-4 flex flex-wrap gap-2"
+              fallbackSignIn={signInWithGoogle}
+              providers={authProviders}
+              signInWithProvider={signInWithProvider}
+            />
           </section>
         ) : null}
         {loading ? <p role="status">{t("loading")}</p> : null}
@@ -586,16 +591,7 @@ export function MatchHistoryPage() {
                   ) : null}
                   <p className={styles.historyDate}>
                     {t("lastUpdated")}{" "}
-                    {new Date(match.updated_at).toLocaleString(
-                      locale === "id" ? "id-ID" : "en-US",
-                      {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
+                    {formatDateTime(match.updated_at, locale)}
                   </p>
                   <div className={styles.historyCardActions}>
                     <Button

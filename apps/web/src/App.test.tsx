@@ -694,7 +694,7 @@ describe("quick start", () => {
 
   it.each([
     ["/rules", "Community Rules"],
-    ["/rules/new", "Sign in with Google to publish a ruleset."],
+    ["/rules/new", "Sign in to publish a ruleset."],
   ])("opens Community Rules route %s", async (path, heading) => {
     await renderApp(
       <MemoryRouter initialEntries={[path]}>

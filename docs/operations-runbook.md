@@ -6,15 +6,17 @@ This runbook covers the current Vercel and Supabase deployment. Confirm the live
 
 The Vite web app reads these browser environment variables:
 
-| Variable                        | Use                                              | Handling                                                  |
-| ------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `VITE_SUPABASE_URL`             | Supabase project endpoint                        | Public browser configuration                              |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase client access subject to RLS            | Public browser key. Do not substitute a service-role key. |
-| `VITE_HCAPTCHA_SITE_KEY`        | hCaptcha widget when Supabase CAPTCHA is enabled | Public site key. Omit while CAPTCHA is disabled.          |
+| Variable                        | Use                                                | Handling                                                  |
+| ------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | Supabase project endpoint                          | Public browser configuration                              |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase client access subject to RLS              | Public browser key. Do not substitute a service-role key. |
+| `VITE_SITE_ORIGIN`              | Canonical public origin used for SEO and redirects | Public browser configuration                              |
+| `VITE_AUTH_PROVIDERS`           | Comma-separated OAuth providers enabled in the UI  | Public browser configuration                              |
+| `VITE_HCAPTCHA_SITE_KEY`        | hCaptcha widget when Supabase CAPTCHA is enabled   | Public site key. Omit while CAPTCHA is disabled.          |
 
-Keep the Google OAuth secret, hCaptcha secret, and Supabase service-role key in their respective trusted dashboards or server-only secret stores. Never add them to a `VITE_` variable, frontend build, issue, or repository.
+Keep OAuth client secrets, the hCaptcha secret, and the Supabase service-role key in their respective trusted dashboards or server-only secret stores. Never add them to a `VITE_` variable, frontend build, issue, or repository.
 
-The app can score locally without Supabase configuration. Guest server sync, Google account features, Live Viewer, and Community Rules require the Supabase project configuration. Roll Community Rules out through Preview before Production, with the moderation, contact, security, and legal gates recorded in release evidence.
+The app can score locally without Supabase configuration. Guest server sync, account features, Live Viewer, and Community Rules require the Supabase project configuration. Roll Community Rules out through Preview before Production, with the moderation, contact, security, and legal gates recorded in release evidence.
 
 ## Deploy the web app
 
@@ -22,7 +24,7 @@ The app can score locally without Supabase configuration. Guest server sync, Goo
 2. Import the repository into Vercel with the repository root unchanged. `vercel.json` builds the pnpm workspace and publishes `apps/web/dist`.
 3. Add the Supabase URL and publishable key to the appropriate Vercel environment. Add the hCaptcha site key only when Supabase CAPTCHA is enabled.
 4. Deploy a preview and run the production-like smoke checks before promoting it.
-5. Confirm the deployed URL is included in Supabase Auth's allowed redirect URLs when Google OAuth is enabled.
+5. Confirm the deployed URL is included in Supabase Auth's allowed redirect URLs for every enabled OAuth provider.
 6. After promotion, test direct route refresh, guest match creation, score sync, and Live Viewer access from a separate browser.
 
 For rollback, use Vercel's previous known-good deployment. Treat database migrations as forward-only. Do not reverse a schema migration by dropping production tables without an explicit recovery plan.
@@ -59,10 +61,16 @@ For each new environment, run the SQL files once in filename order using the Sup
 26. `supabase/migrations/20261015110000_allow_legacy_guest_rule_snapshots.sql`
 27. `supabase/migrations/20261015120000_club_sessions.sql`
 28. `supabase/migrations/20261023150000_club_session_smart_rotation.sql`
+29. `supabase/migrations/20261024100000_club_session_pickleball.sql`
+30. `supabase/migrations/20261024110000_club_session_all_sports.sql`
+31. `supabase/migrations/20261024120000_club_session_play_profiles.sql`
+32. `supabase/migrations/20261026100000_club_session_local_time.sql`
+33. `supabase/migrations/20261026110000_global_auth_providers.sql`
+34. `supabase/migrations/20261026120000_club_session_write_guards.sql`
 
 Do not omit Community Rules migrations from a fresh setup: `20261009140000_release_guardrails.sql` depends on their schema, and `20261014100000_community_rules_all_sports.sql` must be applied before this frontend is deployed. Do not rerun the initial migration to fix a later migration. Check which migrations already ran, take or verify a recovery point using the project's available Supabase controls, then apply only the pending migration. For an existing live deployment, follow the safe-read rollout order for migrations `20261009120000` and `20261009130000`, then apply pending migrations in filename order before deploying this frontend. Keep filenames immutable after release and add a new migration for later schema changes. The release-guardrail migration enables `pg_cron` and installs an hourly cleanup job; verify the extension and job exist in Supabase after applying it. The atomic sync migration must be applied before deploying a client that calls `sync_match_journal`. Apply `20261014130000_cross_device_match_control.sql` before deploying a client that calls `read_match_journal` or the match control RPCs. This migration replaces the sync RPC signature, so deploy the database migration before the frontend release that sends a control token. Apply `20261014140000_republish_community_rule.sql` before deploying a client that calls `publish_community_rule`.
 The `20261014001000_fix_guest_transfer_anonymous_check.sql` migration updates the guest-transfer RPC to use Supabase's `auth.users.is_anonymous` flag, so apply it before testing OAuth guest transfer on an existing deployment. The scale and history migrations add keyset pagination RPCs for account history and Community Rules, compact match-head reads, incremental event reads, search indexes, and viewer-token/query indexes. Apply them before deploying the client that uses those RPCs. The event-integrity migration adds server-side duplicate/sequence/sport checks and a deferred journal-completeness check. The bounded-reader migration adds `read_match_definition`, which the client uses before fetching event chunks; apply both before deploying the hardened cross-device client.
-The `20261015110000_allow_legacy_guest_rule_snapshots.sql` migration keeps the hardened source check for account matches while allowing the intentionally redacted rules snapshot used by older guest payloads. Apply it before promoting the matching frontend fix. The `20261015120000_club_sessions.sql` migration adds the private account-owned Club Sessions tables, RLS policies, match attachment trigger, and account-deletion cascade. The `20261023150000_club_session_smart_rotation.sql` migration adds Open/Mixed pairing mode, player gender, skill, availability, avoid preferences, and explicit open-doubles fallback flags. Apply both before deploying the Club Sessions board with Smart Rotation.
+The `20261015110000_allow_legacy_guest_rule_snapshots.sql` migration keeps the hardened source check for account matches while allowing the intentionally redacted rules snapshot used by older guest payloads. Apply it before promoting the matching frontend fix. The `20261015120000_club_sessions.sql` migration adds the private account-owned Club Sessions tables, RLS policies, match attachment trigger, and account-deletion cascade. The `20261023150000_club_session_smart_rotation.sql` migration adds Open/Mixed pairing mode, player gender, skill, availability, avoid preferences, and explicit open-doubles fallback flags. The `20261024100000_club_session_pickleball.sql` migration allows Pickleball alongside Badminton in the Club Session sport constraint. The `20261024110000_club_session_all_sports.sql` migration expands the Club Session sport constraint to all six supported sports. The `20261024120000_club_session_play_profiles.sql` migration persists the profile ID, permits singles formats, and makes the second player on each side nullable for singles queue entries. The `20261026100000_club_session_local_time.sql` migration adds session start time, IANA time zone, and optional location. The `20261026110000_global_auth_providers.sql` migration removes Google-specific ownership gates from account transfer and Community Rules. The `20261026120000_club_session_write_guards.sql` migration adds database-side assignment validation, IANA time-zone validation, session freshness timestamps, and the transactional queue RPC. Apply all eight Club Session and global-auth migrations before deploying the current frontend.
 
 ## Forward-only migration recovery and rollback
 
@@ -104,7 +112,7 @@ The atomic sync path reports `stale` and `conflict` instead of overwriting a new
 ## Configure Supabase Auth
 
 - Enable Anonymous Sign-Ins for guest play and sync.
-- Enable Google OAuth and the guest-match transfer flow for local and Preview after applying the account-deletion and guest-transfer migrations. Community Rules publishing requires a Google-linked account; keep Production publication closed until its moderation, contact, security, and legal gate passes.
+- Enable the configured OAuth providers and the guest-match transfer flow for local and Preview after applying the account-deletion, guest-transfer, and global-auth migrations. Community Rules publishing requires a durable account; keep Production publication closed until its moderation, contact, security, and legal gate passes.
 - Deploy `supabase/functions/delete-account` with `supabase functions deploy delete-account` and `supabase/functions/transfer-guest-matches` with `supabase functions deploy transfer-guest-matches`. The service-role key must remain in the Edge Function environment and must never be added to Vercel client variables.
 - Set the Anonymous Sign-Ins rate limit in Supabase Auth to 10 sign-ins per IP per hour for the initial public release, if that control is available in the project. The database migration separately limits guest match creation (10/hour), match-state updates (500/hour), event inserts (500/hour), Live Viewer link creation (10/hour), viewer reads (600/minute per match), and Community Rule reports (three/hour per anonymous account). These are safety ceilings, not expected usage targets.
 - Start with CAPTCHA disabled and monitor Auth errors and report volume. If repeated guest-signup abuse appears, enable Supabase CAPTCHA with hCaptcha, configure its secret in Supabase, the public site key in Vercel, and allowed hostnames in hCaptcha, then verify the challenge on the deployed hostname. The UI already supports a CAPTCHA response when Supabase requests one.
@@ -122,7 +130,7 @@ Supabase Free projects with low activity may be paused after seven days. A pause
 
 This procedure applies during Preview and Production only after the owner, moderation contact, response capacity, and security checks are approved. There is no moderator dashboard; use a restricted Supabase SQL Editor session.
 
-Reports are open to guests and Google-linked users; Google sign-in is not required. The optional email is only for follow-up. Each anonymous account can send up to three reports per hour. Reports do not automatically unpublish a rule, and Community Rules remain open for publication without pre-approval. Review them manually in Supabase SQL Editor using a restricted project session:
+Reports are open to guests and durable accounts; OAuth sign-in is not required. The optional email is only for follow-up. Each anonymous account can send up to three reports per hour. Reports do not automatically unpublish a rule, and Community Rules remain open for publication without pre-approval. Review them manually in Supabase SQL Editor using a restricted project session:
 
 ```sql
 select id, rule_id, reporter_id, reporter_contact, reason, details,
@@ -167,9 +175,9 @@ For a report that does not warrant action, set `status = 'dismissed'`, `resoluti
 - Create a Live Viewer link, open it in a private window, score a point, then revoke the link and confirm access stops.
 - Play one Table tennis and one Squash match in a fresh browser profile, including a doubles order confirmation and a reload during an active game.
 - Turn off the network, record a point, restore the network, and verify the score remains local until the next successful atomic sync.
-- Sign in with one disposable Google account in two browser profiles. Open the same active match in both, confirm the second profile is read-only, wait for a score update through polling, take over explicitly, and verify the previous editor loses input.
+- Sign in with one disposable account in two browser profiles. Open the same active match in both, confirm the second profile is read-only, wait for a score update through polling, take over explicitly, and verify the previous editor loses input.
 - Complete the match in one profile, open it from the other profile, and confirm the history action opens a read-only score without requesting control.
-- Visit `/history` as a guest and confirm the Google sign-in state. Visit `/rules` and `/id/rules`, filter all six sports, and confirm empty/error states are understandable. With a disposable Google account, create and publish one clearly labeled test rule in Preview, use it from setup, and verify the match definition contains a community snapshot.
+- Visit `/history` as a guest and confirm the configured account sign-in state. Visit `/rules` and `/id/rules`, filter all six sports, and confirm empty/error states are understandable. With a disposable account, create and publish one clearly labeled test rule in Preview, use it from setup, and verify the match definition contains a community snapshot.
 - Review browser console and network errors. Do not use a real player's private information in test matches.
 
 ## Scale validation

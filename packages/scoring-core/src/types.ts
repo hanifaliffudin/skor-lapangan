@@ -175,6 +175,14 @@ export interface RulesetSnapshot {
   format?: MatchFormat;
   source: RulesetSource;
   version: number;
+  /** Organization that publishes or maintains the referenced rules. */
+  federation?: string;
+  /** Public source used to verify this snapshot. */
+  sourceUrl?: string;
+  /** Date on which the source was last checked, in ISO calendar format. */
+  checkedAt?: string;
+  /** Optional date from which this ruleset is intended to apply. */
+  effectiveFrom?: string;
   configuration?: ScoringRules;
   tennisConfiguration?: TennisRules;
   padelConfiguration?: PadelRules;

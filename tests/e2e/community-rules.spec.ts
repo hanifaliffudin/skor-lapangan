@@ -16,7 +16,7 @@ test.describe("community rules browser flows", () => {
     await page.goto("/rules/new");
     await expect(
       page.getByRole("heading", {
-        name: "Sign in with Google to publish a ruleset.",
+        name: "Sign in to publish a ruleset.",
       }),
     ).toBeVisible();
 

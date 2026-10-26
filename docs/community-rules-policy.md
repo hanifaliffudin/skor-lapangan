@@ -11,7 +11,7 @@ Official Rules remain locked and maintained separately using the federation sour
 ## Who can publish
 
 - Anyone can read a published Community Rule without signing in.
-- A Google-linked account can create, edit, publish, and unpublish rules it owns.
+- A durable account linked through an enabled OAuth provider can create, edit, publish, and unpublish rules it owns.
 - The app publishes a rule immediately. It does not require pre-approval.
 - A guest can make a custom ruleset for the current match only. Guest custom rules stay in that browser and are not uploaded or published.
 
@@ -36,7 +36,7 @@ The owner can publish an unpublished rule again without editing its configuratio
 
 ## Reporting and moderation
 
-Anyone viewing a published rule can submit a report without Google sign-in. The app uses its guest session to rate-limit reports to three per hour per account. Reasons are inaccurate scoring, misleading, unsafe, spam, copyright or other rights, and other. Details can contain up to 500 characters. A reporter may optionally provide an email for follow-up. The system stores the rule ID, reason, details, time, reporter account ID, and optional email.
+Anyone viewing a published rule can submit a report without an account. The app uses its guest session to rate-limit reports to three per hour per account. Reasons are inaccurate scoring, misleading, unsafe, spam, copyright or other rights, and other. Details can contain up to 500 characters. A reporter may optionally provide an email for follow-up. The system stores the rule ID, reason, details, time, reporter account ID, and optional email.
 
 A report does not automatically hide a rule, and rules are not pre-approved before publication. Reports are manually reviewed by the service operator in the restricted Supabase SQL Editor queue. The operator should aim to review unsafe or rights-related reports within 48 hours and other reports within seven days; these are internal targets, not a guaranteed response time. A reviewer records the disposition and notes. A substantiated report may lead to a rule being unpublished; report volume alone is not a removal criterion. The app has no moderator dashboard, creator notification, or appeals interface. A reporter-provided email is for contacting the reporter, not the creator.
 

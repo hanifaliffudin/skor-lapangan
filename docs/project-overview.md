@@ -12,7 +12,7 @@ The current repository contains three product layers:
 
 1. The public scoring MVP for Badminton and Pickleball.
 2. Preview capabilities for Tennis, Padel, Table tennis, Squash, account history, Community Rules, Display Mode, and offline continuity.
-3. Badminton Club Sessions, including manual queueing, standings, and Smart Rotation for fair next-court assignments.
+3. All-sport Club Sessions, including manual queueing, standings, and Smart Rotation for fair next-court assignments.
 
 Preview code is not automatically a public-release approval. Each sport and account-backed feature has its own database, regression, mobile, privacy, and release gates.
 
@@ -25,8 +25,9 @@ Read in this order:
 1. [Product roadmap](product-roadmap.md) for release scope and promotion gates.
 2. [V1 implementation specification](v1-implementation-spec.md) for the product contract and privacy boundaries.
 3. [Club Session plan](club-session-plan.md) for the organizer workflow and Smart Rotation status.
-4. [QA and release checklist](qa-release-checklist.md) for what still needs evidence before promotion.
-5. [Legal and owner release gate](legal-release-gate.md) before public publication.
+4. [Mabar requirements research](research/club-session-mabar-requirements.md) for sport-specific open-play patterns and friction.
+5. [QA and release checklist](qa-release-checklist.md) for what still needs evidence before promotion.
+6. [Legal and owner release gate](legal-release-gate.md) before public publication.
 
 ### Junior developer
 
@@ -57,7 +58,7 @@ Read in this order:
 - Synchronizes signed-in or anonymous guest matches when the server path is available.
 - Provides a token-scoped, read-only Live Viewer and a large Display Mode.
 - Provides account history and a single-editor control lease for active account matches.
-- Provides private organizer-owned Club Sessions for Badminton doubles open play.
+- Provides private organizer-owned Club Sessions for sport-aware open play across all six supported sports, including singles profiles for squash and short table-tennis rounds.
 - Provides versioned Community Rules behind authenticated owner and moderation boundaries.
 
 ### What the application does not promise
@@ -92,17 +93,17 @@ Browser ------------------------------------------------------+
 
 ### Where each responsibility lives
 
-| Area              | Primary location                                                                           | Responsibility                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| Scoring rules     | `packages/scoring-core/src/`                                                               | Pure scoring state, domain events, ruleset snapshots, and sport-specific behavior.             |
-| Match UI          | `apps/web/src/features/match/`                                                             | Setup handoff, score controls, court display, correction, undo/redo, and match recovery.       |
-| Local persistence | `apps/web/src/lib/matchStore.ts` and `session.ts`                                          | Durable journal storage, schema validation, expiry metadata, and legacy migration.             |
-| Synchronization   | `apps/web/src/lib/sync.ts` and `match-remote.ts`                                           | Serialize journals, call server RPCs, retry pending work, and surface stale/control conflicts. |
-| Authentication    | `apps/web/src/lib/auth.tsx` and `supabase/functions/`                                      | Anonymous sessions, Google OAuth, guest transfer, account claiming, and account deletion.      |
-| Club Sessions     | `apps/web/src/features/club-sessions/`                                                     | Roster, courts, queue, standings, Smart Rotation planning, and owner-scoped persistence.       |
-| Public rules      | `apps/web/src/features/rules/` and Supabase RPCs                                           | Safe directory reads, owner mutation, versioning, publishing, and reports.                     |
-| Database contract | `supabase/migrations/` and `apps/web/src/lib/database.types.ts`                            | Tables, constraints, RLS, RPCs, triggers, indexes, and generated client types.                 |
-| Tests             | `apps/web/src/**/*.test.*`, `packages/scoring-core/test/`, `tests/e2e/`, `supabase/tests/` | Unit, component, browser, scoring, synchronization, RLS, and release-guardrail evidence.       |
+| Area              | Primary location                                                                           | Responsibility                                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Scoring rules     | `packages/scoring-core/src/`                                                               | Pure scoring state, domain events, ruleset snapshots, and sport-specific behavior.                      |
+| Match UI          | `apps/web/src/features/match/`                                                             | Setup handoff, score controls, court display, correction, undo/redo, and match recovery.                |
+| Local persistence | `apps/web/src/lib/matchStore.ts` and `session.ts`                                          | Durable journal storage, schema validation, expiry metadata, and legacy migration.                      |
+| Synchronization   | `apps/web/src/lib/sync.ts` and `match-remote.ts`                                           | Serialize journals, call server RPCs, retry pending work, and surface stale/control conflicts.          |
+| Authentication    | `apps/web/src/lib/auth.tsx` and `supabase/functions/`                                      | Anonymous sessions, configured OAuth providers, guest transfer, account claiming, and account deletion. |
+| Club Sessions     | `apps/web/src/features/club-sessions/`                                                     | Roster, courts, queue, standings, Smart Rotation planning, and owner-scoped persistence.                |
+| Public rules      | `apps/web/src/features/rules/` and Supabase RPCs                                           | Safe directory reads, owner mutation, versioning, publishing, and reports.                              |
+| Database contract | `supabase/migrations/` and `apps/web/src/lib/database.types.ts`                            | Tables, constraints, RLS, RPCs, triggers, indexes, and generated client types.                          |
+| Tests             | `apps/web/src/**/*.test.*`, `packages/scoring-core/test/`, `tests/e2e/`, `supabase/tests/` | Unit, component, browser, scoring, synchronization, RLS, and release-guardrail evidence.                |
 
 ## Common user journeys
 
@@ -173,7 +174,7 @@ See the [Smart Rotation specification](specs/club-session-smart-rotation.md) for
 
 ### Secrets
 
-The browser may receive the Supabase URL, publishable key, and optional hCaptcha site key. It must never receive the Supabase service-role key, Google OAuth secret, or hCaptcha secret. Server-only secrets belong in Supabase Edge Function or provider settings.
+The browser may receive the Supabase URL, publishable key, public origin, provider list, and optional hCaptcha site key. It must never receive the Supabase service-role key, OAuth client secrets, or hCaptcha secret. Server-only secrets belong in Supabase Edge Function or provider settings.
 
 ## Repository map
 

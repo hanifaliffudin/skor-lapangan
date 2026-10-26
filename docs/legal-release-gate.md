@@ -21,7 +21,7 @@ Jangan mengganti placeholder dengan data contoh. Nilai final harus berasal dari 
 - Pastikan deskripsi local storage, anonymous Auth, guest expiry, Live Viewer bearer link, dan penghapusan data sama dengan implementasi.
 - Uji mailbox privacy dan support menggunakan pesan test, lalu catat siapa yang menerima dan tanggal pengujian.
 - Pastikan link final privacy notice dan terms dapat dibuka tanpa login.
-- Pastikan owner menyetujui staged rollout Google OAuth, account history, dan in-app account deletion. Community Rules tetap nonaktif sampai moderation, contact, and legal gates pass.
+- Pastikan owner menyetujui staged rollout configured OAuth providers, account history, dan in-app account deletion. Community Rules tetap nonaktif sampai moderation, contact, and legal gates pass.
 
 ## Bukti persetujuan
 
@@ -37,7 +37,7 @@ Simpan bersama catatan release:
 
 - [Privacy notice draft](privacy-notice.md)
 - [Terms of use draft](terms-of-use.md)
-- [Account deletion workflow](account-deletion-request-draft.md), sebelum Google account dipromosikan ke production
+- [Account deletion workflow](account-deletion-request-draft.md), sebelum account foundation dipromosikan ke production
 - [Community Rules policy draft untuk V1.1](community-rules-policy.md), sebelum Community Rules dibuka
 
 Dokumen ini tidak menggantikan nasihat hukum. Untuk rilis Indonesia, minta reviewer yang kompeten menilai dokumen final terhadap hukum yang berlaku, termasuk UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi.

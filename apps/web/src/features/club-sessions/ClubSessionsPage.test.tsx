@@ -39,6 +39,7 @@ const session: ClubSessionSummary = {
   id: "session-1",
   name: "Saturday doubles",
   session_date: "2026-10-19",
+  sport: "badminton",
   status: "active",
   created_at: "2026-10-19T00:00:00.000Z",
 };
@@ -105,10 +106,20 @@ function renderAt(path: string) {
         <Routes>
           <Route path="/sessions" element={<ClubSessionsPage />} />
           <Route path="/sessions/:sessionId" element={<ClubSessionsPage />} />
+          <Route path="/setup" element={<div />} />
         </Routes>
       </LocaleProvider>
     </MemoryRouter>,
   );
+}
+
+async function chooseSelect(
+  user: ReturnType<typeof userEvent.setup>,
+  trigger: HTMLElement,
+  option: string,
+) {
+  await user.click(trigger);
+  await user.click(await screen.findByRole("option", { name: option }));
 }
 
 describe("Club Sessions page", () => {
@@ -126,6 +137,7 @@ describe("Club Sessions page", () => {
 
   afterEach(() => {
     cleanup();
+    window.sessionStorage.clear();
     vi.clearAllMocks();
   });
 
@@ -144,9 +156,10 @@ describe("Club Sessions page", () => {
         name: "Club sessions are saved to your account",
       }),
     ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
     expect(
-      screen.getAllByRole("button", { name: "Sign in with Google" }),
-    ).toHaveLength(2);
+      screen.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeVisible();
   });
 
   it("creates a session from the account board", async () => {
@@ -165,8 +178,130 @@ describe("Club Sessions page", () => {
     expect(adapter.createSession).toHaveBeenCalledWith({
       name: "Friday club",
       sessionDate: expect.any(String),
+      startTime: undefined,
+      timeZone: expect.any(String),
+      locationName: "",
+      sport: "badminton",
+      playProfile: "badminton_doubles",
       pairingMode: "open",
     });
+  });
+
+  it("creates a pickleball doubles session", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    renderAt("/sessions");
+
+    expect(
+      await screen.findByRole("heading", { name: "Your sessions" }),
+    ).toBeVisible();
+    await user.type(screen.getByLabelText("Session name"), "Sunday pickleball");
+    const sportSelect = screen.getByRole("combobox", { name: "Sport" });
+    await user.click(sportSelect);
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("option").map((option) => option.textContent),
+      ).toEqual([
+        "Badminton",
+        "Pickleball",
+        "Tennis",
+        "Padel",
+        "Table tennis",
+        "Squash",
+      ]),
+    );
+    await user.click(screen.getByText("Pickleball", { exact: true }));
+    await user.click(
+      screen.getByRole("button", { name: "Create session board" }),
+    );
+
+    expect(adapter.createSession).toHaveBeenCalledWith({
+      name: "Sunday pickleball",
+      sessionDate: expect.any(String),
+      startTime: undefined,
+      timeZone: expect.any(String),
+      locationName: "",
+      sport: "pickleball",
+      playProfile: "pickleball_doubles",
+      pairingMode: "open",
+    });
+  });
+
+  it("carries pickleball into the scoring setup", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    vi.mocked(adapter.loadSession).mockResolvedValue({
+      ...detail,
+      session: { ...session, sport: "pickleball" },
+      queue: [{ ...queue[0]!, linked_match_id: null, started_at: null }],
+      results: {},
+    });
+
+    renderAt("/sessions/session-1");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Start scoring" }),
+    );
+
+    expect(window.sessionStorage.getItem("skor-lapangan:setup-draft")).toBe(
+      JSON.stringify({
+        sport: "pickleball",
+        format: "doubles",
+        mode: "casual",
+      }),
+    );
+  });
+
+  it("uses two-player singles queue entries for a squash session", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    vi.mocked(adapter.loadSession).mockResolvedValue({
+      ...detail,
+      session: {
+        ...session,
+        name: "Tuesday squash",
+        sport: "squash",
+        play_profile: "squash_singles",
+      },
+      players: players.slice(0, 2),
+      queue: [],
+      results: {},
+    });
+
+    renderAt("/sessions/session-1");
+
+    expect(
+      await screen.findByText("Squash · Singles · 2 players per match"),
+    ).toBeVisible();
+    expect(
+      await screen.findByRole("button", { name: "Fill next courts" }),
+    ).not.toBeDisabled();
+    await chooseSelect(
+      user,
+      screen.getByRole("combobox", { name: "Select a court" }),
+      "Court 1",
+    );
+    await chooseSelect(
+      user,
+      screen.getByRole("combobox", { name: "Team A · Player 1" }),
+      "One",
+    );
+    await chooseSelect(
+      user,
+      screen.getByRole("combobox", { name: "Team B · Player 1" }),
+      "Two",
+    );
+    await user.click(screen.getByRole("button", { name: "Add to queue" }));
+
+    await waitFor(() =>
+      expect(adapter.addQueuedMatch).toHaveBeenCalledWith({
+        sessionId: "session-1",
+        matchId: expect.any(String),
+        courtId: "court-1",
+        playerIds: ["p-1", "p-2"],
+        queueOrder: 0,
+      }),
+    );
   });
 
   it("fills the next free court when the queue is empty", async () => {
@@ -321,10 +456,11 @@ describe("Club Sessions page", () => {
       skillLevel: 3,
     });
 
-    await user.click(
-      screen.getByRole("combobox", { name: "Availability: One" }),
-    );
-    await user.click(screen.getByText("Resting", { exact: true }));
+    const availabilitySelect = screen.getByRole("combobox", {
+      name: "Availability: One",
+    });
+    await user.click(availabilitySelect);
+    await user.keyboard("r{Enter}");
     await waitFor(() =>
       expect(adapter.updatePlayerProfile).toHaveBeenCalledWith({
         sessionId: "session-1",

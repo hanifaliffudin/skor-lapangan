@@ -15,8 +15,12 @@ export interface Database {
           owner_id: string;
           name: string;
           session_date: string;
+          start_time: string | null;
+          time_zone: string;
+          location_name: string | null;
           sport: string;
           format: string;
+          play_profile: string;
           status: string;
           pairing_mode: string;
           created_at: string;
@@ -27,8 +31,12 @@ export interface Database {
           owner_id: string;
           name: string;
           session_date: string;
+          start_time?: string | null;
+          time_zone?: string;
+          location_name?: string | null;
           sport?: string;
           format?: string;
+          play_profile?: string;
           status?: string;
           pairing_mode?: string;
           created_at?: string;
@@ -37,8 +45,12 @@ export interface Database {
         Update: {
           name?: string;
           session_date?: string;
+          start_time?: string | null;
+          time_zone?: string;
+          location_name?: string | null;
           sport?: string;
           format?: string;
+          play_profile?: string;
           status?: string;
           pairing_mode?: string;
           updated_at?: string;
@@ -118,9 +130,9 @@ export interface Database {
           linked_match_id: string | null;
           court_id: string;
           team_a_player_1: string;
-          team_a_player_2: string;
+          team_a_player_2: string | null;
           team_b_player_1: string;
-          team_b_player_2: string;
+          team_b_player_2: string | null;
           queue_order: number;
           started_at: string | null;
           is_open_fallback: boolean;
@@ -134,9 +146,9 @@ export interface Database {
           linked_match_id?: string | null;
           court_id: string;
           team_a_player_1: string;
-          team_a_player_2: string;
+          team_a_player_2: string | null;
           team_b_player_1: string;
-          team_b_player_2: string;
+          team_b_player_2: string | null;
           queue_order: number;
           started_at?: string | null;
           is_open_fallback?: boolean;
@@ -316,6 +328,14 @@ export interface Database {
       transfer_guest_matches: {
         Args: { p_guest_owner_id: string; p_account_owner_id: string };
         Returns: number;
+      };
+      queue_club_session_matches: {
+        Args: {
+          p_session_id: string;
+          p_expected_updated_at: string;
+          p_matches: Json;
+        };
+        Returns: undefined;
       };
       delete_my_account_data: {
         Args: Record<string, never>;

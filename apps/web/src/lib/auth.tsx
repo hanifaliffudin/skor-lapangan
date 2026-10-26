@@ -14,6 +14,12 @@ import {
   removeAllStoredMatchesAsync,
   saveMatchAsync,
 } from "./session";
+import * as runtimeConfig from "./runtime-config";
+import type { AuthProviderId } from "./runtime-config";
+
+const configuredAuthProviders: readonly AuthProviderId[] =
+  runtimeConfig.authProviders;
+const configuredDefaultAuthProvider = runtimeConfig.defaultAuthProvider;
 
 export { useAuth } from "./auth-context";
 
@@ -22,8 +28,9 @@ type GuestSignInResult = { session: Session | null; error: string | null };
 let guestSignIn: Promise<GuestSignInResult> | null = null;
 const guestTransferTokenKey = "skor-lapangan:guest-transfer-token";
 export const authReturnPathKey = "skor-lapangan:auth-return-path";
+const authProviderKey = "skor-lapangan:auth-provider";
 
-function hasGuestGoogleFallbackCallback(): boolean {
+function hasGuestOAuthFallbackCallback(): boolean {
   const query = new URLSearchParams(window.location.search);
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   return [query, hash].some(
@@ -50,6 +57,21 @@ function oauthOptions(): { redirectTo: string } {
   // Keep the OAuth callback on the configured origin. The app restores the
   // page that started login from sessionStorage after Supabase returns.
   return { redirectTo: window.location.origin };
+}
+
+function rememberAuthProvider(provider: AuthProviderId): void {
+  window.sessionStorage.setItem(authProviderKey, provider);
+}
+
+function storedAuthProvider(): AuthProviderId | null {
+  const provider = window.sessionStorage.getItem(authProviderKey);
+  return configuredAuthProviders.includes(provider as AuthProviderId)
+    ? (provider as AuthProviderId)
+    : configuredDefaultAuthProvider;
+}
+
+function noConfiguredProviderError(): string {
+  return "No OAuth provider is enabled.";
 }
 
 function signInAnonymouslyOnce(
@@ -99,7 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [authErrorKind, setAuthErrorKind] = useState<AuthErrorKind>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const claimAttempted = useRef<string | null>(null);
-  const googleFlowActive = useRef(false);
+  const oauthFlowActive = useRef(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -111,9 +133,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, nextSession) => {
-      if (_event === "INITIAL_SESSION" && hasGuestGoogleFallbackCallback()) {
+      if (_event === "INITIAL_SESSION" && hasGuestOAuthFallbackCallback()) {
         authEventObserved = true;
-        googleFlowActive.current = true;
+        oauthFlowActive.current = true;
         if (nextSession?.user.is_anonymous && nextSession.access_token) {
           window.sessionStorage.setItem(
             guestTransferTokenKey,
@@ -125,7 +147,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAuthErrorKind(null);
         setAuthNotice(null);
         setLoading(true);
-        setAction("google");
+        setAction("oauth");
         clearAuthCallbackUrl();
 
         queueMicrotask(() => {
@@ -133,13 +155,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await client.auth.signOut({ scope: "local" });
             claimAttempted.current = null;
             setSession(null);
-            const { error } = await client.auth.signInWithOAuth({
-              provider: "google",
-              options: oauthOptions(),
-            });
+            const provider = storedAuthProvider();
+            const { error } = provider
+              ? await client.auth.signInWithOAuth({
+                  provider,
+                  options: oauthOptions(),
+                })
+              : { error: new Error(noConfiguredProviderError()) };
             if (error) {
               setAuthError(error.message);
-              setAuthErrorKind("google");
+              setAuthErrorKind("oauth");
             }
             setAction("idle");
             setLoading(false);
@@ -155,7 +180,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         nextSession &&
         !nextSession.user.is_anonymous
       ) {
-        googleFlowActive.current = false;
+        oauthFlowActive.current = false;
       }
       setSession(nextSession);
       setAuthError(null);
@@ -205,21 +230,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
-    if (!supabase || action !== "google") return;
+    if (!supabase || action !== "oauth") return;
 
-    const resetInterruptedGoogleFlow = () => {
-      if (!googleFlowActive.current || hasGuestGoogleFallbackCallback()) return;
-      googleFlowActive.current = false;
+    const resetInterruptedOAuthFlow = () => {
+      if (!oauthFlowActive.current || hasGuestOAuthFallbackCallback()) return;
+      oauthFlowActive.current = false;
       setAction("idle");
       setLoading(false);
     };
 
-    window.addEventListener("pageshow", resetInterruptedGoogleFlow);
-    window.addEventListener("popstate", resetInterruptedGoogleFlow);
+    window.addEventListener("pageshow", resetInterruptedOAuthFlow);
+    window.addEventListener("popstate", resetInterruptedOAuthFlow);
 
     return () => {
-      window.removeEventListener("pageshow", resetInterruptedGoogleFlow);
-      window.removeEventListener("popstate", resetInterruptedGoogleFlow);
+      window.removeEventListener("pageshow", resetInterruptedOAuthFlow);
+      window.removeEventListener("popstate", resetInterruptedOAuthFlow);
     };
   }, [action]);
 
@@ -302,6 +327,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => window.clearTimeout(timeoutId);
   }, [authNotice]);
 
+  const signInWithProvider = async (provider: AuthProviderId) => {
+    if (!configuredAuthProviders.includes(provider)) {
+      const message = noConfiguredProviderError();
+      setAuthErrorKind("oauth");
+      setAuthError(message);
+      return message;
+    }
+    if (!supabase) {
+      setAuthErrorKind("oauth");
+      setAuthError("Supabase is not configured.");
+      return "Supabase is not configured.";
+    }
+    oauthFlowActive.current = true;
+    setAction("oauth");
+    setAuthError(null);
+    setAuthErrorKind(null);
+    setAuthNotice(null);
+    rememberAuthReturnPath();
+    rememberAuthProvider(provider);
+    const options = oauthOptions();
+    const wasAnonymous = Boolean(session?.user.is_anonymous);
+    if (wasAnonymous && session?.access_token) {
+      // A guest can use any configured OAuth provider. If that identity already
+      // belongs to an account, the transfer function moves the guest matches.
+      window.sessionStorage.setItem(
+        guestTransferTokenKey,
+        session.access_token,
+      );
+    }
+
+    const result = await supabase.auth.signInWithOAuth({
+      provider,
+      options,
+    });
+
+    const message = result.error?.message ?? null;
+    if (message) {
+      oauthFlowActive.current = false;
+      setAction("idle");
+      setAuthError(message);
+      setAuthErrorKind("oauth");
+    }
+    return message;
+  };
+
   const value = useMemo<AuthContextValue>(
     () => ({
       loading,
@@ -312,6 +382,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       authError,
       authErrorKind,
       authNotice,
+      authProviders: configuredAuthProviders,
       retryGuestSession: async (captchaToken) => {
         if (!supabase) {
           setAuthErrorKind("guest");
@@ -329,43 +400,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAuthErrorKind(result.error ? "guest" : null);
         setLoading(false);
       },
-      signInWithGoogle: async () => {
-        if (!supabase) {
-          setAuthErrorKind("google");
-          setAuthError("Supabase is not configured.");
-          return "Supabase is not configured.";
-        }
-        googleFlowActive.current = true;
-        setAction("google");
-        setAuthError(null);
-        setAuthErrorKind(null);
-        setAuthNotice(null);
-        rememberAuthReturnPath();
-        const options = oauthOptions();
-        const wasAnonymous = Boolean(session?.user.is_anonymous);
-        if (wasAnonymous && session?.access_token) {
-          // A guest cannot be linked when the chosen Google identity already
-          // belongs to an account. Start one OAuth flow and transfer the guest
-          // matches after the account session is restored.
-          window.sessionStorage.setItem(
-            guestTransferTokenKey,
-            session.access_token,
-          );
-        }
-
-        const result = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options,
-        });
-
-        const message = result.error?.message ?? null;
-        if (message) {
-          googleFlowActive.current = false;
-          setAction("idle");
+      signInWithProvider,
+      signInWithGoogle: () => {
+        if (!configuredDefaultAuthProvider) {
+          const message = noConfiguredProviderError();
+          setAuthErrorKind("oauth");
           setAuthError(message);
-          setAuthErrorKind("google");
+          return Promise.resolve(message);
         }
-        return message;
+        return signInWithProvider(configuredDefaultAuthProvider);
       },
       signOut: async () => {
         if (!supabase) return false;
@@ -377,7 +420,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const { error } = await supabase.auth.signOut();
         if (error) {
           setAuthError(error.message);
-          setAuthErrorKind("google");
+          setAuthErrorKind("oauth");
           setAction("idle");
           setLoading(false);
           return false;
@@ -398,7 +441,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return "Supabase is not configured.";
         }
         if (!session?.user || session.user.is_anonymous) {
-          const message = "A Google-linked account is required.";
+          const message = "A durable account is required.";
           setAuthErrorKind("delete");
           setAuthError(message);
           return message;
@@ -435,7 +478,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return result.error;
       },
     }),
-    [action, authError, authErrorKind, authNotice, loading, session],
+    [
+      action,
+      authError,
+      authErrorKind,
+      authNotice,
+      loading,
+      session,
+      signInWithProvider,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
