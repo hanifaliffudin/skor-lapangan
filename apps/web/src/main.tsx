@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { App } from "./App";
 import { AuthProvider } from "./lib/auth";
 import { LocaleProvider } from "./lib/i18n";
@@ -19,6 +20,7 @@ createRoot(document.getElementById("root")!).render(
         </LocaleProvider>
       </BrowserRouter>
       <Analytics beforeSend={sanitizeAnalyticsEvent} />
+      <SpeedInsights />
     </>
   </StrictMode>,
 );
