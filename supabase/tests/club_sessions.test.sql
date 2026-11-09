@@ -1,5 +1,5 @@
 begin;
-select plan(31);
+select plan(39);
 
 select tests.rls_enabled('public', 'club_sessions');
 select tests.rls_enabled('public', 'club_session_players');
@@ -270,8 +270,31 @@ select is(
   0,
   'another account cannot read the owner queue'
 );
+select lives_ok(
+  $$update public.club_sessions
+    set name = 'Hijacked session'
+    where id = '00000000-0000-4000-8000-000000001001'$$,
+  'another account cannot update the owner session'
+);
+select lives_ok(
+  $$delete from public.club_sessions
+    where id = '00000000-0000-4000-8000-000000001001'$$,
+  'another account cannot delete the owner session'
+);
 
 select tests.authenticate_as('club_owner');
+select is(
+  (select name from public.club_sessions
+   where id = '00000000-0000-4000-8000-000000001001'),
+  'Saturday doubles',
+  'cross-account session update does not change the owner data'
+);
+select is(
+  (select count(*)::integer from public.club_sessions
+   where id = '00000000-0000-4000-8000-000000001001'),
+  1,
+  'cross-account session delete does not remove the owner data'
+);
 delete from public.club_sessions
 where id = '00000000-0000-4000-8000-000000001001';
 
@@ -291,6 +314,110 @@ select is(
    where id = '00000000-0000-4000-8000-000000001041'),
   1,
   'deleting a session leaves the account match journal intact'
+);
+
+insert into public.club_sessions
+  (id, owner_id, name, session_date, sport, pairing_mode)
+values (
+  '00000000-0000-4000-8000-000000001007',
+  tests.get_supabase_uid('club_owner'),
+  'Mixed fallback session',
+  '2026-10-26',
+  'pickleball',
+  'mixed'
+);
+
+insert into public.club_session_players
+  (id, session_id, owner_id, display_name, sort_order)
+values
+  ('00000000-0000-4000-8000-000000001071', '00000000-0000-4000-8000-000000001007', tests.get_supabase_uid('club_owner'), 'Fallback One', 0),
+  ('00000000-0000-4000-8000-000000001072', '00000000-0000-4000-8000-000000001007', tests.get_supabase_uid('club_owner'), 'Fallback Two', 1),
+  ('00000000-0000-4000-8000-000000001073', '00000000-0000-4000-8000-000000001007', tests.get_supabase_uid('club_owner'), 'Fallback Three', 2),
+  ('00000000-0000-4000-8000-000000001074', '00000000-0000-4000-8000-000000001007', tests.get_supabase_uid('club_owner'), 'Fallback Four', 3);
+
+insert into public.club_session_courts
+  (id, session_id, owner_id, name, sort_order)
+values (
+  '00000000-0000-4000-8000-000000001075',
+  '00000000-0000-4000-8000-000000001007',
+  tests.get_supabase_uid('club_owner'),
+  'Fallback Court',
+  0
+);
+
+select lives_ok(
+  $$select public.queue_club_session_matches(
+      '00000000-0000-4000-8000-000000001007',
+      (select updated_at from public.club_sessions
+       where id = '00000000-0000-4000-8000-000000001007'),
+      jsonb_build_array(jsonb_build_object(
+        'matchId', '00000000-0000-4000-8000-000000001076',
+        'courtId', '00000000-0000-4000-8000-000000001075',
+        'playerIds', jsonb_build_array(
+          '00000000-0000-4000-8000-000000001071',
+          '00000000-0000-4000-8000-000000001072',
+          '00000000-0000-4000-8000-000000001073',
+          '00000000-0000-4000-8000-000000001074'),
+        'queueOrder', 0,
+        'isOpenFallback', true)))$$,
+  'mixed sessions accept an explicit open fallback through the queue RPC'
+);
+select is(
+  (select is_open_fallback
+   from public.club_session_matches
+   where match_id = '00000000-0000-4000-8000-000000001076'),
+  true,
+  'mixed open fallback remains marked in the queue'
+);
+
+insert into public.club_sessions
+  (id, owner_id, name, session_date, sport)
+values (
+  '00000000-0000-4000-8000-000000001008',
+  tests.get_supabase_uid('club_owner'),
+  'Table tennis singles session',
+  '2026-10-27',
+  'table_tennis'
+);
+
+insert into public.club_session_players
+  (id, session_id, owner_id, display_name, sort_order)
+values
+  ('00000000-0000-4000-8000-000000001081', '00000000-0000-4000-8000-000000001008', tests.get_supabase_uid('club_owner'), 'Singles One', 0),
+  ('00000000-0000-4000-8000-000000001082', '00000000-0000-4000-8000-000000001008', tests.get_supabase_uid('club_owner'), 'Singles Two', 1);
+
+insert into public.club_session_courts
+  (id, session_id, owner_id, name, sort_order)
+values (
+  '00000000-0000-4000-8000-000000001083',
+  '00000000-0000-4000-8000-000000001008',
+  tests.get_supabase_uid('club_owner'),
+  'Table 1',
+  0
+);
+
+select lives_ok(
+  $$select public.queue_club_session_matches(
+      '00000000-0000-4000-8000-000000001008',
+      (select updated_at from public.club_sessions
+       where id = '00000000-0000-4000-8000-000000001008'),
+      jsonb_build_array(jsonb_build_object(
+        'matchId', '00000000-0000-4000-8000-000000001084',
+        'courtId', '00000000-0000-4000-8000-000000001083',
+        'playerIds', jsonb_build_array(
+          '00000000-0000-4000-8000-000000001081',
+          '00000000-0000-4000-8000-000000001082'),
+        'queueOrder', 0)))$$,
+  'table tennis singles accepts exactly two players through the queue RPC'
+);
+select is(
+  (select count(*)::integer
+   from public.club_session_matches
+   where match_id = '00000000-0000-4000-8000-000000001084'
+     and team_a_player_2 is null
+     and team_b_player_2 is null),
+  1,
+  'table tennis singles does not create empty team members'
 );
 
 select * from finish();

@@ -238,6 +238,44 @@ describe("Club Sessions page", () => {
     });
   });
 
+  it("creates a table tennis timed singles session", async () => {
+    const user = userEvent.setup();
+    const adapter = adapterState.adapter!;
+    renderAt("/sessions");
+
+    expect(
+      await screen.findByRole("heading", { name: "Your sessions" }),
+    ).toBeVisible();
+    await user.type(
+      screen.getByLabelText("Session name"),
+      "Tuesday table tennis",
+    );
+    const sportSelect = screen.getByRole("combobox", { name: "Sport" });
+    await user.click(sportSelect);
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("listbox"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toContain("Table tennis"),
+    );
+    await user.click(screen.getByText("Table tennis", { exact: true }));
+    await user.click(
+      screen.getByRole("button", { name: "Create session board" }),
+    );
+
+    expect(adapter.createSession).toHaveBeenCalledWith({
+      name: "Tuesday table tennis",
+      sessionDate: expect.any(String),
+      startTime: undefined,
+      timeZone: expect.any(String),
+      locationName: "",
+      sport: "table_tennis",
+      playProfile: "table_tennis_singles_short",
+      pairingMode: "open",
+    });
+  });
+
   it("carries pickleball into the scoring setup", async () => {
     const user = userEvent.setup();
     const adapter = adapterState.adapter!;

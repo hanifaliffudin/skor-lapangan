@@ -24,7 +24,11 @@ Deno.serve(async (request) => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (!accountToken || !supabaseUrl || !anonKey || !serviceRoleKey) {
+  if (!accountToken) {
+    return json(request, { error: "Authentication is required." }, 401);
+  }
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return json(
       request,
       { error: "Guest match transfer is not configured." },

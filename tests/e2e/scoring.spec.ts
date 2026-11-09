@@ -1,12 +1,54 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function clearBrowserMatchStore(page: Page) {
+  await page.evaluate(async () => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+
+    await new Promise<void>((resolve, reject) => {
+      const request = window.indexedDB.open("skor-lapangan");
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("matches")) {
+          request.result.createObjectStore("matches", { keyPath: "matchId" });
+        }
+      };
+      request.onerror = () =>
+        reject(request.error ?? new Error("Could not open Match storage."));
+      request.onsuccess = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains("matches")) {
+          database.close();
+          resolve();
+          return;
+        }
+
+        const transaction = database.transaction("matches", "readwrite");
+        transaction.objectStore("matches").clear();
+        transaction.oncomplete = () => {
+          database.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          database.close();
+          reject(
+            transaction.error ?? new Error("Could not clear Match storage."),
+          );
+        };
+        transaction.onabort = () => {
+          database.close();
+          reject(
+            transaction.error ?? new Error("Could not clear Match storage."),
+          );
+        };
+      };
+    });
+  });
+}
 
 test.describe("scorekeeper browser smoke flows", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() => {
-      window.localStorage.clear();
-      window.sessionStorage.clear();
-    });
+    await clearBrowserMatchStore(page);
     await page.reload();
   });
 

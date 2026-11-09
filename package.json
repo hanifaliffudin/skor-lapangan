@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.34.6",
   "scripts": {
     "build": "pnpm --filter @skor-lapangan/scoring-core build && pnpm --filter @skor-lapangan/web build",
+    "check:edge-functions": "node scripts/check-edge-functions.mjs",
     "dev": "pnpm --filter @skor-lapangan/web dev",
     "test:e2e": "playwright test",
     "test:coverage": "pnpm --filter @skor-lapangan/scoring-core exec vitest run --coverage && pnpm --filter @skor-lapangan/web exec vitest run --coverage",
